@@ -1,0 +1,9 @@
+{
+  "Nombre": "organismo-persistente",
+  "LispAI": ["(recordar ciclo inicial)"],
+  "Zyrion": {"Estado": "si"},
+  "Capacidades": ["gene.ejecutar", "agente.ejecutar"],
+  "Genes": ["gene-saludo"],
+  "Memoria": "sandbox/memoria-organismo.json",
+  "Agentes": ["agente-supervisor"]
+}
