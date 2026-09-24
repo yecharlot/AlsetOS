@@ -1,88 +1,302 @@
-# Contrato del Núcleo de AlsetOS v0.1
+# Contrato del Núcleo de AlsetOS v0.2
 
 ## Propósito
 
-AlsetOS es un sistema operativo adaptativo orientado a organismos digitales persistentes.
+AlsetOS no define una aplicación como un proceso efímero. Define una unidad semántica persistente:
 
-Su modelo fundamental es:
+`descripción → RootCID → organismo → estado → decisión → acción → memoria → adaptación`
 
-`programa → proceso → ejecución`
+TinyCore/Linux es el sustrato. AlsetOS es la capa que redefine la unidad de ejecución.
 
-frente a:
+## Núcleo obligatorio
 
-`descripción → RootCID → organismo → Genes + Agentes + Memoria → LispAI + Mind + Zyrion → adaptación → ejecución`
+Los siguientes componentes forman parte del contrato:
 
-Tiny Core/Linux actúa como sustrato mínimo de hardware. AlsetOS aporta identidad, ejecución, adaptación, coordinación y semántica del organismo.
+- RootCID
+- Organismo
+- LispAI
+- Mind
+- Zyrion
+- Gene
+- Agente
+- Memoria
+- Pulso
+- Capacidad
+- Eventos
+- Nodo
+- Red P2P
+- DHT
+- Recovery
 
-## Componentes fundamentales
+WASM es la frontera de aislamiento y portabilidad de código.
 
-- **RootCID:** identidad persistente y direccionamiento verificable del organismo.
-- **Gene:** capacidad o módulo desplegable.
-- **Agente:** actor autónomo limitado por capacidades.
-- **Memoria:** estado, historial, conocimiento y datos de recuperación.
-- **Pulso:** mecanismo de eventos, comunicación y actualización.
-- **LispAI:** intérprete y lenguaje dinámico fundamental del sistema.
-- **Mind:** capa de observación, razonamiento, decisión, acción y recuperación.
-- **Zyrion:** lógica nativa ternaria 0/1/2 para estados, incertidumbre y evaluación.
-- **Capacidad:** permiso explícito para utilizar recursos.
-- **Nodo Alset:** lugar físico o virtual donde vive un organismo.
+## Identidad
 
-## Arquitectura
+### RootCID
+
+RootCID identifica la definición canónica de un organismo.
+
+No identifica:
+
+- un proceso;
+- una máquina;
+- una conexión;
+- una instancia temporal.
+
+### NodeID
+
+NodeID identifica criptográficamente al huésped mediante Ed25519.
+
+### PeerID
+
+PeerID identifica el transporte libp2p.
+
+Estas identidades nunca deben confundirse.
+
+## Modelo de ejecución
 
 ```
-APLICACIONES / ORGANISMOS
-        │
-ORGANISMO RUNTIME
-RootCID · Genes · Agentes · Memoria · Pulso · Capacidades
-        │
-MIND
-Observación · Razonamiento · Decisión · Acción · Recuperación
-        │
+MANIFIESTO
+    ↓
+CANONICALIZACIÓN
+    ↓
+ROOTCID
+    ↓
+ORGANISMO
+    ↓
 LISPAI
-Interpretación · Metaprogramación · Composición · Ejecución
-        │
+    ↓
 ZYRION
-Lógica 0/1/2 · Incertidumbre · Evaluación
-        │
-NODO ALSET
-Identidad · Red · Almacenamiento · Dispositivos · Seguridad
-        │
-TINY CORE / LINUX
-        │
-HARDWARE
+    ↓
+MIND
+    ↓
+CAPACIDADES
+    ↓
+GENES / WASM / AGENTES
+    ↓
+PULSO
+    ↓
+MEMORIA + EVENTOS
 ```
 
-## Reglas
+Mind decide.
 
-1. La identidad pertenece al organismo, no al nodo.
-2. Un organismo debe poder recuperarse en otro nodo compatible.
-3. Ningún Agente puede utilizar una capacidad que no le haya sido concedida.
-4. LispAI puede interpretar y modificar comportamiento dentro de los límites de seguridad y capacidades.
-5. Mind decide; las capacidades autorizan.
-6. Zyrion complementa la lógica convencional; no la reemplaza obligatoriamente.
-7. Los cambios relevantes deben poder quedar registrados en Memoria y Pulso.
-8. Los Genes deben declarar identidad, versión, capacidades e interfaz.
-9. La implementación inicial debe favorecer portabilidad y aislamiento, especialmente mediante WASM cuando sea apropiado.
-10. No añadir una nueva abstracción si puede expresarse naturalmente mediante RootCID, Gene, Agente, Memoria, Pulso, Capacidad, LispAI, Mind o Zyrion.
+Capacidad autoriza.
 
-## Aplicaciones como organismos
+Gene ejecuta.
 
-Una aplicación AlsetOS no se considera únicamente un proceso. Es un organismo compuesto por identidad, capacidades, código, agentes, memoria, comunicación y estado persistente.
+Pulso comunica.
 
-Ciclo mínimo:
+Memoria conserva estado.
 
-`crear → identificar → verificar → desplegar → ejecutar → recordar → adaptar → recuperar`
+Eventos conservan historia.
 
-## Multilingüismo
+## LispAI
 
-El repositorio inicial utiliza **español** para variables, estructuras, nombres conceptuales y comentarios.
+LispAI es lenguaje interno del sistema.
 
-La arquitectura separa:
+Debe poder evolucionar hacia:
 
-`lenguaje interno ≠ lenguaje de interfaz ≠ lenguaje de documentación`
+- evaluación simbólica;
+- composición;
+- introspección;
+- modificación controlada del comportamiento;
+- acceso a memoria;
+- activación de acciones autorizadas;
+- integración con Mind y Zyrion.
 
-Las futuras traducciones no deben alterar la semántica interna del núcleo.
+La ejecución nunca debe saltarse la frontera de capacidades.
 
-## Objetivo
+## Zyrion
 
-AlsetOS busca transformar el sistema operativo de un ejecutor pasivo de programas en un entorno capaz de alojar organismos digitales persistentes, adaptarse al entorno, razonar bajo incertidumbre y sobrevivir a cambios de nodo dentro de límites autorizados.
+Zyrion conserva tres valores nativos:
+
+```
+0 = no
+1 = sí
+2 = incierto
+```
+
+El estado incierto es información útil y no puede degradarse silenciosamente a falso.
+
+Mind puede:
+
+- detener;
+- evaluar;
+- ejecutar una acción autorizada.
+
+## Mind
+
+Mind es la capa de decisión.
+
+No posee permisos implícitos.
+
+Una decisión de Mind nunca equivale por sí sola a autorización de recursos.
+
+## Capacidades
+
+Toda operación sensible requiere una capacidad explícita.
+
+Ejemplos:
+
+```
+gene.ejecutar
+agente.ejecutar
+wasm.ejecutar
+recurso:filesystem
+recurso:audio
+recurso:video
+recurso:red
+```
+
+El modelo de seguridad debe ser de mínimo privilegio.
+
+## WASM
+
+Los módulos WASM son código potencialmente no confiable.
+
+Por contrato:
+
+1. se ejecutan dentro del runtime WASM;
+2. no reciben acceso implícito al sistema anfitrión;
+3. requieren `wasm.ejecutar`;
+4. tienen límite temporal;
+5. se identifican mediante su referencia dentro del manifiesto;
+6. sus resultados pueden registrarse como eventos.
+
+## Memoria
+
+La memoria de organismo es distinta de la memoria del sistema.
+
+Debe poder contener:
+
+- estado;
+- contexto;
+- conocimiento;
+- resultados;
+- referencias;
+- información de recuperación.
+
+El formato inicial puede ser simple, pero su identidad pertenece al organismo.
+
+## Eventos
+
+Los eventos forman un historial verificable mediante encadenamiento criptográfico.
+
+Un evento contiene:
+
+- secuencia;
+- fecha;
+- tipo;
+- RootCID;
+- origen;
+- contenido;
+- hash anterior;
+- hash propio.
+
+La modificación de un evento histórico debe ser detectable.
+
+## P2P
+
+El transporte no define la semántica.
+
+La arquitectura es:
+
+```
+Organismo
+   ↓
+Pulso
+   ↓
+Nodo
+   ↓
+Transporte
+   ↓
+libp2p
+   ↓
+DHT
+```
+
+La red actual usa:
+
+- mDNS;
+- libp2p;
+- Pulse firmado;
+- Kademlia;
+- protocolo de organismo;
+- datastore persistente.
+
+## Recuperación
+
+Un organismo debe poder sobrevivir a la pérdida de su huésped cuando exista una réplica compatible.
+
+Proceso:
+
+```
+heartbeat
+    ↓
+detección de pérdida
+    ↓
+localización RootCID
+    ↓
+verificación de contenido
+    ↓
+reinstanciación
+    ↓
+nuevo placement
+```
+
+Nunca se debe ejecutar contenido recuperado sin verificar primero su RootCID.
+
+## Placement
+
+El sistema puede mantener:
+
+```
+RootCID
+ ├── primario
+ └── replicas
+```
+
+El número de réplicas es una política del runtime y no forma parte de la identidad semántica del organismo.
+
+## Planificación
+
+Las tareas periódicas pertenecen al runtime y deben poder cancelarse mediante contexto.
+
+La ejecución prolongada no debe obligar a crear un proceso independiente por cada comportamiento.
+
+## Hardware
+
+AlsetOS no sustituye inmediatamente al kernel Linux.
+
+La ruta de despliegue es:
+
+```
+Hardware
+ ↓
+TinyCore/Linux
+ ↓
+Alset Node
+ ↓
+Alset Runtime
+ ↓
+Organismos
+```
+
+La futura capa de dispositivos debe exponer recursos mediante capacidades.
+
+## Regla fundamental
+
+No introducir una abstracción nueva cuando el comportamiento puede expresarse naturalmente mediante:
+
+`RootCID + Organismo + Gene + Agente + Memoria + Pulso + Capacidad + LispAI + Mind + Zyrion`
+
+La finalidad de AlsetOS es cambiar la unidad fundamental del sistema operativo:
+
+```
+ANTES
+programa → proceso
+
+ALSET
+descripción → organismo → adaptación → supervivencia
+```
