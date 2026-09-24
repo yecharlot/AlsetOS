@@ -46,6 +46,7 @@ func conectar(ctx context.Context, nodo *p2p.Nodo, direccion string) error {
 func main() {
 	escuchar := flag.String("escuchar", "/ip4/127.0.0.1/tcp/0", "dirección libp2p")
 	rutaIdentidad := flag.String("identidad", "estado/identidad-p2p.json", "identidad Ed25519")
+	rutaOrganismos := flag.String("organismos", "estado/organismos.json", "almacén persistente de organismos")
 	peerRemoto := flag.String("peer", "", "multiaddr /p2p del nodo remoto")
 	anunciar := flag.String("anunciar", "", "manifiesto .alset que se anunciará en la DHT")
 	recuperar := flag.String("recuperar", "", "RootCID que se buscará y ejecutará remotamente")
@@ -56,7 +57,7 @@ func main() {
 	if err != nil { fmt.Printf("error identidad: %v
 ", err); os.Exit(1) }
 
-	nodo, err := p2p.Nuevo(identidadNodo, *escuchar)
+	nodo, err := p2p.NuevoConEstado(identidadNodo, *escuchar, *rutaOrganismos)
 	if err != nil { fmt.Printf("error P2P: %v
 ", err); os.Exit(1) }
 	defer nodo.Cerrar()
