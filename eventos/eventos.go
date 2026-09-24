@@ -1,0 +1,8 @@
+package eventos
+import("bufio";"crypto/sha256";"encoding/hex";"encoding/json";"fmt";"os";"path/filepath";"sync";"time")
+type Evento struct{Secuencia uint64;Fecha time.Time;Tipo string;RootCID string;Origen string;Contenido string;Anterior string;Hash string}
+type Registro struct{mu sync.Mutex;ruta string;secuencia uint64;anterior string}
+func Nuevo(ruta string)(*Registro,error){r:=&Registro{ruta:ruta};if ruta==""{return r,nil};if err:=os.MkdirAll(filepath.Dir(ruta),0700);err!=nil{return nil,err};f,err:=os.Open(ruta);if os.IsNotExist(err){return r,nil};if err!=nil{return nil,err};defer f.Close();s:=bufio.NewScanner(f);for s.Scan(){var e Evento;if err:=json.Unmarshal(s.Bytes(),&e);err!=nil{return nil,fmt.Errorf("evento corrupto: %w",err)};if hashEvento(e)!=e.Hash||e.Secuencia!=r.secuencia+1||e.Anterior!=r.anterior{return nil,fmt.Errorf("cadena de eventos inválida en %d",e.Secuencia)};r.secuencia=e.Secuencia;r.anterior=e.Hash};if err:=s.Err();err!=nil{return nil,err};return r,nil}
+func(r *Registro)Emitir(e Evento)(Evento,error){r.mu.Lock();defer r.mu.Unlock();e.Secuencia=r.secuencia+1;if e.Fecha.IsZero(){e.Fecha=time.Now().UTC()}else{e.Fecha=e.Fecha.UTC()};e.Anterior=r.anterior;e.Hash=hashEvento(e);if r.ruta!=""{f,err:=os.OpenFile(r.ruta,os.O_CREATE|os.O_WRONLY|os.O_APPEND,0600);if err!=nil{return Evento{},err};defer f.Close();b,err:=json.Marshal(e);if err!=nil{return Evento{},err};if _,err=f.Write(append(b,'\n'));err!=nil{return Evento{},err}};r.secuencia=e.Secuencia;r.anterior=e.Hash;return e,nil}
+func(r *Registro)UltimoHash()string{r.mu.Lock();defer r.mu.Unlock();return r.anterior}
+func hashEvento(e Evento)string{e.Hash="";b,_:=json.Marshal(e);d:=sha256.Sum256(b);return hex.EncodeToString(d[:])}
