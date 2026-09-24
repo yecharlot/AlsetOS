@@ -39,45 +39,34 @@ func main() {
 
 	identidadNodo, err := cargarIdentidad(*rutaIdentidad)
 	if err != nil {
-		fmt.Printf("error identidad: %v
-", err)
+		fmt.Printf("error identidad: %v\n", err)
 		os.Exit(1)
 	}
 
 	rutaManifiesto := flag.Arg(0)
 	documento, err := manifiesto.Cargar(rutaManifiesto)
 	if err != nil {
-		fmt.Printf("error manifiesto: %v
-", err)
+		fmt.Printf("error manifiesto: %v\n", err)
 		os.Exit(1)
 	}
 
 	host, err := nodo.Nuevo("alset-node-local", *registro)
 	if err != nil {
-		fmt.Printf("error nodo: %v
-", err)
+		fmt.Printf("error nodo: %v\n", err)
 		os.Exit(1)
 	}
 
 	resultado, err := host.Ejecutar(documento)
 	if err != nil {
-		fmt.Printf("error ejecución: %v
-", err)
+		fmt.Printf("error ejecución: %v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Printf("[NODE] %s estado=%s
-", host.Nombre, host.Estado)
-	fmt.Printf("[NODE-ID] %s
-", identidadNodo.ID)
-	fmt.Printf("[ORGANISMO] %s
-", resultado.Organismo.Nombre)
-	fmt.Printf("[ROOTCID] %s
-", resultado.Organismo.RootCID)
-	fmt.Printf("[DECISION] %s
-", resultado.Organismo.Decision)
-	fmt.Printf("[REGISTRO] %s
-", *registro)
-	fmt.Printf("[IDENTIDAD] %s
-", *rutaIdentidad)
+	fmt.Printf("[NODE] %s estado=%s\n", host.Nombre, host.Estado)
+	fmt.Printf("[NODE-ID] %s\n", identidadNodo.ID)
+	fmt.Printf("[ORGANISMO] %s\n", resultado.Organismo.Nombre)
+	fmt.Printf("[ROOTCID] %s\n", resultado.Organismo.RootCID)
+	fmt.Printf("[DECISION] %s\n", resultado.Organismo.Decision)
+	fmt.Printf("[REGISTRO] %s\n", *registro)
+	fmt.Printf("[IDENTIDAD] %s\n", *rutaIdentidad)
 }
