@@ -252,10 +252,11 @@ func (nodo *Nodo) Direcciones() []string {
 }
 
 func (nodo *Nodo) Cerrar() error {
-	if nodo.DHT != nil {
-		if err := nodo.DHT.Close(); err != nil {
-			return err
-		}
-	}
-	return nodo.Host.Close()
+ if nodo.DHT != nil {
+  if err := nodo.DHT.Close(); err != nil { return err }
+ }
+ if nodo.datastore != nil {
+  if err := nodo.datastore.Close(); err != nil { return err }
+ }
+ return nodo.Host.Close()
 }
