@@ -26,3 +26,6 @@ jobs:
 
       - name: Ejecutar escenario incierto
         run: go run ./cmd/alsetos organismos/organismo-incierto.alset
+
+      - name: Ejecutar organismo persistente
+        run: go run ./cmd/alsetos organismos/organismo-persistente.alset
