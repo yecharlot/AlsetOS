@@ -1,0 +1,8 @@
+#!/bin/sh
+set -eu
+ALSET_HOME=/opt/alset
+ALSET_BIN="$ALSET_HOME/alset-kernel"
+mkdir -p /opt/alset/estado
+if [ ! -x "$ALSET_BIN" ]; then echo "[ALSET-BOOT] kernel no encontrado: $ALSET_BIN"; exit 1; fi
+echo "[ALSET-BOOT] iniciando AlsetOS"
+exec "$ALSET_BIN" --identidad /opt/alset/estado/identidad-p2p.json --organismos /opt/alset/estado/organismos.json --dht /opt/alset/estado/dht --colocacion /opt/alset/estado/colocacion.json
