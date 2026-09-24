@@ -6,14 +6,14 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"net"
+	"io"
 
 	"github.com/yecharlot/AlsetOS/identidad"
 	"github.com/yecharlot/AlsetOS/pulso"
 )
 
 type Conexion struct {
-	conexion net.Conn
+	conexion io.ReadWriteCloser
 	lector *bufio.Reader
 }
 
@@ -98,8 +98,6 @@ func (conexion *Conexion) RecibirPulsoFirmado() (Mensaje, error) {
 	if err := VerificarMensaje(mensaje); err != nil { return Mensaje{}, err }
 	return mensaje, nil
 }
-
-func NuevaConexionStream(stream interface { net.Conn; network.Stream }) *Conexion { return NuevaConexion(stream) }
 
 func (conexion *Conexion) Cerrar() error {
 	return conexion.conexion.Close()
