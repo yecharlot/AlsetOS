@@ -29,3 +29,5 @@ La DHT no transporta la semántica de LispAI, Mind o Zyrion. Solo localiza al no
 Flujo: RootCID → CID de localización → Kademlia DHT → proveedor → `/alset/organism/1.0.0` → manifiesto → verificación RootCID → Motor → organismo ejecutado localmente.
 
 El datastore DHT actual es de laboratorio y vive en memoria. La siguiente evolución es persistirlo junto con el registro de organismos para soportar reinicio y recuperación automática.
+
+El CID de localización no vuelve a hashear el manifiesto: se construye a partir del mismo digest SHA-256 contenido en el `RootCID`. Así, la clave Kademlia representa directamente la identidad de contenido del organismo.
