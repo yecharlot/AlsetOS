@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/yecharlot/AlsetOS/rootcid"
 )
@@ -15,12 +16,15 @@ import (
 const ProtocoloOrganismo = "/alset/organism/1.0.0"
 
 type solicitudOrganismo struct {
-	RootCID string `json:"rootcid"`
+	Operacion  string
+	RootCID    string
+	Manifiesto []byte
 }
 
 type respuestaOrganismo struct {
-	RootCID    string `json:"rootcid"`
-	Manifiesto []byte `json:"manifiesto"`
+	RootCID    string
+	Manifiesto []byte
+	Error      string
 }
 
 func normalizarRootCID(valor string) string {
@@ -39,7 +43,9 @@ func (nodo *Nodo) AnunciarOrganismo(ctx context.Context, rootCID string, manifie
 	nodo.mu.Lock()
 	nodo.organismos[rootCID] = append([]byte(nil), manifiesto...)
 	copia := make(map[string][]byte, len(nodo.organismos))
-	for root, contenido := range nodo.organismos { copia[root] = append([]byte(nil), contenido...) }
+	for root, contenido := range nodo.organismos {
+		copia[root] = append([]byte(nil), contenido...)
+	}
 	nodo.mu.Unlock()
 	if err := guardarOrganismos(nodo.rutaOrganismos, copia); err != nil {
 		return err
@@ -51,6 +57,39 @@ func (nodo *Nodo) AnunciarOrganismo(ctx context.Context, rootCID string, manifie
 	}
 	if err := nodo.DHT.Provide(ctx, clave, true); err != nil {
 		return fmt.Errorf("anunciar RootCID en DHT: %w", err)
+	}
+	return nil
+}
+
+func (nodo *Nodo) ReplicarOrganismo(ctx context.Context, destino peer.ID, rootCID string, manifiesto []byte) error {
+	rootCID = normalizarRootCID(rootCID)
+	if rootcid.CrearContenido(manifiesto) != rootCID {
+		return fmt.Errorf("manifiesto y RootCID no coinciden")
+	}
+
+	stream, err := nodo.Host.NewStream(ctx, destino, ProtocoloOrganismo)
+	if err != nil {
+		return fmt.Errorf("abrir stream de réplica: %w", err)
+	}
+	defer stream.Close()
+
+	if err := json.NewEncoder(stream).Encode(solicitudOrganismo{
+		Operacion:  "replicar",
+		RootCID:    rootCID,
+		Manifiesto: manifiesto,
+	}); err != nil {
+		return fmt.Errorf("enviar réplica: %w", err)
+	}
+
+	var respuesta respuestaOrganismo
+	if err := json.NewDecoder(bufio.NewReader(stream)).Decode(&respuesta); err != nil {
+		return fmt.Errorf("leer confirmación de réplica: %w", err)
+	}
+	if respuesta.Error != "" {
+		return fmt.Errorf("réplica rechazada: %s", respuesta.Error)
+	}
+	if respuesta.RootCID != rootCID {
+		return fmt.Errorf("confirmación de réplica inválida")
 	}
 	return nil
 }
@@ -80,7 +119,10 @@ func (nodo *Nodo) buscarProveedor(ctx context.Context, rootCID string) ([]byte, 
 		if err != nil {
 			continue
 		}
-		_ = json.NewEncoder(stream).Encode(solicitudOrganismo{RootCID: rootCID})
+		_ = json.NewEncoder(stream).Encode(solicitudOrganismo{
+			Operacion: "obtener",
+			RootCID:   rootCID,
+		})
 		var respuesta respuestaOrganismo
 		err = json.NewDecoder(bufio.NewReader(stream)).Decode(&respuesta)
 		_ = stream.Close()
@@ -107,15 +149,25 @@ func (nodo *Nodo) recibirOrganismo(stream network.Stream) {
 	}
 	rootCID := normalizarRootCID(solicitud.RootCID)
 
+	if solicitud.Operacion == "replicar" {
+		if err := nodo.AnunciarOrganismo(context.Background(), rootCID, solicitud.Manifiesto); err != nil {
+			_ = json.NewEncoder(stream).Encode(respuestaOrganismo{RootCID: rootCID, Error: err.Error()})
+			return
+		}
+		_ = json.NewEncoder(stream).Encode(respuestaOrganismo{RootCID: rootCID})
+		return
+	}
+
 	nodo.mu.RLock()
 	manifiesto := append([]byte(nil), nodo.organismos[rootCID]...)
 	nodo.mu.RUnlock()
 	if len(manifiesto) == 0 {
+		_ = json.NewEncoder(stream).Encode(respuestaOrganismo{RootCID: rootCID, Error: "organismo no encontrado"})
 		return
 	}
 
 	_ = json.NewEncoder(stream).Encode(respuestaOrganismo{
-		RootCID: rootCID,
+		RootCID:    rootCID,
 		Manifiesto: manifiesto,
 	})
 }
@@ -127,4 +179,3 @@ func (nodo *Nodo) RecuperarOrganismo(ctx context.Context, rootCID string) ([]byt
 		return nil, err
 	}
 }
-
