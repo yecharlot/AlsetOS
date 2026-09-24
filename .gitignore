@@ -1,11 +1,11 @@
 estado/identidad.json
 estado/identidad.json.tmp
-
 estado/identidad-p2p.json
 estado/identidad-p2p.json.tmp
-
 estado/organismos.json
 estado/organismos.json.tmp
-
 estado/colocacion.json
 estado/colocacion.json.tmp
+estado/eventos.jsonl
+estado/eventos.jsonl.tmp
+estado/dht/
