@@ -26,17 +26,27 @@ func cargarIdentidad(ruta string) (*identidad.Identidad, error) {
 	}
 
 	nueva, err := identidad.Nueva()
-	if err != nil { return nil, err }
-	if err := nueva.Guardar(ruta); err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
+	if err := nueva.Guardar(ruta); err != nil {
+		return nil, err
+	}
 	return nueva, nil
 }
 
 func conectar(ctx context.Context, nodo *p2p.Nodo, direccion string) error {
-	if direccion == "" { return nil }
+	if direccion == "" {
+		return nil
+	}
 	multi, err := multiaddr.NewMultiaddr(direccion)
-	if err != nil { return fmt.Errorf("dirección peer inválida: %w", err) }
+	if err != nil {
+		return fmt.Errorf("dirección peer inválida: %w", err)
+	}
 	info, err := peer.AddrInfoFromP2pAddr(multi)
-	if err != nil { return fmt.Errorf("interpretar peer: %w", err) }
+	if err != nil {
+		return fmt.Errorf("interpretar peer: %w", err)
+	}
 	if err := nodo.Host.Connect(ctx, *info); err != nil {
 		return fmt.Errorf("conectar peer: %w", err)
 	}
@@ -54,10 +64,16 @@ func main() {
 	flag.Parse()
 
 	identidadNodo, err := cargarIdentidad(*rutaIdentidad)
-	if err != nil { fmt.Printf("error identidad: %v\n", err); os.Exit(1) }
+	if err != nil {
+		fmt.Printf("error identidad: %v\n", err)
+		os.Exit(1)
+	}
 
 	nodo, err := p2p.NuevoConEstado(identidadNodo, *escuchar, *rutaOrganismos)
-	if err != nil { fmt.Printf("error P2P: %v\n", err); os.Exit(1) }
+	if err != nil {
+		fmt.Printf("error P2P: %v\n", err)
+		os.Exit(1)
+	}
 	defer nodo.Cerrar()
 
 	fmt.Printf("[P2P-NODE] node-id=%s\n", identidadNodo.ID)
@@ -86,9 +102,15 @@ func main() {
 
 	if *anunciar != "" {
 		documento, err := manifiesto.Cargar(*anunciar)
-		if err != nil { fmt.Printf("error manifiesto: %v\n", err); os.Exit(1) }
+		if err != nil {
+			fmt.Printf("error manifiesto: %v\n", err)
+			os.Exit(1)
+		}
 		contenido, err := documento.Canonico()
-		if err != nil { fmt.Printf("error canónico: %v\n", err); os.Exit(1) }
+		if err != nil {
+			fmt.Printf("error canónico: %v\n", err)
+			os.Exit(1)
+		}
 		root := rootcid.CrearContenido(contenido)
 		if err := nodo.AnunciarOrganismo(ctx, root, contenido); err != nil {
 			fmt.Printf("error anuncio: %v\n", err)
@@ -117,7 +139,7 @@ func main() {
 		defer fin.Stop()
 		for {
 			select {
-			case <-fin:
+			case <-fin.C:
 				fmt.Println("[P2P] fin de prueba")
 				return
 			case <-ticker.C:
