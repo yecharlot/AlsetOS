@@ -25,16 +25,16 @@ Memoria Genes  Agentes
         \  |  /
          Pulso
            ↓
-     transporte de red
+     transporte firmado
+           ↓
+       Nodo remoto
 ```
 
 La implementación mantiene el núcleo sin dependencias externas para poder ejecutarse sobre hardware limitado.
 
-## Identidad RootCID
+## Identidad del organismo
 
-El RootCID ya no depende solamente del nombre del organismo.
-
-Ahora se calcula sobre la **definición canónica completa del manifiesto**:
+El RootCID se calcula sobre la **definición canónica completa del manifiesto**:
 
 ```
 manifiesto
@@ -46,88 +46,99 @@ SHA-256
 RootCID
 ```
 
-Por tanto:
+Así, la identidad pertenece a la definición del organismo y no al proceso que lo ejecuta.
 
-- mismo manifiesto → mismo RootCID;
-- manifiesto diferente → RootCID diferente;
-- cambiar capacidades, Genes, LispAI o configuración semántica cambia la identidad.
+## Identidad del nodo
 
-Esto establece una frontera importante: **la identidad pertenece a la definición del organismo, no al proceso que lo ejecuta**.
+Cada `alset-node` posee una identidad criptográfica Ed25519 persistente:
 
-## Ejecutar el núcleo
-
-```bash
-go test ./...
-go run ./cmd/alsetos organismos/organismo-si.alset
+```
+clave privada + clave pública
+            ↓
+         NodeID
 ```
 
-## Ejecutar como nodo
+La identidad se crea automáticamente en:
+
+```
+estado/identidad.json
+```
+
+La clave privada queda excluida de Git mediante `.gitignore`.
+
+Para ejecutar:
 
 ```bash
 go run ./cmd/alset-node organismos/organismo-persistente.alset
-cat estado/registro.json
 ```
 
-El registro persistente mantiene la relación:
+El nodo mostrará su `NODE-ID`. Las ejecuciones posteriores reutilizan la misma identidad.
+
+## Pulse autenticado
+
+La capa `red/` ya puede transportar un Pulse firmado:
 
 ```
-RootCID → organismo → último estado conocido
+Nodo A
+  │
+  ├── NodeID
+  ├── clave pública
+  ├── Pulse
+  └── firma Ed25519
+          │
+          ↓
+       Nodo B
+          │
+          ↓
+       verificar
+          │
+          ↓
+        aceptar
 ```
 
-## Transporte Pulse
+Un receptor rechaza el Pulse si el contenido fue manipulado después de firmarse.
 
-La nueva capa `red/` transporta Pulsos sin introducir semántica de red en el organismo:
+El transporte actual usa `net.Conn`/TCP como laboratorio mínimo. No es la arquitectura P2P definitiva.
+
+## Frontera de red
+
+La separación deliberada es:
 
 ```
 Organismo
-    ↓
+   ↓
   Pulso
-    ↓
-Nodo
-    ↓
-Transporte
-    ↓
-Nodo remoto
-    ↓
-  Pulso
+   ↓
+  Nodo
+   ↓
+ Transporte
+   ↓
+ libp2p (próxima capa)
+   ↓
+ DHT / descubrimiento
+   ↓
+ Nodo remoto
 ```
 
-La implementación actual usa TCP mediante `net.Conn` y JSON delimitado por líneas como transporte mínimo y comprobable.
-
-**Importante:** TCP no es la arquitectura final. La capa está diseñada para que posteriormente pueda sustituirse por libp2p/DHT sin modificar la semántica de `Pulso`, `Organismo`, `Mind` o `Zyrion`.
+La semántica de `Organismo`, `Mind`, `Zyrion` y `Pulso` no depende del transporte.
 
 ## Persistencia
 
-La memoria del organismo y el registro del nodo son dos capas distintas:
+Existen dos capas distintas:
 
 - **Memoria**: estado interno del organismo.
 - **Registro RootCID**: identidad y estado conocido por el nodo.
-
-Esta separación será la base para recuperación distribuida.
-
-## Principios
-
-- RootCID identifica la definición del organismo.
-- Zyrion expresa `no / si / incierto`.
-- Mind transforma el estado en decisión.
-- Capacidades limitan acciones.
-- Genes aportan capacidades ejecutables.
-- Agentes observan y actúan.
-- Pulso transporta eventos.
-- Memoria conserva estado.
-- El nodo hospeda, registra y recupera organismos.
-- La red transporta Pulsos sin contaminar el núcleo semántico.
+- **Identidad del nodo**: credencial criptográfica del huésped.
 
 ## Próxima frontera
 
-La siguiente expansión importante será:
+La siguiente expansión importante es:
 
-1. **identidad de nodo** y claves criptográficas;
-2. **descubrimiento entre nodos**;
-3. sustitución/adaptación del transporte a **libp2p**;
-4. **Pulse entre organismos reales**;
-5. recuperación de la definición por RootCID;
-6. genes aislados mediante **WASM**;
-7. después, persistencia distribuida y DHT.
+1. descubrimiento entre nodos;
+2. protocolo de conexión nodo↔nodo;
+3. adaptación del transporte a libp2p;
+4. recuperación de organismos por RootCID;
+5. genes aislados mediante WASM;
+6. persistencia distribuida y DHT.
 
-La intención no es construir una aplicación encima de un SO convencional, sino definir una unidad de ejecución distinta: el **organismo digital**.
+La intención sigue siendo definir una unidad de ejecución distinta: el **organismo digital**.
