@@ -1,0 +1,7 @@
+{
+  "nombre": "organismo-incierto",
+  "lispai": ["(recordar entorno manifiesto)"],
+  "zyrion": {"estado": "incierto", "estrategia": "evaluar"},
+  "capacidades": ["gene.ejecutar"],
+  "genes": ["gene-saludo"]
+}
