@@ -54,66 +54,58 @@ func main() {
 	flag.Parse()
 
 	identidadNodo, err := cargarIdentidad(*rutaIdentidad)
-	if err != nil { fmt.Printf("error identidad: %v
-", err); os.Exit(1) }
+	if err != nil { fmt.Printf("error identidad: %v\n", err); os.Exit(1) }
 
 	nodo, err := p2p.NuevoConEstado(identidadNodo, *escuchar, *rutaOrganismos)
-	if err != nil { fmt.Printf("error P2P: %v
-", err); os.Exit(1) }
+	if err != nil { fmt.Printf("error P2P: %v\n", err); os.Exit(1) }
 	defer nodo.Cerrar()
 
-	fmt.Printf("[P2P-NODE] node-id=%s
-", identidadNodo.ID)
-	fmt.Printf("[P2P-PEER] peer-id=%s
-", nodo.ID())
+	fmt.Printf("[P2P-NODE] node-id=%s\n", identidadNodo.ID)
+	fmt.Printf("[P2P-PEER] peer-id=%s\n", nodo.ID())
 	for _, direccion := range nodo.Direcciones() {
-		fmt.Printf("[P2P-ADDR] %s
-", direccion)
+		fmt.Printf("[P2P-ADDR] %s\n", direccion)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
 	if err := conectar(ctx, nodo, *peerRemoto); err != nil {
-		fmt.Printf("error conexión: %v
-", err)
+		fmt.Printf("error conexión: %v\n", err)
 		os.Exit(1)
 	}
-	if err := nodo.BootstrapDHT(ctx); err != nil {
-		fmt.Printf("error bootstrap DHT: %v
-", err)
-		os.Exit(1)
+	if *peerRemoto != "" {
+		if err := nodo.BootstrapDHT(ctx); err != nil {
+			fmt.Printf("error bootstrap DHT: %v\n", err)
+			os.Exit(1)
+		}
+		if err := nodo.ReanunciarOrganismos(ctx); err != nil {
+			fmt.Printf("error reanunciar organismos: %v\n", err)
+			os.Exit(1)
+		}
 	}
 
 	if *anunciar != "" {
 		documento, err := manifiesto.Cargar(*anunciar)
-		if err != nil { fmt.Printf("error manifiesto: %v
-", err); os.Exit(1) }
+		if err != nil { fmt.Printf("error manifiesto: %v\n", err); os.Exit(1) }
 		contenido, err := documento.Canonico()
-		if err != nil { fmt.Printf("error canónico: %v
-", err); os.Exit(1) }
+		if err != nil { fmt.Printf("error canónico: %v\n", err); os.Exit(1) }
 		root := rootcid.CrearContenido(contenido)
 		if err := nodo.AnunciarOrganismo(ctx, root, contenido); err != nil {
-			fmt.Printf("error anuncio: %v
-", err)
+			fmt.Printf("error anuncio: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Printf("[DHT-ANUNCIADO] rootcid=%s
-", root)
+		fmt.Printf("[DHT-ANUNCIADO] rootcid=%s\n", root)
 	}
 
 	if *recuperar != "" {
 		resultado, err := recuperacion.Nuevo(nodo).EjecutarRemoto(ctx, *recuperar)
 		if err != nil {
-			fmt.Printf("error recuperación: %v
-", err)
+			fmt.Printf("error recuperación: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Printf("[RECUPERADO] organismo=%s rootcid=%s decisión=%s
-", resultado.Nombre, resultado.RootCID, resultado.Decision)
+		fmt.Printf("[RECUPERADO] organismo=%s rootcid=%s decisión=%s\n", resultado.Nombre, resultado.RootCID, resultado.Decision)
 		for _, gene := range resultado.GenesEjecutados {
-			fmt.Printf("[RECUPERADO-GENE] %s
-", gene)
+			fmt.Printf("[RECUPERADO-GENE] %s\n", gene)
 		}
 	}
 
@@ -125,7 +117,7 @@ func main() {
 		defer fin.Stop()
 		for {
 			select {
-			case <-fin.C:
+			case <-fin:
 				fmt.Println("[P2P] fin de prueba")
 				return
 			case <-ticker.C:
@@ -140,8 +132,7 @@ func main() {
 					err := nodo.EnviarPulso(ctxPulso, info.ID, evento)
 					cancelPulso()
 					if err == nil {
-						fmt.Printf("[P2P-ENVIADO] destino=%s
-", info.ID)
+						fmt.Printf("[P2P-ENVIADO] destino=%s\n", info.ID)
 					}
 				}
 			}
