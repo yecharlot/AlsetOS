@@ -142,3 +142,20 @@ La siguiente expansión importante es:
 6. persistencia distribuida y DHT.
 
 La intención sigue siendo definir una unidad de ejecución distinta: el **organismo digital**.
+
+
+## P2P + DHT + recuperación
+
+AlsetOS ya separa tres identidades: `RootCID` para la definición semántica del organismo, `NodeID` para el host Ed25519 y `PeerID` para el transporte libp2p. La capa P2P usa mDNS para descubrimiento local, Pulse firmado para comunicación y Kademlia DHT para localizar organismos por RootCID.
+
+Un nodo puede anunciar un manifiesto, otro nodo puede localizarlo por RootCID, verificar que el contenido recuperado produce exactamente esa identidad y ejecutar el organismo con su propio Motor. La localización DHT no sustituye a LispAI, Mind o Zyrion: los entrega al Motor después de verificar la definición.
+
+Ejemplo de laboratorio:
+
+`go run ./cmd/alset-p2p --anunciar organismos/organismo-persistente.alset`
+
+y en otro nodo:
+
+`go run ./cmd/alset-p2p --recuperar <RootCID> --peer <multiaddr-del-primer-nodo>`
+
+El datastore DHT actual es de laboratorio en memoria; la siguiente etapa es persistencia de organismos + DHT y recuperación automática después de reinicio.
