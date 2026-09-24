@@ -100,7 +100,7 @@ func NuevoConEstado(identidadNodo *identidad.Identidad, escuchar, rutaOrganismos
 
 func iniciarDHT(ctx context.Context, nodo *Nodo) error {
 	if nodo.DHT != nil { return nil }
-	dht, err := kaddht.New(nodo.Host, nodo.datastore)
+	dht, err := kaddht.New(nodo.Host, kaddht.Datastore(nodo.datastore))
 	if err != nil { return fmt.Errorf("crear DHT: %w", err) }
 	nodo.DHT = dht
 	return nil
