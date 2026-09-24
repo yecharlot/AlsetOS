@@ -2,7 +2,6 @@ package lispai
 
 import (
  "fmt"
- "strconv"
  "strings"
  "github.com/yecharlot/AlsetOS/organismo"
 )
@@ -39,7 +38,7 @@ func evaluarNodo(n any,e *organismo.Organismo)(string,int,error){
  case "secuencia":
   var valor string; cambios:=0;for _,parte:=range lista[1:]{v,c,err:=evaluarNodo(parte,e);if err!=nil{return "",cambios,err};valor=v;cambios+=c};return valor,cambios,nil
  default:
-  if len(lista)==1{return strconv.Unquote(op)}
+  if len(lista)==1{return op,0,nil}
   return "",0,fmt.Errorf("forma LispAI desconocida: %s",op)
  }
 }
