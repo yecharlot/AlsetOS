@@ -7,6 +7,8 @@ import (
 
 	"github.com/yecharlot/AlsetOS/manifiesto"
 	"github.com/yecharlot/AlsetOS/motor"
+	"github.com/yecharlot/AlsetOS/pulso"
+	"github.com/yecharlot/AlsetOS/red"
 	"github.com/yecharlot/AlsetOS/registro"
 )
 
@@ -75,6 +77,24 @@ func (nodo *Nodo) Ejecutar(documento manifiesto.Manifiesto) (Resultado, error) {
 	nodo.mu.Unlock()
 
 	return Resultado{Organismo: resultado}, nil
+}
+
+// EnviarPulso delega el transporte a la capa de red sin mezclar
+// semántica de red con el núcleo del organismo.
+func (nodo *Nodo) EnviarPulso(conexion *red.Conexion, evento pulso.Pulso) error {
+	if conexion == nil {
+		return fmt.Errorf("conexión de red nula")
+	}
+	return conexion.EnviarPulso(evento)
+}
+
+// RecibirPulso recibe un evento remoto que luego puede ser procesado
+// por agentes, Mind u otros órganos del nodo.
+func (nodo *Nodo) RecibirPulso(conexion *red.Conexion) (pulso.Pulso, error) {
+	if conexion == nil {
+		return pulso.Pulso{}, fmt.Errorf("conexión de red nula")
+	}
+	return conexion.RecibirPulso()
 }
 
 func (nodo *Nodo) Recuperar(rootCID string, cargar func() (manifiesto.Manifiesto, error)) (Resultado, error) {
