@@ -99,6 +99,8 @@ func (conexion *Conexion) RecibirPulsoFirmado() (Mensaje, error) {
 	return mensaje, nil
 }
 
+func NuevaConexionStream(stream interface { net.Conn; network.Stream }) *Conexion { return NuevaConexion(stream) }
+
 func (conexion *Conexion) Cerrar() error {
 	return conexion.conexion.Close()
 }
