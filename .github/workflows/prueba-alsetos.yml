@@ -30,6 +30,8 @@ jobs:
         run: go run ./cmd/alset-node --registro estado/registro.json --identidad estado/identidad.json organismos/organismo-persistente.alset
       - name: Ejecutar autonomía
         run: go run ./cmd/alset-autonomia --duracion 3s
+      - name: Arrancar kernel AlsetOS
+        run: timeout 5s go run ./cmd/alset-kernel || test $? -eq 124
       - name: Verificar estado
         run: |
           test -s estado/registro.json
