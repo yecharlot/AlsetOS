@@ -29,3 +29,9 @@ jobs:
 
       - name: Ejecutar organismo persistente
         run: go run ./cmd/alsetos organismos/organismo-persistente.alset
+
+      - name: Ejecutar alset-node
+        run: go run ./cmd/alset-node --registro estado/registro.json organismos/organismo-persistente.alset
+
+      - name: Verificar registro del nodo
+        run: test -s estado/registro.json
