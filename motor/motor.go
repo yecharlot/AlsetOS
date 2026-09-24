@@ -29,7 +29,7 @@ func(motor *Motor)EjecutarManifiesto(d manifiesto.Manifiesto)(Resultado,error){
  motor.auditar(eventos.Evento{Tipo:"organismo.inicio",RootCID:entidad.RootCID,Origen:entidad.Nombre,Contenido:"crear"})
  if d.Memoria!=""{datos,err:=memoria.Cargar(d.Memoria);if err!=nil{entidad.Estado=organismo.Error;motor.auditar(eventos.Evento{Tipo:"organismo.error",RootCID:entidad.RootCID,Contenido:err.Error()});return Resultado{},err};entidad.Memoria=datos}
  for _,c:=range d.Capacidades{entidad.Capacidad[c]=true};for _,r:=range d.Recursos{recursos.Conceder(entidad,r)}
- interprete:=lispai.Interprete{};for _,programa:=range d.LispAI{interprete.Evaluar(programa,entidad)}
+ interprete:=lispai.Interprete{};for _,programa:=range d.LispAI{if _,err:=interprete.Ejecutar(programa,entidad);err!=nil{entidad.Estado=organismo.Error;return Resultado{},fmt.Errorf("LispAI: %w",err)}}
  mente:=mind.Mente{};estrategia:=mind.Detener;if d.Zyrion.Estrategia==string(mind.Evaluar){estrategia=mind.Evaluar};decision:=mente.DecidirConEstrategia(estado,entidad,estrategia)
  resultado:=Resultado{Name:entidad.Nombre,RootCID:entidad.RootCID,Estado:estado.Texto(),Decision:decision}
  motor.auditar(eventos.Evento{Tipo:"mind.decision",RootCID:entidad.RootCID,Origen:"mind",Contenido:decision})
