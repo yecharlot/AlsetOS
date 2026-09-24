@@ -38,7 +38,12 @@ func (nodo *Nodo) AnunciarOrganismo(ctx context.Context, rootCID string, manifie
 
 	nodo.mu.Lock()
 	nodo.organismos[rootCID] = append([]byte(nil), manifiesto...)
+	copia := make(map[string][]byte, len(nodo.organismos))
+	for root, contenido := range nodo.organismos { copia[root] = append([]byte(nil), contenido...) }
 	nodo.mu.Unlock()
+	if err := guardarOrganismos(nodo.rutaOrganismos, copia); err != nil {
+		return err
+	}
 
 	clave, err := CIDRoot(rootCID)
 	if err != nil {
