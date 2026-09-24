@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"strings"
 
 	"github.com/libp2p/go-libp2p/core/network"
@@ -124,6 +123,3 @@ func (nodo *Nodo) RecuperarOrganismo(ctx context.Context, rootCID string) ([]byt
 	}
 }
 
-func copiarOrganismo(r io.Reader) ([]byte, error) {
-	return io.ReadAll(io.LimitReader(r, 4<<20))
-}
