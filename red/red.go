@@ -30,7 +30,7 @@ type mensajeFirmable struct {
 	Pulso pulso.Pulso
 }
 
-func NuevaConexion(conexion net.Conn) *Conexion {
+func NuevaConexion(conexion io.ReadWriteCloser) *Conexion {
 	return &Conexion{conexion: conexion, lector: bufio.NewReader(conexion)}
 }
 
