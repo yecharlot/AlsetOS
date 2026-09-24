@@ -18,6 +18,9 @@ jobs:
         with:
           go-version: "1.23"
 
+      - name: Resolver módulos
+        run: go mod tidy
+
       - name: Ejecutar pruebas
         run: go test ./...
 
