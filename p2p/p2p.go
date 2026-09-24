@@ -123,6 +123,15 @@ func (nodo *Nodo) ReanunciarOrganismos(ctx context.Context) error {
 
 func (nodo *Nodo) BootstrapDHT(ctx context.Context) error {
 	if nodo.DHT == nil { return fmt.Errorf("DHT no inicializada") }
+
+	for _, peerID := range nodo.Host.Network().Peers() {
+		if err := nodo.DHT.Ping(ctx, peerID); err == nil {
+			if _, err := nodo.DHT.RoutingTable().TryAddPeer(peerID, true, true); err != nil {
+				return fmt.Errorf("añadir peer al routing table: %w", err)
+			}
+		}
+	}
+
 	if err := nodo.DHT.Bootstrap(ctx); err != nil {
 		return fmt.Errorf("bootstrap DHT: %w", err)
 	}
