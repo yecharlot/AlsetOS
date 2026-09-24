@@ -31,6 +31,7 @@ type Nodo struct {
 	mu         sync.RWMutex
 	conocidos  map[peer.ID]peer.AddrInfo
 	organismos map[string][]byte
+	rutaOrganismos string
 }
 
 type descubrimiento struct { nodo *Nodo }
@@ -48,6 +49,10 @@ func (d *descubrimiento) HandlePeerFound(info peer.AddrInfo) {
 }
 
 func Nuevo(identidadNodo *identidad.Identidad, escuchar string) (*Nodo, error) {
+	return NuevoConEstado(identidadNodo, escuchar, "")
+}
+
+func NuevoConEstado(identidadNodo *identidad.Identidad, escuchar, rutaOrganismos string) (*Nodo, error) {
 	if identidadNodo == nil { return nil, fmt.Errorf("identidad nula") }
 
 	clave, err := libp2pcrypto.UnmarshalEd25519PrivateKey(identidadNodo.ClavePrivada)
@@ -59,12 +64,19 @@ func Nuevo(identidadNodo *identidad.Identidad, escuchar string) (*Nodo, error) {
 	)
 	if err != nil { return nil, fmt.Errorf("crear nodo libp2p: %w", err) }
 
+	organismos, err := cargarOrganismos(rutaOrganismos)
+	if err != nil {
+		_ = h.Close()
+		return nil, err
+	}
+
 	nodo := &Nodo{
 		Host: h,
 		Identidad: identidadNodo,
 		datastore: syncds.MutexWrap(datastore.NewMapDatastore()),
 		conocidos: make(map[peer.ID]peer.AddrInfo),
-		organismos: make(map[string][]byte),
+		organismos: organismos,
+		rutaOrganismos: rutaOrganismos,
 	}
 
 	h.SetStreamHandler(ProtocoloPulse, nodo.recibirPulso)
@@ -91,6 +103,21 @@ func iniciarDHT(ctx context.Context, nodo *Nodo) error {
 	dht, err := kaddht.New(nodo.Host, nodo.datastore)
 	if err != nil { return fmt.Errorf("crear DHT: %w", err) }
 	nodo.DHT = dht
+	return nil
+}
+
+func (nodo *Nodo) ReanunciarOrganismos(ctx context.Context) error {
+	if nodo.DHT == nil { return fmt.Errorf("DHT no inicializada") }
+	nodo.mu.RLock()
+	copia := make(map[string][]byte, len(nodo.organismos))
+	for root, contenido := range nodo.organismos { copia[root] = append([]byte(nil), contenido...) }
+	nodo.mu.RUnlock()
+	for root, contenido := range copia {
+		clave, err := CIDRoot(root)
+		if err != nil { return err }
+		if err := nodo.DHT.Provide(ctx, clave, true); err != nil { return fmt.Errorf("reanunciar %s: %w", root, err) }
+		_ = contenido
+	}
 	return nil
 }
 
