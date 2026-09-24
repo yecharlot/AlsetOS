@@ -8,4 +8,5 @@ require (
 	github.com/libp2p/go-libp2p v0.50.0
 	github.com/libp2p/go-libp2p-kad-dht v0.42.2
 	github.com/multiformats/go-multihash v0.2.3
+	github.com/multiformats/go-multiaddr v0.16.1
 )
