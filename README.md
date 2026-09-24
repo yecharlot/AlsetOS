@@ -247,7 +247,7 @@ transporte
 
 Esto permite sustituir TCP, libp2p, WebSocket o futuros transportes sin redefinir qué es un organismo.
 
-## Próximo salto físico
+## Punto de llegada del runtime\n\nEl ejecutable `alset-kernel` ya reúne identidad, nodo libp2p, DHT persistente y autonomía en un ciclo de vida único. El siguiente trabajo es portar esta capa al medio de arranque TinyCore y conectar adaptadores reales de dispositivos.\n\n## Próximo salto físico
 
 El runtime ya tiene las piezas semánticas y distribuidas necesarias para comenzar la capa de sistema operativo:
 
