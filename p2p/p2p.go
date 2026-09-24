@@ -11,6 +11,9 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
+	kaddht "github.com/libp2p/go-libp2p-kad-dht"
+	datastore "github.com/ipfs/go-datastore"
+	syncds "github.com/ipfs/go-datastore/sync"
 	"github.com/libp2p/go-libp2p/p2p/discovery/mdns"
 
 	"github.com/yecharlot/AlsetOS/identidad"
@@ -21,10 +24,13 @@ import (
 const ProtocoloPulse = "/alset/pulse/1.0.0"
 
 type Nodo struct {
-	Host host.Host
-	Identidad *identidad.Identidad
-	mu sync.RWMutex
-	conocidos map[peer.ID]peer.AddrInfo
+	Host       host.Host
+	Identidad  *identidad.Identidad
+	DHT        *kaddht.IpfsDHT
+	datastore  datastore.Batching
+	mu         sync.RWMutex
+	conocidos  map[peer.ID]peer.AddrInfo
+	organismos map[string][]byte
 }
 
 type descubrimiento struct { nodo *Nodo }
@@ -43,20 +49,57 @@ func (d *descubrimiento) HandlePeerFound(info peer.AddrInfo) {
 
 func Nuevo(identidadNodo *identidad.Identidad, escuchar string) (*Nodo, error) {
 	if identidadNodo == nil { return nil, fmt.Errorf("identidad nula") }
+
 	clave, err := libp2pcrypto.UnmarshalEd25519PrivateKey(identidadNodo.ClavePrivada)
 	if err != nil { return nil, fmt.Errorf("convertir identidad Ed25519 a libp2p: %w", err) }
-	h, err := libp2p.New(libp2p.Identity(clave), libp2p.ListenAddrStrings(escuchar))
+
+	h, err := libp2p.New(
+		libp2p.Identity(clave),
+		libp2p.ListenAddrStrings(escuchar),
+	)
 	if err != nil { return nil, fmt.Errorf("crear nodo libp2p: %w", err) }
 
-	nodo := &Nodo{Host:h, Identidad:identidadNodo, conocidos:make(map[peer.ID]peer.AddrInfo)}
-	h.SetStreamHandler(ProtocoloPulse, nodo.recibirPulso)
+	nodo := &Nodo{
+		Host: h,
+		Identidad: identidadNodo,
+		datastore: syncds.MutexWrap(datastore.NewMapDatastore()),
+		conocidos: make(map[peer.ID]peer.AddrInfo),
+		organismos: make(map[string][]byte),
+	}
 
-	servicio := mdns.NewMdnsService(h, "_alset._tcp", &descubrimiento{nodo:nodo})
+	h.SetStreamHandler(ProtocoloPulse, nodo.recibirPulso)
+	h.SetStreamHandler(ProtocoloOrganismo, nodo.recibirOrganismo)
+
+	servicio := mdns.NewMdnsService(h, "_alset._tcp", &descubrimiento{nodo: nodo})
 	if err := servicio.Start(); err != nil {
 		_ = h.Close()
 		return nil, fmt.Errorf("iniciar descubrimiento mDNS: %w", err)
 	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := iniciarDHT(ctx, nodo); err != nil {
+		_ = h.Close()
+		return nil, err
+	}
+
 	return nodo, nil
+}
+
+func iniciarDHT(ctx context.Context, nodo *Nodo) error {
+	if nodo.DHT != nil { return nil }
+	dht, err := kaddht.New(nodo.Host, nodo.datastore)
+	if err != nil { return fmt.Errorf("crear DHT: %w", err) }
+	nodo.DHT = dht
+	return nil
+}
+
+func (nodo *Nodo) BootstrapDHT(ctx context.Context) error {
+	if nodo.DHT == nil { return fmt.Errorf("DHT no inicializada") }
+	if err := nodo.DHT.Bootstrap(ctx); err != nil {
+		return fmt.Errorf("bootstrap DHT: %w", err)
+	}
+	return nil
 }
 
 func (nodo *Nodo) recibirPulso(stream network.Stream) {
@@ -98,4 +141,9 @@ func (nodo *Nodo) Direcciones() []string {
 	return resultado
 }
 
-func (nodo *Nodo) Cerrar() error { return nodo.Host.Close() }
+func (nodo *Nodo) Cerrar() error {
+	if nodo.DHT != nil {
+		if err := nodo.DHT.Close(); err != nil { return err }
+	}
+	return nodo.Host.Close()
+}
