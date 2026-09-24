@@ -4,11 +4,24 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+
 	"github.com/yecharlot/AlsetOS/zyrion"
 )
 
-type ConfiguracionZyrion struct { Estado string; Estrategia string }
-type Manifiesto struct { Nombre string; LispAI []string; Zyrion ConfiguracionZyrion; Capacidades []string; Genes []string; Memoria string; Agentes []string }
+type ConfiguracionZyrion struct {
+	Estado string `json:"estado"`
+	Estrategia string `json:"estrategia,omitempty"`
+}
+
+type Manifiesto struct {
+	Nombre string `json:"nombre"`
+	LispAI []string `json:"lispai,omitempty"`
+	Zyrion ConfiguracionZyrion `json:"zyrion"`
+	Capacidades []string `json:"capacidades,omitempty"`
+	Genes []string `json:"genes,omitempty"`
+	Memoria string `json:"memoria,omitempty"`
+	Agentes []string `json:"agentes,omitempty"`
+}
 
 func Cargar(ruta string) (Manifiesto, error) {
 	contenido, err := os.ReadFile(ruta)
