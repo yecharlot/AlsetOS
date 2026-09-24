@@ -15,6 +15,7 @@ import (
 	datastore "github.com/ipfs/go-datastore"
 	syncds "github.com/ipfs/go-datastore/sync"
 	"github.com/libp2p/go-libp2p/p2p/discovery/mdns"
+	"github.com/multiformats/go-multiaddr"
 
 	"github.com/yecharlot/AlsetOS/identidad"
 	"github.com/yecharlot/AlsetOS/pulso"
@@ -24,20 +25,23 @@ import (
 const ProtocoloPulse = "/alset/pulse/1.0.0"
 
 type Nodo struct {
-	Host       host.Host
-	Identidad  *identidad.Identidad
-	DHT        *kaddht.IpfsDHT
-	datastore  datastore.Batching
-	mu         sync.RWMutex
-	conocidos  map[peer.ID]peer.AddrInfo
-	organismos map[string][]byte
-	rutaOrganismos string
+	Host            host.Host
+	Identidad       *identidad.Identidad
+	DHT             *kaddht.IpfsDHT
+	datastore       datastore.Batching
+	mu              sync.RWMutex
+	conocidos       map[peer.ID]peer.AddrInfo
+	organismos      map[string][]byte
+	rutaOrganismos  string
+	ultimoLatido    map[peer.ID]time.Time
 }
 
-type descubrimiento struct { nodo *Nodo }
+type descubrimiento struct{ nodo *Nodo }
 
 func (d *descubrimiento) HandlePeerFound(info peer.AddrInfo) {
-	if info.ID == d.nodo.Host.ID() { return }
+	if info.ID == d.nodo.Host.ID() {
+		return
+	}
 	d.nodo.mu.Lock()
 	d.nodo.conocidos[info.ID] = info
 	d.nodo.mu.Unlock()
@@ -53,16 +57,22 @@ func Nuevo(identidadNodo *identidad.Identidad, escuchar string) (*Nodo, error) {
 }
 
 func NuevoConEstado(identidadNodo *identidad.Identidad, escuchar, rutaOrganismos string) (*Nodo, error) {
-	if identidadNodo == nil { return nil, fmt.Errorf("identidad nula") }
+	if identidadNodo == nil {
+		return nil, fmt.Errorf("identidad nula")
+	}
 
 	clave, err := libp2pcrypto.UnmarshalEd25519PrivateKey(identidadNodo.ClavePrivada)
-	if err != nil { return nil, fmt.Errorf("convertir identidad Ed25519 a libp2p: %w", err) }
+	if err != nil {
+		return nil, fmt.Errorf("convertir identidad Ed25519 a libp2p: %w", err)
+	}
 
 	h, err := libp2p.New(
 		libp2p.Identity(clave),
 		libp2p.ListenAddrStrings(escuchar),
 	)
-	if err != nil { return nil, fmt.Errorf("crear nodo libp2p: %w", err) }
+	if err != nil {
+		return nil, fmt.Errorf("crear nodo libp2p: %w", err)
+	}
 
 	organismos, err := cargarOrganismos(rutaOrganismos)
 	if err != nil {
@@ -71,12 +81,13 @@ func NuevoConEstado(identidadNodo *identidad.Identidad, escuchar, rutaOrganismos
 	}
 
 	nodo := &Nodo{
-		Host: h,
-		Identidad: identidadNodo,
-		datastore: syncds.MutexWrap(datastore.NewMapDatastore()),
-		conocidos: make(map[peer.ID]peer.AddrInfo),
-		organismos: organismos,
+		Host:           h,
+		Identidad:      identidadNodo,
+		datastore:      syncds.MutexWrap(datastore.NewMapDatastore()),
+		conocidos:      make(map[peer.ID]peer.AddrInfo),
+		organismos:     organismos,
 		rutaOrganismos: rutaOrganismos,
+		ultimoLatido:   make(map[peer.ID]time.Time),
 	}
 
 	h.SetStreamHandler(ProtocoloPulse, nodo.recibirPulso)
@@ -99,30 +110,44 @@ func NuevoConEstado(identidadNodo *identidad.Identidad, escuchar, rutaOrganismos
 }
 
 func iniciarDHT(ctx context.Context, nodo *Nodo) error {
-	if nodo.DHT != nil { return nil }
+	if nodo.DHT != nil {
+		return nil
+	}
 	dht, err := kaddht.New(nodo.Host, kaddht.Datastore(nodo.datastore), kaddht.Mode(kaddht.ModeServer))
-	if err != nil { return fmt.Errorf("crear DHT: %w", err) }
+	if err != nil {
+		return fmt.Errorf("crear DHT: %w", err)
+	}
 	nodo.DHT = dht
 	return nil
 }
 
 func (nodo *Nodo) ReanunciarOrganismos(ctx context.Context) error {
-	if nodo.DHT == nil { return fmt.Errorf("DHT no inicializada") }
+	if nodo.DHT == nil {
+		return fmt.Errorf("DHT no inicializada")
+	}
 	nodo.mu.RLock()
 	copia := make(map[string][]byte, len(nodo.organismos))
-	for root, contenido := range nodo.organismos { copia[root] = append([]byte(nil), contenido...) }
+	for root, contenido := range nodo.organismos {
+		copia[root] = append([]byte(nil), contenido...)
+	}
 	nodo.mu.RUnlock()
-	for root, contenido := range copia {
+
+	for root := range copia {
 		clave, err := CIDRoot(root)
-		if err != nil { return err }
-		if err := nodo.DHT.Provide(ctx, clave, true); err != nil { return fmt.Errorf("reanunciar %s: %w", root, err) }
-		_ = contenido
+		if err != nil {
+			return err
+		}
+		if err := nodo.DHT.Provide(ctx, clave, true); err != nil {
+			return fmt.Errorf("reanunciar %s: %w", root, err)
+		}
 	}
 	return nil
 }
 
 func (nodo *Nodo) BootstrapDHT(ctx context.Context) error {
-	if nodo.DHT == nil { return fmt.Errorf("DHT no inicializada") }
+	if nodo.DHT == nil {
+		return fmt.Errorf("DHT no inicializada")
+	}
 
 	for _, peerID := range nodo.Host.Network().Peers() {
 		if err := nodo.DHT.Ping(ctx, peerID); err == nil {
@@ -146,12 +171,26 @@ func (nodo *Nodo) recibirPulso(stream network.Stream) {
 		fmt.Printf("[P2P-RECHAZADO] %v\n", err)
 		return
 	}
+
+	remoto := stream.Conn().RemotePeer()
+	nodo.mu.Lock()
+	if mensaje.Pulso.Tipo == "heartbeat" {
+		nodo.ultimoLatido[remoto] = time.Now().UTC()
+		nodo.conocidos[remoto] = peer.AddrInfo{
+			ID:    remoto,
+			Addrs: []multiaddr.Multiaddr{stream.Conn().RemoteMultiaddr()},
+		}
+	}
+	nodo.mu.Unlock()
+
 	fmt.Printf("[P2P-RECIBIDO] nodo=%s tipo=%s contenido=%s\n", mensaje.NodoID, mensaje.Pulso.Tipo, mensaje.Pulso.Contenido)
 }
 
 func (nodo *Nodo) EnviarPulso(ctx context.Context, destino peer.ID, evento pulso.Pulso) error {
 	stream, err := nodo.Host.NewStream(ctx, destino, ProtocoloPulse)
-	if err != nil { return fmt.Errorf("abrir stream Pulse: %w", err) }
+	if err != nil {
+		return fmt.Errorf("abrir stream Pulse: %w", err)
+	}
 	defer stream.Close()
 	if err := red.NuevaConexion(stream).EnviarPulsoFirmado(nodo.Identidad, evento); err != nil {
 		return fmt.Errorf("enviar Pulse: %w", err)
@@ -159,11 +198,46 @@ func (nodo *Nodo) EnviarPulso(ctx context.Context, destino peer.ID, evento pulso
 	return nil
 }
 
+func (nodo *Nodo) EnviarHeartbeat(ctx context.Context, destino peer.ID) error {
+	return nodo.EnviarPulso(ctx, destino, pulso.Pulso{
+		Tipo:      "heartbeat",
+		Origen:    nodo.Identidad.ID,
+		Contenido: "alive",
+		Fecha:     time.Now().UTC(),
+	})
+}
+
+func (nodo *Nodo) RegistrarLatido(destino peer.ID) {
+	nodo.mu.Lock()
+	nodo.ultimoLatido[destino] = time.Now().UTC()
+	nodo.mu.Unlock()
+}
+
+func (nodo *Nodo) UltimoLatido(destino peer.ID) (time.Time, bool) {
+	nodo.mu.RLock()
+	defer nodo.mu.RUnlock()
+	fecha, ok := nodo.ultimoLatido[destino]
+	return fecha, ok
+}
+
+func (nodo *Nodo) EstadoNodo(destino peer.ID, ahora time.Time, limite time.Duration) string {
+	ultimo, ok := nodo.UltimoLatido(destino)
+	if !ok {
+		return "desconocido"
+	}
+	if ahora.Sub(ultimo) > limite {
+		return "perdido"
+	}
+	return "vivo"
+}
+
 func (nodo *Nodo) Conocidos() []peer.AddrInfo {
 	nodo.mu.RLock()
 	defer nodo.mu.RUnlock()
 	resultado := make([]peer.AddrInfo, 0, len(nodo.conocidos))
-	for _, info := range nodo.conocidos { resultado = append(resultado, info) }
+	for _, info := range nodo.conocidos {
+		resultado = append(resultado, info)
+	}
 	return resultado
 }
 
@@ -179,7 +253,9 @@ func (nodo *Nodo) Direcciones() []string {
 
 func (nodo *Nodo) Cerrar() error {
 	if nodo.DHT != nil {
-		if err := nodo.DHT.Close(); err != nil { return err }
+		if err := nodo.DHT.Close(); err != nil {
+			return err
+		}
 	}
 	return nodo.Host.Close()
 }
