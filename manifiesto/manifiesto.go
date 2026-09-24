@@ -8,7 +8,7 @@ import (
 )
 
 type ConfiguracionZyrion struct { Estado string; Estrategia string }
-type Manifiesto struct { Nombre string; LispAI []string; Zyrion ConfiguracionZyrion; Capacidades []string; Genes []string }
+type Manifiesto struct { Nombre string; LispAI []string; Zyrion ConfiguracionZyrion; Capacidades []string; Genes []string; Memoria string; Agentes []string }
 
 func Cargar(ruta string) (Manifiesto, error) {
 	contenido, err := os.ReadFile(ruta)
