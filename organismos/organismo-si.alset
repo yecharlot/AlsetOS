@@ -1,0 +1,7 @@
+{
+  "nombre": "organismo-si",
+  "lispai": ["(recordar entorno manifiesto)"],
+  "zyrion": {"estado": "si"},
+  "capacidades": ["gene.ejecutar"],
+  "genes": ["gene-saludo"]
+}
