@@ -16,7 +16,7 @@ func (interprete Interprete) Evaluar(programa string, entidad *organismo.Organis
 		contenido := strings.TrimSuffix(strings.TrimPrefix(instruccion, "(recordar "), ")")
 		partes := strings.SplitN(contenido, " ", 2)
 		if len(partes) == 2 {
-			entidad.Memoria[partes[0]] = strings.Trim(partes[1], """)
+			entidad.Memoria[partes[0]] = strings.Trim(partes[1], "\"")
 			return "memoria actualizada"
 		}
 	}
