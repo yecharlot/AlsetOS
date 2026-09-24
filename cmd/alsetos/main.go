@@ -2,56 +2,37 @@ package main
 
 import (
 	"fmt"
-	"time"
+	"os"
 
-	"github.com/yecharlot/AlsetOS/gene"
-	"github.com/yecharlot/AlsetOS/lispai"
-	"github.com/yecharlot/AlsetOS/mind"
-	"github.com/yecharlot/AlsetOS/organismo"
-	"github.com/yecharlot/AlsetOS/pulso"
-	"github.com/yecharlot/AlsetOS/rootcid"
-	"github.com/yecharlot/AlsetOS/zyrion"
+	"github.com/yecharlot/AlsetOS/manifiesto"
+	"github.com/yecharlot/AlsetOS/motor"
 )
 
-func EjecutarFlujo() string {
-	entidad := organismo.Nuevo("organismo-prueba")
-	entidad.RootCID = rootcid.Crear(entidad.Nombre)
-	entidad.Capacidad["gene.ejecutar"] = true
+func EjecutarManifiesto(ruta string) error {
+	documento, err := manifiesto.Cargar(ruta)
+	if err != nil { return err }
 
-	fmt.Printf("[ORGANISMO] %s\n", entidad.Nombre)
-	fmt.Printf("[ROOTCID] %s\n", entidad.RootCID)
+	resultado, err := motor.Nuevo().EjecutarManifiesto(documento)
+	if err != nil { return err }
 
-	interprete := lispai.Interprete{}
-	fmt.Printf("[LISPAI] %s\n", interprete.Evaluar("(recordar origen lisPai)", entidad))
-
-	estado := zyrion.Si
-	fmt.Printf("[ZYRION] estado=%s\n", estado.Texto())
-
-	mente := mind.Mente{}
-	decision := mente.Decidir(estado, entidad)
-	fmt.Printf("[MIND] decisión=%s\n", decision)
-
-	gen := gene.Gene{Nombre: "gene-saludo"}
-	var resultado string
-	if decision == "ejecutar_gene" {
-		resultado = gen.Ejecutar(entidad)
-		fmt.Printf("[GENE] %s\n", resultado)
-	}
-
-	pulso.Emitir(entidad, pulso.Pulso{
-		Tipo:      "resultado",
-		Origen:    entidad.RootCID,
-		Contenido: resultado,
-		Fecha:     time.Now(),
-	})
-
-	return resultado
+	fmt.Printf("[ORGANISMO] %s\n", resultado.Nombre)
+	fmt.Printf("[ROOTCID] %s\n", resultado.RootCID)
+	fmt.Printf("[ZYRION] estado=%s\n", resultado.Estado)
+	fmt.Printf("[MIND] decisión=%s\n", resultado.Decision)
+	for _, ejecucion := range resultado.GenesEjecutados { fmt.Printf("[GENE] %s\n", ejecucion) }
+	fmt.Printf("[PULSO] %s\n", resultado.UltimoPulso)
+	fmt.Printf("[RESULTADO] %s\n", resultado.Decision)
+	return nil
 }
 
 func main() {
-	resultado := EjecutarFlujo()
-	if resultado == "" {
-		panic("flujo AlsetOS sin resultado")
+	if len(os.Args) < 2 {
+		fmt.Println("uso: go run ./cmd/alsetos <organismo.alset>")
+		fmt.Println("ejemplo: go run ./cmd/alsetos organismos/organismo-si.alset")
+		os.Exit(2)
 	}
-	fmt.Printf("[RESULTADO] %s\n", resultado)
+	if err := EjecutarManifiesto(os.Args[1]); err != nil {
+		fmt.Printf("error AlsetOS: %v\n", err)
+		os.Exit(1)
+	}
 }
