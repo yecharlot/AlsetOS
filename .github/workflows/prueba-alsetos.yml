@@ -12,31 +12,26 @@ jobs:
     steps:
       - name: Obtener código
         uses: actions/checkout@v4
-
       - name: Preparar Go
         uses: actions/setup-go@v5
         with:
           go-version: "1.23"
-
       - name: Resolver módulos
         run: go mod tidy
-
       - name: Ejecutar pruebas
         run: go test ./...
-
       - name: Ejecutar organismo declarativo
         run: go run ./cmd/alsetos organismos/organismo-si.alset
-
       - name: Ejecutar escenario incierto
         run: go run ./cmd/alsetos organismos/organismo-incierto.alset
-
       - name: Ejecutar organismo persistente
         run: go run ./cmd/alsetos organismos/organismo-persistente.alset
-
       - name: Ejecutar alset-node
         run: go run ./cmd/alset-node --registro estado/registro.json --identidad estado/identidad.json organismos/organismo-persistente.alset
-
-      - name: Verificar registro e identidad
+      - name: Ejecutar autonomía
+        run: go run ./cmd/alset-autonomia --duracion 3s
+      - name: Verificar estado
         run: |
           test -s estado/registro.json
           test -s estado/identidad.json
+      
