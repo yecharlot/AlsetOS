@@ -4,9 +4,8 @@ import (
  "fmt"
  "os"
  "path/filepath"
- "github.com/ipfs/go-ds-pebble"
+ pebbleds "github.com/ipfs/go-ds-pebble"
  kaddht "github.com/libp2p/go-libp2p-kad-dht"
- datastore "github.com/ipfs/go-datastore"
  syncds "github.com/ipfs/go-datastore/sync"
 )
 
@@ -23,11 +22,3 @@ func(nodo *Nodo) ActivarPersistenciaDHT(ruta string)error{
  nodo.DHT=dht
  return nil
 }
-
-func(nodo *Nodo) CerrarPersistencia()error{
- if nodo==nil{return nil}
- if nodo.DHT!=nil{return nodo.DHT.Close()}
- return nil
-}
-
-var _ datastore.Batching = (datastore.Batching)(nil)
