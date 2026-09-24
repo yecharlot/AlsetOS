@@ -2,7 +2,6 @@ package kernel
 
 import(
  "context"
- "fmt"
  "time"
  "github.com/yecharlot/AlsetOS/autonomia"
  "github.com/yecharlot/AlsetOS/identidad"
@@ -33,11 +32,9 @@ func cargarIdentidad(ruta string)(*identidad.Identidad,error){
 func(k *Kernel) Ejecutar(ctx context.Context){
  go k.Autonomia.Ejecutar(ctx)
  <-ctx.Done()
- _=k.Cerrar()
 }
 func(k *Kernel) Cerrar()error{
  if k==nil||k.Nodo==nil{return nil}
  return k.Nodo.Cerrar()
 }
 func Esperar(ctx context.Context,d time.Duration){if d<=0{<-ctx.Done();return};t:=time.NewTimer(d);defer t.Stop();select{case<-ctx.Done():case<-t.C:}}
-var _=fmt.Sprintf
