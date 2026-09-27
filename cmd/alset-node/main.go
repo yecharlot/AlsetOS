@@ -64,7 +64,7 @@ func main() {
 
 	fmt.Printf("[NODE] %s estado=%s\n", host.Nombre, host.Estado)
 	fmt.Printf("[NODE-ID] %s\n", identidadNodo.ID)
-	fmt.Printf("[ORGANISMO] %s\n", resultado.Organismo.Nombre)
+	fmt.Printf("[ORGANISMO] %s\n", resultado.Organismo.Name)
 	fmt.Printf("[ROOTCID] %s\n", resultado.Organismo.RootCID)
 	fmt.Printf("[DECISION] %s\n", resultado.Organismo.Decision)
 	fmt.Printf("[REGISTRO] %s\n", *registro)

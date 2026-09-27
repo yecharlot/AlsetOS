@@ -15,7 +15,7 @@ func EjecutarManifiesto(ruta string) error {
 	resultado, err := motor.Nuevo().EjecutarManifiesto(documento)
 	if err != nil { return err }
 
-	fmt.Printf("[ORGANISMO] %s\n", resultado.Nombre)
+	fmt.Printf("[ORGANISMO] %s\n", resultado.Name)
 	fmt.Printf("[ROOTCID] %s\n", resultado.RootCID)
 	fmt.Printf("[ZYRION] estado=%s\n", resultado.Estado)
 	fmt.Printf("[MIND] decisión=%s\n", resultado.Decision)

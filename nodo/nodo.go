@@ -60,7 +60,7 @@ func (nodo *Nodo) Ejecutar(documento manifiesto.Manifiesto) (Resultado, error) {
 	}
 
 	err = nodo.Registro.Guardar(registro.Entrada{
-		Nombre:      resultado.Nombre,
+		Nombre:      resultado.Name,
 		RootCID:     resultado.RootCID,
 		Estado:      "detenido",
 		Actualizado: time.Now().UTC().Format(time.RFC3339Nano),

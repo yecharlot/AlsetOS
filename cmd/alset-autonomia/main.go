@@ -27,28 +27,16 @@ func main(){
  replicas:=flag.Int("replicas",2,"cantidad de réplicas deseadas")
  duracion:=flag.Duration("duracion",30*time.Second,"duración del monitor")
  flag.Parse()
- id,err:=cargarIdentidad(*identidadRuta);if err!=nil{fmt.Printf("error identidad: %v
-",err);os.Exit(1)}
- nodo,err:=p2p.NuevoConEstado(id,*escuchar,*organismosRuta);if err!=nil{fmt.Printf("error nodo: %v
-",err);os.Exit(1)};defer nodo.Cerrar()
- if err:=nodo.ActivarPersistenciaDHT(*dhtRuta);err!=nil{fmt.Printf("error DHT persistente: %v
-",err);os.Exit(1)}
+ id,err:=cargarIdentidad(*identidadRuta);if err!=nil{fmt.Printf("error identidad: %v\n", err);os.Exit(1)}
+ nodo,err:=p2p.NuevoConEstado(id,*escuchar,*organismosRuta);if err!=nil{fmt.Printf("error nodo: %v\n", err);os.Exit(1)};defer nodo.Cerrar()
+ if err:=nodo.ActivarPersistenciaDHT(*dhtRuta);err!=nil{fmt.Printf("error DHT persistente: %v\n", err);os.Exit(1)}
  ctx,cancel:=context.WithTimeout(context.Background(),15*time.Second);defer cancel()
- if err:=conectar(ctx,nodo,*peerRemoto);err!=nil{fmt.Printf("error peer: %v
-",err);os.Exit(1)}
- if *peerRemoto!=""{if err:=nodo.BootstrapDHT(ctx);err!=nil{fmt.Printf("error DHT: %v
-",err);os.Exit(1)}}
- servicio,err:=autonomia.Nuevo(nodo,*colocacionRuta);if err!=nil{fmt.Printf("error autonomía: %v
-",err);os.Exit(1)};servicio.FactorReplica=*replicas
- if *publicar!=""{doc,err:=manifiesto.Cargar(*publicar);if err!=nil{fmt.Printf("error manifiesto: %v
-",err);os.Exit(1)};contenido,err:=doc.Canonico();if err!=nil{fmt.Printf("error canónico: %v
-",err);os.Exit(1)};root:=rootcid.CrearContenido(contenido);c,err:=servicio.Publicar(ctx,root,contenido);if err!=nil{fmt.Printf("error publicar: %v
-",err);os.Exit(1)};fmt.Printf("[ALSET-PLACEMENT] rootcid=%s primario=%s replicas=%v
-",c.RootCID,c.Primario,c.Replicas)}
- fmt.Printf("[ALSET-AUTONOMIA] node=%s intervalo=%s timeout=%s dht=%s
-",nodo.ID(),servicio.Intervalo,servicio.Timeout,*dhtRuta)
+ if err:=conectar(ctx,nodo,*peerRemoto);err!=nil{fmt.Printf("error peer: %v\n", err);os.Exit(1)}
+ if *peerRemoto!=""{if err:=nodo.BootstrapDHT(ctx);err!=nil{fmt.Printf("error DHT: %v\n", err);os.Exit(1)}}
+ servicio,err:=autonomia.Nuevo(nodo,*colocacionRuta);if err!=nil{fmt.Printf("error autonomía: %v\n", err);os.Exit(1)};servicio.FactorReplica=*replicas
+ if *publicar!=""{doc,err:=manifiesto.Cargar(*publicar);if err!=nil{fmt.Printf("error manifiesto: %v\n", err);os.Exit(1)};contenido,err:=doc.Canonico();if err!=nil{fmt.Printf("error canónico: %v\n", err);os.Exit(1)};root:=rootcid.CrearContenido(contenido);c,err:=servicio.Publicar(ctx,root,contenido);if err!=nil{fmt.Printf("error publicar: %v\n", err);os.Exit(1)};fmt.Printf("[ALSET-PLACEMENT] rootcid=%s primario=%s replicas=%v\n",c.RootCID,c.Primario,c.Replicas)}
+ fmt.Printf("[ALSET-AUTONOMIA] node=%s intervalo=%s timeout=%s dht=%s\n",nodo.ID(),servicio.Intervalo,servicio.Timeout,*dhtRuta)
  monitorCtx,monitorCancel:=context.WithCancel(context.Background());defer monitorCancel();go servicio.Ejecutar(monitorCtx)
  timer:=time.NewTimer(*duracion);defer timer.Stop();<-timer.C
- for _,c:=range servicio.Registro.Todos(){fmt.Printf("[ALSET-PLACEMENT] rootcid=%s primario=%s replicas=%v
-",c.RootCID,c.Primario,c.Replicas)}
+ for _,c:=range servicio.Registro.Todos(){fmt.Printf("[ALSET-PLACEMENT] rootcid=%s primario=%s replicas=%v\n",c.RootCID,c.Primario,c.Replicas)}
 }

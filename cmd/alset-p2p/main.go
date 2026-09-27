@@ -125,7 +125,7 @@ func main() {
 			fmt.Printf("error recuperación: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Printf("[RECUPERADO] organismo=%s rootcid=%s decisión=%s\n", resultado.Nombre, resultado.RootCID, resultado.Decision)
+		fmt.Printf("[RECUPERADO] organismo=%s rootcid=%s decisión=%s\n", resultado.Name, resultado.RootCID, resultado.Decision)
 		for _, gene := range resultado.GenesEjecutados {
 			fmt.Printf("[RECUPERADO-GENE] %s\n", gene)
 		}

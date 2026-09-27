@@ -18,13 +18,10 @@ func main(){
  colocacion:=flag.String("colocacion","estado/colocacion.json","placement")
  flag.Parse()
  k,err:=kernel.Arrancar(kernel.Config{Escuchar:*escuchar,Identidad:*identidad,Organismos:*organismos,DHT:*dht,Colocacion:*colocacion})
- if err!=nil{fmt.Printf("error kernel: %v
-",err);os.Exit(1)}
+ if err!=nil{fmt.Printf("error kernel: %v\n", err);os.Exit(1)}
  defer k.Cerrar()
- fmt.Printf("[ALSET-KERNEL] node=%s
-",k.Nodo.ID())
- fmt.Printf("[ALSET-KERNEL] direcciones=%v
-",k.Nodo.Direcciones())
+ fmt.Printf("[ALSET-KERNEL] node=%s\n",k.Nodo.ID())
+ fmt.Printf("[ALSET-KERNEL] direcciones=%v\n",k.Nodo.Direcciones())
  ctx,cancel:=signal.NotifyContext(context.Background(),os.Interrupt,syscall.SIGTERM);defer cancel()
  k.Ejecutar(ctx)
 }

@@ -40,7 +40,7 @@ func TestRedTransportaPulse(t *testing.T) {
 	if recibido.Tipo != evento.Tipo ||
 		recibido.Origen != evento.Origen ||
 		recibido.Contenido != evento.Contenido ||
-		recibido.Fecha != evento.Fecha {
+		!recibido.Fecha.Equal(evento.Fecha) {
 		t.Fatalf("Pulse alterado durante transporte: %#v != %#v", recibido, evento)
 	}
 }
