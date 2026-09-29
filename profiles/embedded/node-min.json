@@ -1,0 +1,9 @@
+{
+  "profile": "embedded-min",
+  "description": "Identity + memory + pulse + optional P2P. No heavy demos.",
+  "enable_p2p": true,
+  "enable_dht": false,
+  "enable_wasm": true,
+  "memory_limit_mb": 64,
+  "notes": "Use enable_dht=true only when RAM/network allow."
+}

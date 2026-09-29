@@ -1,58 +1,29 @@
-# AlsetOS — Estado del repositorio
+# AlsetOS — Estado
 
-**Toolchain:** Go **1.26.0** · suite **verde** · CLIs compilables  
-**Contrato:** v0.2 (`Contrato.md`)
+**Toolchain:** Go 1.26 · suite verde · cross-compile embedded  
+**Contrato:** v0.2
 
-## Qué está operativo
+## De experimental → sistema operativo de organismos
 
-| Área | Estado |
-|------|--------|
-| Organismo + RootCID | OK |
-| LispAI | OK + tests |
-| Mind + Zyrion (ternario) | OK + tests |
-| Genes / agentes / motor | OK (pruebas + demo) |
-| Eventos / pulso | OK |
-| Kernel | OK + tests |
-| P2P libp2p / DHT / persistencia | OK + tests |
-| Recuperación / autonomía | OK + tests |
-| WASM (wazero) | OK + tests |
-| Sandbox simulación | OK |
-| CLIs `alsetos`, `alset-node`, `alset-kernel`, `alset-p2p` | build OK |
+AlsetOS **deja de presentarse solo como prototipo de laboratorio**.  
+El contrato (organismo, RootCID, Mind, Zyrion, Pulse, P2P, recovery) es la unidad de ejecución.  
+Linux/TinyCore es el sustrato; el producto es el **nodo Alset** multiplataforma.
 
-## Comandos
+### Ya funcional
 
-```bash
-export GOTOOLCHAIN=go1.26.0
-go test ./... -count=1
-go run ./cmd/alsetos ejemplos/demo.alset
-```
+- Ciclo manifiesto → RootCID → Mind → gene → pulso  
+- P2P libp2p + tests  
+- Perfil **embedded** + script multi-arch (`scripts/build-embedded.sh`)  
+- CLIs compilables sin CGO  
 
-## Demo verificada
+### Trayectoria de producto
 
-```
-[ORGANISMO] organismo-demo-gtmo
-[ZYRION] estado=si
-[MIND] decisión=ejecutar_gene
-[GENE] Gene gene-saludo ejecutado
-[RESULTADO] ejecutar_gene
-```
+| Fase | Entrega |
+|------|---------|
+| Ahora | Nodo Go portable (Pi, PC, edge) |
+| +1 | Imagen Raspberry / contenedor mínimo |
+| +2 | Shell/UI Alset-JS sobre AIP del nodo |
+| +3 | Placement y recovery en flotas heterogéneas |
+| +4 | Perfiles ultra-light (sin DHT) para wearables/drones vía gateway |
 
-## Identidades (no mezclar)
-
-```
-RootCID  = definición del organismo
-NodeID   = identidad del nodo
-PeerID   = transporte libp2p
-```
-
-## Relación con PrismaTec-Core
-
-AlsetOS = tejido experimental (manifiesto, LispAI, P2P nativo).  
-PrismaTec-Core = runtime de producto (AIP, Studio, réplica TCP).  
-No fusionar semánticas ternarias entre ambos.
-
-## Pendiente
-
-- Empaquetado operador (systemd / contenedor)
-- Firma de Pulse homogénea en demos wire
-- Más golden tests de RootCID
+Ver `profiles/embedded/README.md`.

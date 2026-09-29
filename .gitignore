@@ -9,3 +9,5 @@ estado/colocacion.json.tmp
 estado/eventos.jsonl
 estado/eventos.jsonl.tmp
 estado/dht/
+bin/
+dist/
