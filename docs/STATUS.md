@@ -1,29 +1,25 @@
 # AlsetOS — Estado
 
-**Toolchain:** Go 1.26 · suite verde · cross-compile embedded  
-**Contrato:** v0.2
+**Toolchain:** Go 1.26 · suite verde  
+**Desktop:** estrategia **Tiny Core first** (ver `docs/ALSET_DESKTOP.es.md`)
 
-## De experimental → sistema operativo de organismos
+## Runtime organismos
 
-AlsetOS **deja de presentarse solo como prototipo de laboratorio**.  
-El contrato (organismo, RootCID, Mind, Zyrion, Pulse, P2P, recovery) es la unidad de ejecución.  
-Linux/TinyCore es el sustrato; el producto es el **nodo Alset** multiplataforma.
+Manifiesto → RootCID → Mind → gene → pulso · P2P · embedded multi-arch.
 
-### Ya funcional
+## Alset Desktop 0.1 (en curso)
 
-- Ciclo manifiesto → RootCID → Mind → gene → pulso  
-- P2P libp2p + tests  
-- Perfil **embedded** + script multi-arch (`scripts/build-embedded.sh`)  
-- CLIs compilables sin CGO  
+| Pieza | Estado |
+|-------|--------|
+| Arquitectura TC + shell + bridge | documentada |
+| `alset-desktop-bridge` | código |
+| Shell estática (panel/menú/organismo) | código |
+| Scripts onboot / recovery | ejemplo |
+| ISO USB arrancable | pendiente (en hardware/VM con TC) |
 
-### Trayectoria de producto
+```bash
+./scripts/desktop-dev.sh
+# http://127.0.0.1:7420/
+```
 
-| Fase | Entrega |
-|------|---------|
-| Ahora | Nodo Go portable (Pi, PC, edge) |
-| +1 | Imagen Raspberry / contenedor mínimo |
-| +2 | Shell/UI Alset-JS sobre AIP del nodo |
-| +3 | Placement y recovery en flotas heterogéneas |
-| +4 | Perfiles ultra-light (sin DHT) para wearables/drones vía gateway |
-
-Ver `profiles/embedded/README.md`.
+Orden: **Tiny Core → Alset Shell → organismos**.

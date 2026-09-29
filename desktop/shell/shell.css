@@ -1,0 +1,52 @@
+:root {
+  --bg: #0e1218;
+  --panel: #161c26;
+  --line: rgba(255,255,255,0.08);
+  --gold: #e6c35c;
+  --text: #eef1f6;
+  --muted: #939cb0;
+  --accent: #5b9fd4;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); }
+#desktop { min-height: 100dvh; display: flex; flex-direction: column; }
+#panel {
+  display: flex; align-items: center; gap: 12px; padding: 8px 12px;
+  background: var(--panel); border-bottom: 1px solid var(--line);
+}
+.brand { font-weight: 800; letter-spacing: 0.12em; color: var(--gold); }
+.clock { margin-left: auto; color: var(--muted); font-size: 13px; }
+.panel-btn {
+  background: transparent; border: 1px solid var(--line); color: var(--text);
+  border-radius: 8px; padding: 6px 12px; cursor: pointer;
+}
+#launcher {
+  position: absolute; top: 48px; left: 12px; z-index: 20;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+  padding: 8px; display: flex; flex-direction: column; gap: 4px; min-width: 200px;
+}
+#launcher.hidden { display: none; }
+#launcher button {
+  text-align: left; background: transparent; border: 0; color: var(--text);
+  padding: 10px 12px; border-radius: 8px; cursor: pointer;
+}
+#launcher button:hover { background: rgba(255,255,255,0.06); }
+#workspace { flex: 1; padding: 16px; overflow: auto; }
+.window {
+  max-width: 640px; background: var(--panel); border: 1px solid var(--line);
+  border-radius: 12px; overflow: hidden;
+}
+.window header {
+  padding: 10px 14px; border-bottom: 1px solid var(--line); font-weight: 650; font-size: 13px;
+}
+.window .body { padding: 14px; line-height: 1.45; }
+.muted { color: var(--muted); font-size: 13px; }
+.status {
+  margin-top: 12px; padding: 12px; border-radius: 10px; background: #0a0d12;
+  font-family: ui-monospace, monospace; font-size: 12px; white-space: pre-wrap;
+}
+#tasks {
+  display: flex; justify-content: space-between; padding: 8px 12px;
+  border-top: 1px solid var(--line); background: var(--panel); font-size: 12px; color: var(--muted);
+}
+pre { margin: 0; white-space: pre-wrap; font-size: 12px; }

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Alset Shell</title>
+  <link rel="stylesheet" href="shell.css" />
+</head>
+<body>
+  <div id="desktop">
+    <header id="panel">
+      <div class="brand">ALSET</div>
+      <div class="clock" id="clock">—</div>
+      <button type="button" id="btn-menu" class="panel-btn">Menú</button>
+    </header>
+
+    <nav id="launcher" class="hidden" aria-label="Lanzador">
+      <button type="button" data-app="status">Estado del sistema</button>
+      <button type="button" data-app="organism">Organismo local</button>
+      <button type="button" data-app="files">Archivos Alset</button>
+      <button type="button" data-app="terminal">Notas de recuperación</button>
+    </nav>
+
+    <main id="workspace">
+      <section class="window" id="win-welcome">
+        <header>Alset Desktop 0.1 · Tiny Core</header>
+        <div class="body">
+          <p>Shell ligera sobre <strong>bridge local</strong>. FLWM permanece como gestor de rescate.</p>
+          <p class="muted">Alset-JS nativo en X vendrá después; este prototipo usa DOM en contenedor web mínimo.</p>
+          <div id="status-box" class="status">Cargando…</div>
+        </div>
+      </section>
+    </main>
+
+    <footer id="tasks">
+      <span>Escritorio Alset</span>
+      <span id="task-org">organismo: —</span>
+    </footer>
+  </div>
+  <script src="shell.js"></script>
+</body>
+</html>

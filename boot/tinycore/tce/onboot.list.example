@@ -1,0 +1,9 @@
+# Resolve actual .tcz names on your Tiny Core mirror / version.
+# Typical needs for Alset Desktop 0.1:
+Xorg-7.7.tcz
+flwm.tcz
+# graphics deps as required by TC version
+# browser OR minimal webview helper — pick one available for your arch:
+# chromium-browser.tcz
+# firefox.tcz
+# Optional: openssh, wifi firmware, etc.
