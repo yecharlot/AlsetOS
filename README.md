@@ -1,5 +1,8 @@
 # AlsetOS
 
+**Estado actual:** ver [docs/STATUS.md](docs/STATUS.md) (Go 1.26, suite verde).
+
+
 AlsetOS es un núcleo experimental de sistema operativo orientado a **organismos digitales persistentes, verificables y recuperables**.
 
 La ruptura conceptual es:

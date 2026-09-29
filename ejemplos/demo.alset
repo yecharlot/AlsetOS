@@ -1,0 +1,7 @@
+{
+  "nombre": "organismo-demo-gtmo",
+  "zyrion": { "estado": "si" },
+  "capacidades": ["gene.ejecutar"],
+  "genes": ["gene-saludo"],
+  "lispai": ["(recordar origen demo-alsetos)"]
+}
