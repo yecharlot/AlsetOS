@@ -3,7 +3,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 WEB="${ALSET_WEB:-$(cd "$ROOT/../Alset-LISPAI-Runtime/web" 2>/dev/null && pwd || true)}"
-export GOTOOLCHAIN="${GOTOOLCHAIN:-local}"
+export GOTOOLCHAIN="${GOTOOLCHAIN:-go1.26.0}"
 cd "$ROOT"
 mkdir -p bin
 go build -o bin/alset-desktop-bridge ./cmd/alset-desktop-bridge
@@ -16,6 +16,7 @@ else
   echo "WARN: sin -web (no se encontró Alset-LISPAI-Runtime/web)"
 fi
 echo "Desktop  http://127.0.0.1:7420/"
-echo "Studio   http://127.0.0.1:7420/tools/  (index Studio)"
-echo "Editor   http://127.0.0.1:7420/tools/alset-editor/"
+echo "Studio   http://127.0.0.1:7420/tools/"
+echo "Editor   http://127.0.0.1:7420/alset-editor/"
+echo "Deploy desde Studio crea icono + ventana en este escritorio"
 exec ./bin/alset-desktop-bridge "${ARGS[@]}"

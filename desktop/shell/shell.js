@@ -4,6 +4,7 @@
 (function () {
   const ICON_KEY = 'alset-desktop-icons-v3';
   const THEME_KEY = 'alset-desktop-theme-v1';
+  const WIN_KEY = 'alset-desktop-windows-v1';
   const iconLayer = document.getElementById('icon-layer');
   const windowLayer = document.getElementById('window-layer');
   const taskButtons = document.getElementById('task-buttons');
@@ -192,6 +193,7 @@
     windowLayer.appendChild(el);
     windows.set(id, { el, taskBtn, title });
     focusWin(id);
+    try { saveWindowsSession(); } catch (_) {}
     return windows.get(id);
   }
   function enableWinDrag(el) {
@@ -665,5 +667,103 @@ help · ls · cat path · open studio|editor|files|apps|settings
   api('/v1/mind/tick', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: 'escritorio listo' }) })
     .then(updateTrayMind).catch(() => { trayMind.textContent = 'Mind · offline'; });
 
+
+  function saveWindowsSession() {
+    const list = [];
+    windows.forEach((w, id) => {
+      if (!id.startsWith('installed-') && id !== 'app-studio' && id !== 'app-editor') return;
+      const el = w.el;
+      if (!el || el.style.display === 'none') return;
+      list.push({
+        id,
+        title: w.title,
+        left: el.style.left,
+        top: el.style.top,
+        width: el.style.width,
+        height: el.style.height,
+        url: el.querySelector('iframe')?.src || null,
+      });
+    });
+    try { localStorage.setItem(WIN_KEY, JSON.stringify(list)); } catch (_) {}
+  }
+
+  function restoreWindowsSession() {
+    let list = [];
+    try { list = JSON.parse(localStorage.getItem(WIN_KEY) || '[]'); } catch (_) {}
+    list.forEach((s) => {
+      if (!s.url) return;
+      const name = s.id.replace(/^installed-/, '');
+      createWindow({
+        id: s.id,
+        title: s.title || name,
+        width: parseInt(s.width, 10) || 400,
+        height: parseInt(s.height, 10) || 480,
+        x: parseInt(s.left, 10) || 80,
+        y: parseInt(s.top, 10) || 60,
+        iframeSrc: s.url,
+      });
+    });
+  }
+
+  // Studio/Editor deploy → icon + window inside desktop
+  window.addEventListener('message', (ev) => {
+    const d = ev.data;
+    if (!d || d.type !== 'alset-desktop-deploy') return;
+    const name = d.name || 'app';
+    const title = d.title || name;
+    const url = d.url || ('/apps/' + encodeURIComponent(name) + '/');
+    const iconId = 'app:' + name;
+    if (!iconState.find((i) => i.id === iconId)) {
+      iconState.push({
+        id: iconId,
+        label: title.slice(0, 14),
+        glyph: '📦',
+        x: 216,
+        y: 24 + (iconState.length % 6) * 96,
+      });
+      saveIcons(iconState);
+      renderIcons();
+    }
+    createWindow({
+      id: 'installed-' + name,
+      title: title,
+      width: 480,
+      height: 560,
+      iframeSrc: url,
+    });
+    saveWindowsSession();
+  });
+
+  // Persist after window moves (debounce)
+  const _createWindow = createWindow;
+  // wrap closeWin
+  const _closeWin = closeWin;
+  closeWin = function (id) {
+    _closeWin(id);
+    saveWindowsSession();
+  };
+
+  async function syncInstalledAppIcons() {
+    try {
+      const data = await api('/v1/apps/list');
+      (data.apps || []).forEach((a) => {
+        const iconId = 'app:' + a.name;
+        if (!iconState.find((i) => i.id === iconId)) {
+          iconState.push({
+            id: iconId,
+            label: (a.title || a.name || '').slice(0, 14),
+            glyph: a.glyph || '📦',
+            x: 216,
+            y: 24 + (iconState.length % 6) * 96,
+          });
+        }
+      });
+      saveIcons(iconState);
+      renderIcons();
+    } catch (_) {}
+  }
+
   renderIcons();
+  syncInstalledAppIcons().then(() => restoreWindowsSession());
 })();
+

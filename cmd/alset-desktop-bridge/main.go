@@ -112,6 +112,7 @@ func main() {
 	mux.HandleFunc("/v1/apps/list", b.handleAppsList)
 	mux.HandleFunc("/v1/apps/deploy", b.handleAppsDeploy)
 	mux.HandleFunc("/v1/apps/get", b.handleAppsGet)
+	mux.HandleFunc("/v1/deploy", b.handleStudioDeploy) // Studio → same pipeline as apps
 	// Installed apps as static files under /apps/<name>/
 	appsDir := filepath.Join(dataDir, "apps")
 	_ = os.MkdirAll(appsDir, 0o755)
@@ -516,29 +517,108 @@ func (b *bridge) handleAppsDeploy(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "POST only", 405)
 		return
 	}
-	var body struct {
-		Name  string `json:"name"`
-		Title string `json:"title"`
-		HTML  string `json:"html"`
-		Kind  string `json:"kind"` // html | alset-js
+	raw, _ := io.ReadAll(io.LimitReader(r.Body, 6<<20))
+	var body map[string]any
+	_ = json.Unmarshal(raw, &body)
+
+	name := strAny(body["name"])
+	if name == "" {
+		name = strAny(body["Name"])
 	}
-	_ = json.NewDecoder(io.LimitReader(r.Body, 4<<20)).Decode(&body)
-	name := strings.TrimSpace(body.Name)
 	if name == "" {
 		name = "app"
 	}
-	name = strings.Map(func(r rune) rune {
+	title := strAny(body["title"])
+	if title == "" {
+		title = name
+	}
+	kind := strAny(body["kind"])
+	html := strAny(body["html"])
+	name = sanitizeAppName(name)
+	dir := filepath.Join(b.dataDir, "apps", name)
+	_ = os.MkdirAll(dir, 0o755)
+
+	// Persist original payload for re-open / Studio round-trip
+	_ = os.WriteFile(filepath.Join(dir, "app.alset.json"), raw, 0o644)
+
+	if html == "" {
+		html = buildAppHTML(name, title, body)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "index.html"), []byte(html), 0o644); err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	meta, _ := json.MarshalIndent(map[string]any{
+		"name": name, "title": title, "kind": kind, "deployed": time.Now().UTC(),
+		"glyph": "📦", "desktop": true,
+	}, "", "  ")
+	_ = os.WriteFile(filepath.Join(dir, "app.json"), meta, 0o644)
+	writeJSON(w, map[string]any{
+		"ok": true, "name": name, "title": title,
+		"url": "/apps/" + name + "/",
+		"rootcid": "cid:alset-app:" + name,
+	})
+}
+
+func (b *bridge) handleStudioDeploy(w http.ResponseWriter, r *http.Request) {
+	// Alias: Studio posts alset-app/v1 tree here
+	b.handleAppsDeploy(w, r)
+}
+
+func sanitizeAppName(name string) string {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return "app"
+	}
+	return strings.Map(func(r rune) rune {
 		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
 			return r
 		}
 		return '-'
 	}, name)
-	dir := filepath.Join(b.dataDir, "apps", name)
-	_ = os.MkdirAll(dir, 0o755)
-	html := body.HTML
-	if html == "" {
-		// default calculator demo
-		html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+}
+
+func strAny(v any) string {
+	switch x := v.(type) {
+	case string:
+		return x
+	default:
+		return ""
+	}
+}
+
+func buildAppHTML(name, title string, body map[string]any) string {
+	// If tree present → Alset-JS runtime shell; else calculator demo
+	tree, hasTree := body["tree"]
+	if hasTree && tree != nil {
+		payload, _ := json.Marshal(body)
+		// escape for script embedding
+		esc := strings.ReplaceAll(string(payload), "<", "\\u003c")
+		return fmt.Sprintf(`<!DOCTYPE html>
+<html lang="es"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>%s</title>
+<style>
+body{margin:0;background:#09090b;color:#f4f4f5;font-family:system-ui,sans-serif;min-height:100dvh}
+header{padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;gap:10px;align-items:center}
+header strong{color:#f5c542;font-size:13px;letter-spacing:.06em}
+#app{padding:12px;min-height:50dvh}
+.device-label{display:none}
+</style>
+</head><body>
+<header><strong>%s</strong><span style="color:#a1a1aa;font-size:12px">Alset app · desktop</span></header>
+<div id="app"></div>
+<script type="module">
+import { renderAlsetPreview, stateLoad } from '/studio/alsetBridge.js';
+const app = %s;
+try { if (app.states) stateLoad(app.states); } catch(e) {}
+const host = document.getElementById('app');
+renderAlsetPreview(host, app.tree || [], (m)=>console.log(m), { device: null, theme: app.theme });
+</script>
+</body></html>`, title, name, esc)
+	}
+	// default calculator
+	return `<!DOCTYPE html><html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Calculadora</title>
 <style>
 body{margin:0;font-family:system-ui;background:#0c1018;color:#f2f4f8;display:flex;justify-content:center;padding:24px}
@@ -551,35 +631,21 @@ button.eq{background:#3ddc97;color:#111}
 </style></head><body>
 <div class="calc"><div class="display" id="d">0</div><div class="grid" id="g"></div></div>
 <script>
-let cur='0',op=null,acc=null;
-const d=document.getElementById('d');
-const keys=['7','8','9','/','4','5','6','*','1','2','3','-','0','.','=','+'];
-keys.forEach(k=>{
-  const b=document.createElement('button');
-  b.textContent=k;
-  if('/+-*'.includes(k))b.className='op';
-  if(k==='=')b.className='eq';
+let cur='0',op=null,acc=null;const d=document.getElementById('d');
+['7','8','9','/','4','5','6','*','1','2','3','-','0','.','=','+'].forEach(k=>{
+  const b=document.createElement('button');b.textContent=k;
+  if('/+-*'.includes(k))b.className='op';if(k==='=')b.className='eq';
   b.onclick=()=>{
     if('0123456789.'.includes(k)){cur=cur==='0'&&k!=='.'?k:cur+k;d.textContent=cur;return;}
     if(k==='='){if(op&&acc!=null){const n=Number(cur);let r=n;if(op==='+')r=acc+n;if(op==='-')r=acc-n;if(op==='*')r=acc*n;if(op==='/')r=acc/n;cur=String(r);acc=null;op=null;d.textContent=cur;}return;}
     acc=Number(cur);op=k;cur='0';
-  };
-  document.getElementById('g').appendChild(b);
+  };document.getElementById('g').appendChild(b);
 });
 </script></body></html>`
-	}
-	if err := os.WriteFile(filepath.Join(dir, "index.html"), []byte(html), 0o644); err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
-	meta, _ := json.MarshalIndent(map[string]any{
-		"name": name, "title": body.Title, "kind": body.Kind, "deployed": time.Now().UTC(),
-	}, "", "  ")
-	_ = os.WriteFile(filepath.Join(dir, "app.json"), meta, 0o644)
-	writeJSON(w, map[string]any{"ok": true, "name": name, "url": "/apps/" + name + "/", "title": body.Title})
 }
 
 func (b *bridge) handleAppsGet(w http.ResponseWriter, r *http.Request) {
+
 	name := r.URL.Query().Get("name")
 	dir := filepath.Join(b.dataDir, "apps", name)
 	raw, err := os.ReadFile(filepath.Join(dir, "app.json"))
