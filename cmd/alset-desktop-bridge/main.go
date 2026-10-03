@@ -1,5 +1,4 @@
-// alset-desktop-bridge: local IPC + static Alset Shell for Tiny Core desktop.
-// Does not replace the window manager; sits above FLWM and talks to AlsetOS.
+// alset-desktop-bridge: IPC + Alset Shell + optional Studio/Editor static tools.
 package main
 
 import (
@@ -11,22 +10,25 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
 
 type status struct {
-	Service   string    `json:"service"`
-	Time      time.Time `json:"time"`
-	DataDir   string    `json:"data_dir"`
-	Organism  string    `json:"organism"`
-	RootCID   string    `json:"rootcid,omitempty"`
-	AlsetOS   string    `json:"alsetos"` // running | missing | error
-	Message   string    `json:"message,omitempty"`
+	Service  string    `json:"service"`
+	Time     time.Time `json:"time"`
+	DataDir  string    `json:"data_dir"`
+	Organism string    `json:"organism"`
+	RootCID  string    `json:"rootcid,omitempty"`
+	AlsetOS  string    `json:"alsetos"`
+	Tools    string    `json:"tools,omitempty"`
+	Message  string    `json:"message,omitempty"`
 }
 
 type bridge struct {
 	dataDir string
+	webDir  string
 	mu      sync.Mutex
 	orgName string
 	rootCID string
@@ -34,10 +36,11 @@ type bridge struct {
 }
 
 func main() {
-	addr := flag.String("addr", "127.0.0.1:7420", "bind address (localhost only recommended)")
+	addr := flag.String("addr", "127.0.0.1:7420", "bind address")
 	data := flag.String("data", "", "persistent data dir")
-	shellDir := flag.String("shell", "", "path to desktop/shell static files")
-	alsetos := flag.String("alsetos", "alsetos", "alsetos binary name/path for organism demo")
+	shellDir := flag.String("shell", "", "desktop/shell static")
+	webDir := flag.String("web", "", "Alset-LISPAI-Runtime/web (Studio + Editor)")
+	alsetos := flag.String("alsetos", "alsetos", "alsetos binary")
 	flag.Parse()
 
 	dataDir := *data
@@ -50,28 +53,19 @@ func main() {
 	}
 	_ = os.MkdirAll(dataDir, 0o755)
 
-	sh := *shellDir
-	if sh == "" {
-		// walk common locations relative to cwd / executable
-		cands := []string{
-			"desktop/shell",
-			filepath.Join("..", "desktop", "shell"),
-		}
-		if exe, err := os.Executable(); err == nil {
-			cands = append([]string{filepath.Join(filepath.Dir(exe), "desktop", "shell")}, cands...)
-		}
-		for _, c := range cands {
-			if st, err := os.Stat(filepath.Join(c, "index.html")); err == nil && !st.IsDir() {
-				sh, _ = filepath.Abs(c)
-				break
-			}
-		}
+	sh := resolveDir(*shellDir, []string{"desktop/shell", filepath.Join("..", "desktop", "shell")})
+	web := *webDir
+	if web == "" {
+		web = resolveDir("", []string{
+			filepath.Join("..", "Alset-LISPAI-Runtime", "web"),
+			filepath.Join("..", "..", "Alset-LISPAI-Runtime", "web"),
+		})
 	}
 
-	b := &bridge{dataDir: dataDir, orgName: "desktop-local"}
+	b := &bridge{dataDir: dataDir, webDir: web, orgName: "desktop-local"}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/health", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, map[string]any{"ok": true, "service": "alset-desktop-bridge"})
+		writeJSON(w, map[string]any{"ok": true, "service": "alset-desktop-bridge", "tools": web != ""})
 	})
 	mux.HandleFunc("/v1/status", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, b.status(*alsetos))
@@ -93,7 +87,6 @@ func main() {
 		if dir == "" {
 			dir = dataDir
 		}
-		// safety: only under dataDir
 		abs, err := filepath.Abs(dir)
 		if err != nil || !under(dataDir, abs) {
 			http.Error(w, "path not allowed", 403)
@@ -111,19 +104,55 @@ func main() {
 		writeJSON(w, map[string]any{"path": abs, "entries": names})
 	})
 
+	// Terminal helper: eval simple recordar via API
+	mux.HandleFunc("/v1/term/echo", func(w http.ResponseWriter, r *http.Request) {
+		_ = r.ParseForm()
+		writeJSON(w, map[string]any{"ok": true, "echo": r.FormValue("q")})
+	})
+
+	if web != "" {
+		log.Printf("tools web: %s", web)
+		mux.Handle("/tools/", http.StripPrefix("/tools/", http.FileServer(http.Dir(web))))
+		// aliases
+		mux.Handle("/studio/", http.StripPrefix("/studio/", http.FileServer(http.Dir(filepath.Join(web)))))
+		mux.Handle("/alset-editor/", http.StripPrefix("/alset-editor/", http.FileServer(http.Dir(filepath.Join(web, "alset-editor")))))
+	}
+
 	if sh != "" {
 		log.Printf("shell static: %s", sh)
 		mux.Handle("/", http.FileServer(http.Dir(sh)))
 	} else {
 		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-			fmt.Fprintf(w, "alset-desktop-bridge OK\nSet -shell path to desktop/shell\n")
+			fmt.Fprintf(w, "alset-desktop-bridge OK\nUse -shell desktop/shell\n")
 		})
 	}
 
-	log.Printf("Alset Desktop Bridge on http://%s/", *addr)
-	log.Printf("data dir: %s", dataDir)
+	log.Printf("Alset Desktop Bridge http://%s/", *addr)
+	log.Printf("data: %s", dataDir)
+	if web != "" {
+		log.Printf("Studio  http://%s/tools/  or /studio/", *addr)
+		log.Printf("Editor  http://%s/tools/alset-editor/", *addr)
+	}
 	log.Fatal(http.ListenAndServe(*addr, mux))
+}
+
+func resolveDir(explicit string, cands []string) string {
+	if explicit != "" {
+		if st, err := os.Stat(explicit); err == nil && st.IsDir() {
+			a, _ := filepath.Abs(explicit)
+			return a
+		}
+	}
+	if exe, err := os.Executable(); err == nil {
+		cands = append([]string{filepath.Join(filepath.Dir(exe), "desktop", "shell")}, cands...)
+	}
+	for _, c := range cands {
+		if st, err := os.Stat(c); err == nil && st.IsDir() {
+			a, _ := filepath.Abs(c)
+			return a
+		}
+	}
+	return ""
 }
 
 func (b *bridge) status(alsetosBin string) status {
@@ -136,9 +165,14 @@ func (b *bridge) status(alsetosBin string) status {
 		Organism: b.orgName,
 		RootCID:  b.rootCID,
 		Message:  b.lastMsg,
+		Tools:    b.webDir,
 	}
 	if path, err := exec.LookPath(alsetosBin); err != nil {
-		st.AlsetOS = "missing"
+		if _, err2 := os.Stat(alsetosBin); err2 == nil {
+			st.AlsetOS = "found:" + alsetosBin
+		} else {
+			st.AlsetOS = "missing"
+		}
 	} else {
 		st.AlsetOS = "found:" + path
 	}
@@ -146,10 +180,8 @@ func (b *bridge) status(alsetosBin string) status {
 }
 
 func (b *bridge) runOrganism(alsetosBin string) (string, error) {
-	// Prefer ejemplos/demo.alset if present
 	manifest := "ejemplos/demo.alset"
 	if _, err := os.Stat(manifest); err != nil {
-		// write a minimal manifest into data dir
 		manifest = filepath.Join(b.dataDir, "demo.alset")
 		_ = os.WriteFile(manifest, []byte(`{
   "nombre": "desktop-local",
@@ -158,16 +190,17 @@ func (b *bridge) runOrganism(alsetosBin string) (string, error) {
   "genes": ["gene-saludo"]
 }`), 0o644)
 	}
-	cmd := exec.Command(alsetosBin, manifest)
+	bin := alsetosBin
+	cmd := exec.Command(bin, manifest)
 	cmd.Dir = findModuleRoot()
 	out, err := cmd.CombinedOutput()
 	b.mu.Lock()
 	b.lastMsg = string(out)
 	if err == nil {
-		// best-effort parse RootCID line
-		for _, line := range splitLines(string(out)) {
-			if len(line) > 9 && line[:9] == "[ROOTCID]" {
-				b.rootCID = trimSpace(line[9:])
+		for _, line := range strings.Split(string(out), "\n") {
+			if strings.HasPrefix(line, "[ROOTCID]") {
+				b.rootCID = strings.TrimSpace(strings.TrimPrefix(line, "[ROOTCID]"))
+				b.rootCID = strings.TrimLeft(b.rootCID, ": ")
 			}
 		}
 	}
@@ -190,7 +223,7 @@ func under(root, path string) bool {
 	if err != nil {
 		return false
 	}
-	return rel != ".." && (len(rel) < 2 || rel[:2] != "..")
+	return rel != ".." && !strings.HasPrefix(rel, ".."+string(os.PathSeparator))
 }
 
 func writeJSON(w http.ResponseWriter, v any) {
@@ -198,26 +231,4 @@ func writeJSON(w http.ResponseWriter, v any) {
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 	_ = enc.Encode(v)
-}
-
-func splitLines(s string) []string {
-	var out []string
-	start := 0
-	for i := 0; i < len(s); i++ {
-		if s[i] == '\n' {
-			out = append(out, s[start:i])
-			start = i + 1
-		}
-	}
-	if start < len(s) {
-		out = append(out, s[start:])
-	}
-	return out
-}
-
-func trimSpace(s string) string {
-	for len(s) > 0 && (s[0] == ' ' || s[0] == '\t' || s[0] == ':') {
-		s = s[1:]
-	}
-	return s
 }
