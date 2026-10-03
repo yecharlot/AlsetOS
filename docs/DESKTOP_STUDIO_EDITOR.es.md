@@ -1,49 +1,43 @@
-# Alset Desktop + Studio + Editor
+# Alset Desktop — gestor de ventanas real
 
-## Probar ya (desarrollo)
-
-Desde el monorepo:
+## Probar ya
 
 ```bash
 cd AlsetOS
+export GOTOOLCHAIN=go1.26.0
 ./scripts/run-alset-desktop.sh
+# o:
+go run ./cmd/alset-desktop-bridge -addr 127.0.0.1:7420 \
+  -shell desktop/shell \
+  -web ../Alset-LISPAI-Runtime/web \
+  -alsetos ./bin/alsetos
 ```
 
-Abre:
+Abre **http://127.0.0.1:7420/**
 
-| URL | Qué es |
-|-----|--------|
-| http://127.0.0.1:7420/ | **Escritorio** (iconos, menú, terminal) |
-| http://127.0.0.1:7420/tools/ | **Alset Studio** |
-| http://127.0.0.1:7420/tools/alset-editor/ | **Alset-JS Editor** |
+## Qué incluye
 
-Requiere la carpeta hermana `Alset-LISPAI-Runtime/web`.
+| Capacidad | Comportamiento |
+|-----------|----------------|
+| **Iconos** | Arrastrar y soltar; posición en `localStorage` |
+| **Ventanas** | Mover (barra título), redimensionar, minimizar, maximizar, cerrar |
+| **Studio / Editor** | Se abren **dentro** del escritorio (iframe), no en otra pestaña |
+| **Terminal** | LispAI + alsetState + mind/zyrion/neural |
+| **Mind · Zyrion · Neural · Silogismos** | Servicios del sistema en `/v1/...` |
 
-## Terminal LispAI / alsetState
+## APIs cognitivas (OS + apps)
 
-En el escritorio → icono **Terminal**:
+| Ruta | Uso |
+|------|-----|
+| `POST /v1/mind/tick` | `{ "text": "..." }` → decisión Mind |
+| `POST /v1/zyrion` | `{ "a", "b" }` → valor ternario |
+| `POST /v1/syllogism/assert` | hecho `{ s, r, o, c }` |
+| `POST /v1/syllogism/infer` | cadena de hechos |
+| `POST /v1/syllogism/ask` | consulta |
+| `GET/POST /v1/neural` | pesos 0..1 |
 
-```text
-help
-(recordar saludo hola)
-(leer saludo)
-(set-state count 1)
-(get-state count)
-status
-organism
-studio
-editor
-```
+Las apps creadas en Studio/Editor pueden llamar las **mismas** rutas: coexisten con el sistema operativo.
 
-## ISO / USB
+## Iconos de escritorio
 
-```bash
-./scripts/package-alset-desktop-iso.sh
-# → dist/desktop/alset-os-desktop-payload.tgz
-```
-
-En Tiny Core: extraer a `/`, ejecutar `/opt/alset/boot-alset.sh`.
-
-## Editor
-
-Hot-reload al editar código (App). Paneles flotantes redimensionables. Deploy PWA vía Studio API si el Studio corre en el mismo host de tools.
+Doble clic abre la app. Arrastra para reposicionar (se guarda solo).

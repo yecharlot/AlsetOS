@@ -7,62 +7,35 @@
   <link rel="stylesheet" href="shell.css" />
 </head>
 <body>
-  <div id="desktop">
-    <header id="panel">
-      <div class="brand">ALSET OS</div>
-      <button type="button" id="btn-menu" class="panel-btn">Menú</button>
-      <div class="clock" id="clock">—</div>
-    </header>
-
-    <nav id="launcher" class="hidden" aria-label="Lanzador">
-      <button type="button" data-app="studio">Alset Studio</button>
-      <button type="button" data-app="editor">Alset-JS Editor</button>
-      <button type="button" data-app="terminal">Terminal LispAI</button>
-      <button type="button" data-app="organism">Organismo local</button>
-      <button type="button" data-app="status">Estado del sistema</button>
-      <button type="button" data-app="files">Archivos</button>
-    </nav>
-
-    <div id="icons" class="icons" aria-label="Escritorio">
-      <button type="button" class="icon" data-app="studio"><span>◈</span>Studio</button>
-      <button type="button" class="icon" data-app="editor"><span>◇</span>Editor</button>
-      <button type="button" class="icon" data-app="terminal"><span>▣</span>Terminal</button>
-      <button type="button" class="icon" data-app="organism"><span>◎</span>Organismo</button>
+  <div id="os">
+    <!-- Wallpaper + desktop surface -->
+    <div id="desktop" aria-label="Escritorio Alset">
+      <div id="icon-layer"></div>
+      <div id="window-layer"></div>
     </div>
 
-    <main id="workspace">
-      <section class="window" id="win-welcome">
-        <header>
-          <span>Alset Desktop · gestor</span>
-          <button type="button" class="win-close" data-close="win-welcome">×</button>
-        </header>
-        <div class="body">
-          <p>Escritorio Alset sobre el bridge local. FLWM/terminal del SO siguen de rescate.</p>
-          <p class="muted">Studio y Editor se abren si el bridge sirve el runtime web (<code>-web</code>).</p>
-          <div id="status-box" class="status">Cargando…</div>
-        </div>
-      </section>
-    </main>
+    <!-- Start menu -->
+    <div id="start-menu" class="start-menu hidden" role="menu">
+      <div class="start-brand">ALSET OS <small>Desktop</small></div>
+      <button type="button" data-launch="studio">◈ Alset Studio</button>
+      <button type="button" data-launch="editor">◇ Alset-JS Editor</button>
+      <button type="button" data-launch="terminal">▣ Terminal</button>
+      <button type="button" data-launch="mind">◎ Mind · Zyrion · Neural</button>
+      <button type="button" data-launch="organism">⚡ Organismo</button>
+      <button type="button" data-launch="status">▤ Estado del sistema</button>
+      <button type="button" data-launch="files">📁 Archivos</button>
+      <hr />
+      <button type="button" data-launch="about">ℹ Acerca de</button>
+    </div>
 
-    <section class="window terminal-win hidden" id="win-terminal">
-      <header>
-        <span>Terminal · LispAI / alsetState</span>
-        <button type="button" class="win-close" data-close="win-terminal">×</button>
-      </header>
-      <div class="body term-body">
-        <pre id="term-out" class="term-out">Alset Terminal 0.2
-Comandos: help · status · organism · recordar k v · leer k · set-state k v · get-state k · studio · editor · clear
-</pre>
-        <form id="term-form" class="term-form">
-          <span class="prompt">›</span>
-          <input id="term-in" autocomplete="off" spellcheck="false" placeholder="(recordar saludo hola)  o  status" />
-        </form>
+    <!-- Dock / taskbar -->
+    <footer id="taskbar">
+      <button type="button" id="btn-start" class="start-btn" title="Menú Alset">⬡</button>
+      <div id="task-buttons" class="task-buttons"></div>
+      <div class="tray">
+        <span id="tray-mind" class="tray-chip" title="Mind">Mind · —</span>
+        <span id="tray-clock" class="tray-clock">—</span>
       </div>
-    </section>
-
-    <footer id="tasks">
-      <span>Escritorio Alset</span>
-      <span id="task-org">organismo: —</span>
     </footer>
   </div>
   <script src="shell.js"></script>
