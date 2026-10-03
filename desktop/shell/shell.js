@@ -1,10 +1,9 @@
 /**
- * Alset Desktop Window Manager
- * Icons movable · windows move/resize/close · apps in-desktop (iframe)
- * Mind · Zyrion · Neural · Syllogisms as system services
+ * Alset Desktop WM — icons, windows, files, apps, theme, LispAI control
  */
 (function () {
-  const ICON_KEY = 'alset-desktop-icons-v2';
+  const ICON_KEY = 'alset-desktop-icons-v3';
+  const THEME_KEY = 'alset-desktop-theme-v1';
   const iconLayer = document.getElementById('icon-layer');
   const windowLayer = document.getElementById('window-layer');
   const taskButtons = document.getElementById('task-buttons');
@@ -13,19 +12,49 @@
   const trayClock = document.getElementById('tray-clock');
 
   let zTop = 30;
-  const windows = new Map(); // id -> { el, taskBtn, title }
+  const windows = new Map();
   const mem = Object.create(null);
-  const neural = Object.create(null); // key -> weight 0..1
-  const facts = []; // syllogism triples {s,r,o,c}
 
   const DEFAULT_ICONS = [
     { id: 'studio', label: 'Studio', glyph: '◈', x: 24, y: 24 },
     { id: 'editor', label: 'Editor JS', glyph: '◇', x: 24, y: 120 },
-    { id: 'terminal', label: 'Terminal', glyph: '▣', x: 24, y: 216 },
-    { id: 'mind', label: 'Mind', glyph: '◎', x: 24, y: 312 },
-    { id: 'organism', label: 'Organismo', glyph: '⚡', x: 24, y: 408 },
-    { id: 'status', label: 'Sistema', glyph: '▤', x: 120, y: 24 },
+    { id: 'files', label: 'Archivos', glyph: '📁', x: 24, y: 216 },
+    { id: 'terminal', label: 'Terminal', glyph: '▣', x: 24, y: 312 },
+    { id: 'mind', label: 'Mind', glyph: '◎', x: 24, y: 408 },
+    { id: 'apps', label: 'Apps', glyph: '▦', x: 120, y: 24 },
+    { id: 'settings', label: 'Ajustes', glyph: '⚙', x: 120, y: 120 },
+    { id: 'organism', label: 'Organismo', glyph: '⚡', x: 120, y: 216 },
   ];
+
+  // —— Theme ——
+  function applyTheme(t) {
+    const root = document.documentElement;
+    const cfg = Object.assign({
+      gold: '#f0c14b', accent: '#5b9fd4', bg0: '#06080c', bg1: '#0c1018',
+      font: 'system-ui', iconScale: '1', wallpaper: 'default',
+    }, t || {});
+    root.style.setProperty('--gold', cfg.gold);
+    root.style.setProperty('--accent', cfg.accent);
+    root.style.setProperty('--bg0', cfg.bg0);
+    root.style.setProperty('--bg1', cfg.bg1);
+    document.body.style.fontFamily = cfg.font + ', system-ui, sans-serif';
+    document.documentElement.style.setProperty('--icon-scale', cfg.iconScale);
+    const desk = document.getElementById('desktop');
+    if (cfg.wallpaper === 'aurora') {
+      desk.style.background = 'radial-gradient(ellipse 80% 60% at 20% 0%, rgba(91,159,212,.28), transparent 55%), radial-gradient(ellipse at 100% 100%, rgba(240,193,75,.15), transparent 50%), #06080c';
+    } else if (cfg.wallpaper === 'ember') {
+      desk.style.background = 'radial-gradient(ellipse at 30% 20%, rgba(240,100,50,.2), transparent 50%), #0a0808';
+    } else if (cfg.wallpaper === 'plain') {
+      desk.style.background = cfg.bg0;
+    } else {
+      desk.style.background = '';
+    }
+    localStorage.setItem(THEME_KEY, JSON.stringify(cfg));
+    document.querySelectorAll('.desk-icon .glyph').forEach((g) => {
+      g.style.transform = 'scale(' + (cfg.iconScale || 1) + ')';
+    });
+  }
+  try { applyTheme(JSON.parse(localStorage.getItem(THEME_KEY) || '{}')); } catch (_) { applyTheme({}); }
 
   function loadIcons() {
     try {
@@ -34,11 +63,7 @@
     } catch (_) {}
     return DEFAULT_ICONS.map((i) => ({ ...i }));
   }
-
-  function saveIcons(list) {
-    localStorage.setItem(ICON_KEY, JSON.stringify(list));
-  }
-
+  function saveIcons(list) { localStorage.setItem(ICON_KEY, JSON.stringify(list)); }
   let iconState = loadIcons();
 
   function renderIcons() {
@@ -53,13 +78,19 @@
       btn.innerHTML = `<span class="glyph">${ic.glyph}</span><span class="label">${ic.label}</span>`;
       enableIconDrag(btn, ic);
       btn.addEventListener('dblclick', () => launch(ic.id));
-      btn.addEventListener('click', (e) => {
+      btn.addEventListener('click', () => {
         if (btn._dragged) { btn._dragged = false; return; }
         document.querySelectorAll('.desk-icon').forEach((x) => x.classList.remove('selected'));
         btn.classList.add('selected');
       });
       iconLayer.appendChild(btn);
     });
+    try {
+      const th = JSON.parse(localStorage.getItem(THEME_KEY) || '{}');
+      document.querySelectorAll('.desk-icon .glyph').forEach((g) => {
+        g.style.transform = 'scale(' + (th.iconScale || 1) + ')';
+      });
+    } catch (_) {}
   }
 
   function enableIconDrag(el, ic) {
@@ -67,12 +98,10 @@
     el.addEventListener('pointerdown', (e) => {
       if (e.button !== 0) return;
       el.setPointerCapture(e.pointerId);
-      sx = e.clientX; sy = e.clientY;
-      ox = ic.x; oy = ic.y; moved = false;
+      sx = e.clientX; sy = e.clientY; ox = ic.x; oy = ic.y; moved = false;
       el.classList.add('dragging');
       const onMove = (ev) => {
-        const dx = ev.clientX - sx;
-        const dy = ev.clientY - sy;
+        const dx = ev.clientX - sx, dy = ev.clientY - sy;
         if (Math.abs(dx) + Math.abs(dy) > 4) moved = true;
         const desk = document.getElementById('desktop').getBoundingClientRect();
         ic.x = Math.max(0, Math.min(desk.width - 90, ox + dx));
@@ -85,29 +114,25 @@
         el.releasePointerCapture?.(e.pointerId);
         el.removeEventListener('pointermove', onMove);
         el.removeEventListener('pointerup', onUp);
-        if (moved) {
-          el._dragged = true;
-          saveIcons(iconState);
-        }
+        if (moved) { el._dragged = true; saveIcons(iconState); }
       };
       el.addEventListener('pointermove', onMove);
       el.addEventListener('pointerup', onUp);
     });
   }
 
-  // ——— Window manager ———
   function focusWin(id) {
     const w = windows.get(id);
     if (!w) return;
     zTop += 1;
     w.el.style.zIndex = String(zTop);
     w.el.classList.add('active');
+    w.el.style.display = '';
     windows.forEach((other, oid) => {
       if (oid !== id) other.el.classList.remove('active');
       if (other.taskBtn) other.taskBtn.classList.toggle('active', oid === id);
     });
   }
-
   function closeWin(id) {
     const w = windows.get(id);
     if (!w) return;
@@ -115,21 +140,8 @@
     w.taskBtn?.remove();
     windows.delete(id);
   }
-
-  function toggleMax(id) {
-    const w = windows.get(id);
-    if (!w) return;
-    w.el.classList.toggle('maximized');
-  }
-
   function createWindow({ id, title, width, height, x, y, contentHTML, iframeSrc }) {
-    if (windows.has(id)) {
-      focusWin(id);
-      const existing = windows.get(id);
-      existing.el.classList.remove('hidden-min');
-      existing.el.style.display = '';
-      return existing;
-    }
+    if (windows.has(id)) { focusWin(id); return windows.get(id); }
     const desk = document.getElementById('desktop').getBoundingClientRect();
     const el = document.createElement('div');
     el.className = 'win active';
@@ -138,25 +150,22 @@
     el.style.height = (height || 480) + 'px';
     el.style.left = (x != null ? x : Math.max(40, (desk.width - (width || 720)) / 2)) + 'px';
     el.style.top = (y != null ? y : Math.max(30, (desk.height - (height || 480)) / 3)) + 'px';
-
     el.innerHTML = `
       <div class="win-title" data-drag>
         <span class="title-text">${title}</span>
         <div class="win-controls">
-          <button type="button" data-act="min" title="Minimizar">–</button>
-          <button type="button" data-act="max" title="Maximizar">□</button>
-          <button type="button" class="close" data-act="close" title="Cerrar">×</button>
+          <button type="button" data-act="min">–</button>
+          <button type="button" data-act="max">□</button>
+          <button type="button" class="close" data-act="close">×</button>
         </div>
       </div>
       <div class="win-body"></div>
-      <div class="win-resize" data-resize></div>
-    `;
+      <div class="win-resize" data-resize></div>`;
     const body = el.querySelector('.win-body');
     if (iframeSrc) {
       const iframe = document.createElement('iframe');
       iframe.src = iframeSrc;
       iframe.title = title;
-      iframe.setAttribute('allow', 'clipboard-read; clipboard-write');
       body.appendChild(iframe);
     } else {
       const inner = document.createElement('div');
@@ -164,31 +173,20 @@
       inner.innerHTML = contentHTML || '';
       body.appendChild(inner);
     }
-
     const taskBtn = document.createElement('button');
     taskBtn.type = 'button';
     taskBtn.className = 'task-btn active';
     taskBtn.textContent = title;
     taskBtn.onclick = () => {
-      if (el.style.display === 'none') {
-        el.style.display = '';
-        focusWin(id);
-      } else if (el.classList.contains('active')) {
-        el.style.display = 'none';
-      } else {
-        focusWin(id);
-      }
+      if (el.style.display === 'none') { el.style.display = ''; focusWin(id); }
+      else if (el.classList.contains('active')) el.style.display = 'none';
+      else focusWin(id);
     };
     taskButtons.appendChild(taskBtn);
-
     el.querySelector('[data-act="close"]').onclick = (e) => { e.stopPropagation(); closeWin(id); };
-    el.querySelector('[data-act="max"]').onclick = (e) => { e.stopPropagation(); toggleMax(id); };
-    el.querySelector('[data-act="min"]').onclick = (e) => {
-      e.stopPropagation();
-      el.style.display = 'none';
-    };
+    el.querySelector('[data-act="max"]').onclick = (e) => { e.stopPropagation(); el.classList.toggle('maximized'); };
+    el.querySelector('[data-act="min"]').onclick = (e) => { e.stopPropagation(); el.style.display = 'none'; };
     el.addEventListener('mousedown', () => focusWin(id));
-
     enableWinDrag(el);
     enableWinResize(el);
     windowLayer.appendChild(el);
@@ -196,129 +194,267 @@
     focusWin(id);
     return windows.get(id);
   }
-
   function enableWinDrag(el) {
     const bar = el.querySelector('[data-drag]');
     bar.addEventListener('pointerdown', (e) => {
-      if (e.target.closest('.win-controls')) return;
-      if (el.classList.contains('maximized')) return;
+      if (e.target.closest('.win-controls') || el.classList.contains('maximized')) return;
       e.preventDefault();
       const rect = el.getBoundingClientRect();
       const desk = document.getElementById('desktop').getBoundingClientRect();
-      const ox = e.clientX - rect.left;
-      const oy = e.clientY - rect.top;
+      const ox = e.clientX - rect.left, oy = e.clientY - rect.top;
       bar.setPointerCapture(e.pointerId);
       const onMove = (ev) => {
-        let left = ev.clientX - desk.left - ox;
-        let top = ev.clientY - desk.top - oy;
-        left = Math.max(-rect.width + 80, Math.min(desk.width - 40, left));
-        top = Math.max(0, Math.min(desk.height - 40, top));
-        el.style.left = left + 'px';
-        el.style.top = top + 'px';
+        el.style.left = Math.max(-rect.width + 80, Math.min(desk.width - 40, ev.clientX - desk.left - ox)) + 'px';
+        el.style.top = Math.max(0, Math.min(desk.height - 40, ev.clientY - desk.top - oy)) + 'px';
       };
-      const onUp = () => {
-        bar.releasePointerCapture?.(e.pointerId);
-        bar.removeEventListener('pointermove', onMove);
-        bar.removeEventListener('pointerup', onUp);
-      };
+      const onUp = () => { bar.releasePointerCapture?.(e.pointerId); bar.removeEventListener('pointermove', onMove); bar.removeEventListener('pointerup', onUp); };
       bar.addEventListener('pointermove', onMove);
       bar.addEventListener('pointerup', onUp);
     });
   }
-
   function enableWinResize(el) {
     const handle = el.querySelector('[data-resize]');
     handle.addEventListener('pointerdown', (e) => {
       if (el.classList.contains('maximized')) return;
-      e.preventDefault();
-      e.stopPropagation();
-      const startX = e.clientX, startY = e.clientY;
-      const startW = el.offsetWidth, startH = el.offsetHeight;
+      e.preventDefault(); e.stopPropagation();
+      const sx = e.clientX, sy = e.clientY, sw = el.offsetWidth, sh = el.offsetHeight;
       handle.setPointerCapture(e.pointerId);
       const onMove = (ev) => {
-        el.style.width = Math.max(320, startW + (ev.clientX - startX)) + 'px';
-        el.style.height = Math.max(200, startH + (ev.clientY - startY)) + 'px';
+        el.style.width = Math.max(320, sw + (ev.clientX - sx)) + 'px';
+        el.style.height = Math.max(200, sh + (ev.clientY - sy)) + 'px';
       };
-      const onUp = () => {
-        handle.releasePointerCapture?.(e.pointerId);
-        handle.removeEventListener('pointermove', onMove);
-        handle.removeEventListener('pointerup', onUp);
-      };
+      const onUp = () => { handle.releasePointerCapture?.(e.pointerId); handle.removeEventListener('pointermove', onMove); handle.removeEventListener('pointerup', onUp); };
       handle.addEventListener('pointermove', onMove);
       handle.addEventListener('pointerup', onUp);
     });
   }
 
-  // ——— API helpers ———
   async function api(path, opts) {
     const r = await fetch(path, opts);
     const t = await r.text();
-    try { return JSON.parse(t); } catch { return { raw: t, ok: r.ok }; }
+    try { return JSON.parse(t); } catch { return { raw: t, ok: r.ok, status: r.status }; }
   }
 
-  // ——— Apps ———
   function launch(id) {
     startMenu.classList.add('hidden');
-    switch (id) {
-      case 'studio':
-        createWindow({
-          id: 'app-studio',
-          title: 'Alset Studio',
-          width: Math.min(1100, window.innerWidth - 40),
-          height: Math.min(700, window.innerHeight - 80),
-          iframeSrc: '/tools/',
-        });
-        break;
-      case 'editor':
-        createWindow({
-          id: 'app-editor',
-          title: 'Alset-JS Editor',
-          width: Math.min(1100, window.innerWidth - 40),
-          height: Math.min(700, window.innerHeight - 80),
-          iframeSrc: '/tools/alset-editor/',
-        });
-        break;
-      case 'terminal':
-        openTerminal();
-        break;
-      case 'mind':
-        openMind();
-        break;
-      case 'organism':
-        openOrganism();
-        break;
-      case 'status':
-        openStatus();
-        break;
-      case 'files':
-        openFiles();
-        break;
-      case 'about':
-        createWindow({
-          id: 'app-about',
-          title: 'Acerca de Alset OS',
-          width: 420,
-          height: 280,
-          contentHTML: `<p><strong>Alset Desktop</strong> — gestor de ventanas nativo del ecosistema Alset.</p>
-            <p class="status-pre">Mind · Zyrion · Neural · Silogismos disponibles como servicios del sistema.
-Studio y Editor se ejecutan dentro del escritorio (no en pestañas externas).</p>
-            <p class="status-pre">Iconos arrastrables · ventanas movibles · persistencia local de layout de iconos.</p>`,
-        });
-        break;
-      default:
-        break;
+    if (id === 'studio') {
+      createWindow({
+        id: 'app-studio', title: 'Alset Studio',
+        width: Math.min(1100, window.innerWidth - 40),
+        height: Math.min(720, window.innerHeight - 80),
+        iframeSrc: '/tools/',
+      });
+      return;
+    }
+    if (id === 'editor') {
+      createWindow({
+        id: 'app-editor', title: 'Alset-JS Editor',
+        width: Math.min(1100, window.innerWidth - 40),
+        height: Math.min(720, window.innerHeight - 80),
+        iframeSrc: '/alset-editor/',
+      });
+      return;
+    }
+    if (id === 'files') return openFiles();
+    if (id === 'terminal') return openTerminal();
+    if (id === 'mind') return openMind();
+    if (id === 'apps') return openApps();
+    if (id === 'settings') return openSettings();
+    if (id === 'organism') return openOrganism();
+    if (id === 'status') return openStatus();
+    if (id === 'about') {
+      createWindow({
+        id: 'app-about', title: 'Acerca de Alset OS', width: 440, height: 300,
+        contentHTML: `<p><strong>Alset Desktop</strong></p>
+          <p class="status-pre">Ventanas · archivos · apps instaladas · Mind/Zyrion/Neural · LispAI en terminal.
+Studio/Editor dentro del SO. Despliega apps y ábrelas aquí.</p>`,
+      });
     }
   }
 
+  // —— Files ——
+  function openFiles(startPath) {
+    const w = createWindow({
+      id: 'app-files', title: 'Archivos · AlsetOS', width: 640, height: 480,
+      contentHTML: `
+        <div class="row" style="margin-bottom:8px;gap:8px;display:flex;flex-wrap:wrap;align-items:center">
+          <button type="button" class="btn btn-ghost" id="fs-up">↑ Padre</button>
+          <button type="button" class="btn btn-ghost" id="fs-refresh">Actualizar</button>
+          <button type="button" class="btn btn-gold" id="fs-mkdir">Nueva carpeta</button>
+          <span id="fs-path" style="color:var(--muted);font-size:12px;font-family:monospace"></span>
+        </div>
+        <div id="fs-list" class="fs-list"></div>
+        <pre class="out" id="fs-preview" style="max-height:160px">Selecciona un archivo de texto para previsualizar</pre>`,
+    });
+    let cur = startPath || '';
+    const listEl = w.el.querySelector('#fs-list');
+    const pathEl = w.el.querySelector('#fs-path');
+    const prev = w.el.querySelector('#fs-preview');
+
+    async function load(path) {
+      cur = path || '';
+      const data = await api('/v1/fs/list?path=' + encodeURIComponent(cur));
+      pathEl.textContent = data.rel || data.path || '/';
+      listEl.innerHTML = '';
+      (data.entries || []).forEach((e) => {
+        const row = document.createElement('button');
+        row.type = 'button';
+        row.className = 'fs-row';
+        row.innerHTML = `<span>${e.dir ? '📁' : '📄'}</span> <span>${e.name}</span>` +
+          (e.size != null ? `<span class="sz">${e.size} B</span>` : '');
+        row.onclick = async () => {
+          const next = cur ? (cur.replace(/\/$/, '') + '/' + e.name) : e.name;
+          if (e.dir) load(next);
+          else {
+            const r = await api('/v1/fs/read?path=' + encodeURIComponent(next));
+            prev.textContent = r.content != null ? r.content : JSON.stringify(r);
+          }
+        };
+        listEl.appendChild(row);
+      });
+    }
+    w.el.querySelector('#fs-up').onclick = async () => {
+      const data = await api('/v1/fs/list?path=' + encodeURIComponent(cur));
+      load(data.parent === data.root ? '' : (data.parent || ''));
+    };
+    w.el.querySelector('#fs-refresh').onclick = () => load(cur);
+    w.el.querySelector('#fs-mkdir').onclick = async () => {
+      const name = prompt('Nombre de carpeta');
+      if (!name) return;
+      const path = cur ? cur + '/' + name : name;
+      await api('/v1/fs/mkdir', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path }) });
+      load(cur);
+    };
+    load(cur);
+  }
+
+  // —— Apps ——
+  async function openApps() {
+    const w = createWindow({
+      id: 'app-apps', title: 'Apps instaladas', width: 520, height: 420,
+      contentHTML: `
+        <div class="row" style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+          <button type="button" class="btn btn-gold" id="btn-deploy-calc">Instalar Calculadora</button>
+          <button type="button" class="btn btn-ghost" id="btn-apps-refresh">Actualizar</button>
+        </div>
+        <div id="apps-list"></div>
+        <p style="color:var(--muted);font-size:12px;margin-top:12px">Despliega desde Studio/Editor o terminal: <code>(deploy-app nombre)</code></p>`,
+    });
+    async function refresh() {
+      const data = await api('/v1/apps/list');
+      const box = w.el.querySelector('#apps-list');
+      box.innerHTML = '';
+      (data.apps || []).forEach((a) => {
+        const row = document.createElement('div');
+        row.className = 'card';
+        row.style.marginBottom = '8px';
+        row.innerHTML = `<strong>${a.title || a.name}</strong>
+          <div class="row" style="margin-top:8px">
+            <button type="button" class="btn btn-gold" data-open="${a.name}">Abrir</button>
+          </div>`;
+        row.querySelector('[data-open]').onclick = () => openInstalledApp(a.name, a.title || a.name);
+        box.appendChild(row);
+      });
+      if (!(data.apps || []).length) box.innerHTML = '<p style="color:var(--muted)">Ninguna app aún. Instala la calculadora o despliega desde Studio.</p>';
+    }
+    w.el.querySelector('#btn-apps-refresh').onclick = refresh;
+    w.el.querySelector('#btn-deploy-calc').onclick = async () => {
+      await api('/v1/apps/deploy', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'calculadora', title: 'Calculadora', kind: 'html' }),
+      });
+      // add desktop icon if missing
+      if (!iconState.find((i) => i.id === 'app:calculadora')) {
+        iconState.push({ id: 'app:calculadora', label: 'Calculadora', glyph: '🔢', x: 216, y: 24 });
+        saveIcons(iconState);
+        renderIcons();
+      }
+      refresh();
+    };
+    refresh();
+  }
+
+  function openInstalledApp(name, title) {
+    createWindow({
+      id: 'installed-' + name,
+      title: title || name,
+      width: 400,
+      height: 480,
+      iframeSrc: '/apps/' + name + '/',
+    });
+  }
+
+  // Patch launch for app: icons
+  const _launch = launch;
+  launch = function (id) {
+    if (id && id.startsWith('app:')) {
+      openInstalledApp(id.slice(4), id.slice(4));
+      return;
+    }
+    return _launch(id);
+  };
+
+  // —— Settings ——
+  function openSettings() {
+    let cur = {};
+    try { cur = JSON.parse(localStorage.getItem(THEME_KEY) || '{}'); } catch (_) {}
+    const w = createWindow({
+      id: 'app-settings', title: 'Ajustes del escritorio', width: 480, height: 460,
+      contentHTML: `
+        <div class="card"><h3>Tema</h3>
+          <label>Fondo
+            <select id="set-wall">
+              <option value="default">Default</option>
+              <option value="aurora">Aurora</option>
+              <option value="ember">Ember</option>
+              <option value="plain">Liso</option>
+            </select>
+          </label>
+          <label style="display:block;margin-top:8px">Acento <input id="set-gold" type="color" value="${cur.gold || '#f0c14b'}" /></label>
+          <label style="display:block;margin-top:8px">Tipografía
+            <select id="set-font">
+              <option value="system-ui">System</option>
+              <option value="Georgia">Georgia</option>
+              <option value="ui-monospace">Mono</option>
+              <option value="Inter">Inter</option>
+            </select>
+          </label>
+          <label style="display:block;margin-top:8px">Tamaño iconos
+            <input id="set-icon" type="range" min="0.8" max="1.4" step="0.1" value="${cur.iconScale || 1}" />
+          </label>
+          <div class="row" style="margin-top:12px">
+            <button type="button" class="btn btn-gold" id="set-apply">Aplicar</button>
+            <button type="button" class="btn btn-ghost" id="set-reset">Reset iconos</button>
+          </div>
+        </div>`,
+    });
+    w.el.querySelector('#set-wall').value = cur.wallpaper || 'default';
+    w.el.querySelector('#set-font').value = cur.font || 'system-ui';
+    w.el.querySelector('#set-apply').onclick = () => {
+      applyTheme({
+        gold: w.el.querySelector('#set-gold').value,
+        font: w.el.querySelector('#set-font').value,
+        iconScale: w.el.querySelector('#set-icon').value,
+        wallpaper: w.el.querySelector('#set-wall').value,
+      });
+      renderIcons();
+    };
+    w.el.querySelector('#set-reset').onclick = () => {
+      iconState = DEFAULT_ICONS.map((i) => ({ ...i }));
+      saveIcons(iconState);
+      renderIcons();
+    };
+  }
+
+  // —— Terminal + LispAI ——
   function openTerminal() {
     const w = createWindow({
-      id: 'app-terminal',
-      title: 'Terminal · LispAI / alsetState',
-      width: 640,
-      height: 420,
-      contentHTML: `<pre class="term-out" id="term-out">Alset Terminal
-help · status · organism · (recordar k v) · (leer k) · (set-state k v) · (get-state k)
-(mind texto) · (zyrion a b) · (assert s r o) · (infer) · (neural k v)
+      id: 'app-terminal', title: 'Terminal · LispAI / AlsetOS', width: 680, height: 440,
+      contentHTML: `<pre class="term-out" id="term-out">Alset LispAI Terminal
+help · ls · cat path · open studio|editor|files|apps|settings
+(theme gold "#f0c14b") (wallpaper aurora) (icon-scale 1.2)
+(deploy-app calculadora) (open-app calculadora)
+(recordar k v) (mind …) (zyrion a b)
 </pre>
 <form class="term-form" id="term-form"><span class="prompt">›</span><input id="term-in" autocomplete="off" /></form>`,
     });
@@ -332,7 +468,7 @@ help · status · organism · (recordar k v) · (leer k) · (set-state k v) · (
         const line = input.value;
         input.value = '';
         out.textContent += '› ' + line + '\n';
-        const res = await execTerm(line);
+        const res = await execLispAI(line);
         if (res != null) out.textContent += res + '\n';
         out.scrollTop = out.scrollHeight;
       });
@@ -358,273 +494,176 @@ help · status · organism · (recordar k v) · (leer k) · (set-state k v) · (
     return { op, parts };
   }
 
-  async function execTerm(line) {
+  async function execLispAI(line) {
     const raw = (line || '').trim();
     if (!raw) return null;
     const low = raw.toLowerCase();
     if (low === 'help') {
-      return 'status organism clear mem studio editor mind\n(recordar k v) (leer k) (set-state k v) (get-state k)\n(mind texto…) (zyrion a b) (assert s r o [c]) (infer) (ask s r)\n(neural k peso) (neural-get k)';
+      return `Comandos:
+  ls [path] | cat path | open <studio|editor|files|apps|settings|mind>
+  (theme gold "#hex") (wallpaper aurora|ember|plain|default)
+  (icon-scale 1.2) (deploy-app name) (open-app name) (apps)
+  (recordar k v) (leer k) (mind texto) (zyrion a b)
+  (assert s r o) (infer) (neural k v) status organism`;
     }
     if (low === 'clear') {
       const o = document.getElementById('term-out');
       if (o) o.textContent = '';
       return null;
     }
-    if (low === 'mem') return JSON.stringify(mem, null, 2);
-    if (low === 'studio' || low === 'editor' || low === 'mind') { launch(low); return 'ok'; }
-    if (low === 'status') {
-      const st = await api('/v1/status');
-      return JSON.stringify(st, null, 2);
+    if (low.startsWith('ls')) {
+      const path = raw.slice(2).trim();
+      const data = await api('/v1/fs/list?path=' + encodeURIComponent(path));
+      return (data.entries || []).map((e) => (e.dir ? '📁 ' : '📄 ') + e.name).join('\n') || '(vacío)';
     }
-    if (low === 'organism') {
-      const r = await api('/v1/organism/run', { method: 'POST' });
-      return JSON.stringify(r, null, 2);
+    if (low.startsWith('cat ')) {
+      const r = await api('/v1/fs/read?path=' + encodeURIComponent(raw.slice(4).trim()));
+      return r.content != null ? r.content : JSON.stringify(r);
     }
+    if (low.startsWith('open ')) {
+      launch(raw.slice(5).trim());
+      return 'ok';
+    }
+    if (low === 'status') return JSON.stringify(await api('/v1/status'), null, 2);
+    if (low === 'organism') return JSON.stringify(await api('/v1/organism/run', { method: 'POST' }), null, 2);
+    if (low === 'apps') return JSON.stringify(await api('/v1/apps/list'), null, 2);
+
     const L = parseLisp(raw);
     if (!L) return 'desconocido — help';
     const { op, parts } = L;
+    if (op === 'theme') {
+      const key = parts[0], val = parts[1];
+      const cur = JSON.parse(localStorage.getItem(THEME_KEY) || '{}');
+      if (key === 'gold' || key === 'accent') cur[key] = val;
+      applyTheme(cur);
+      return 'theme ok';
+    }
+    if (op === 'wallpaper') {
+      const cur = JSON.parse(localStorage.getItem(THEME_KEY) || '{}');
+      cur.wallpaper = parts[0];
+      applyTheme(cur);
+      return 'wallpaper ' + parts[0];
+    }
+    if (op === 'icon-scale') {
+      const cur = JSON.parse(localStorage.getItem(THEME_KEY) || '{}');
+      cur.iconScale = parts[0];
+      applyTheme(cur);
+      renderIcons();
+      return 'icon-scale ' + parts[0];
+    }
+    if (op === 'deploy-app') {
+      const name = parts[0] || 'calculadora';
+      const r = await api('/v1/apps/deploy', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, title: name, kind: 'html' }),
+      });
+      if (!iconState.find((i) => i.id === 'app:' + name)) {
+        iconState.push({ id: 'app:' + name, label: name, glyph: '📦', x: 216, y: 24 + iconState.length * 20 });
+        saveIcons(iconState); renderIcons();
+      }
+      return JSON.stringify(r);
+    }
+    if (op === 'open-app') {
+      openInstalledApp(parts[0], parts[0]);
+      return 'ok';
+    }
+    if (op === 'open') { launch(parts[0]); return 'ok'; }
     if (op === 'recordar' || op === 'set-state') {
       mem[parts[0]] = parts.slice(1).join(' ');
-      return 'ok ' + parts[0];
+      return 'ok';
     }
-    if (op === 'leer' || op === 'get-state') {
-      return parts[0] + ' => ' + (mem[parts[0]] ?? 'nil');
-    }
+    if (op === 'leer' || op === 'get-state') return parts[0] + ' => ' + (mem[parts[0]] ?? 'nil');
     if (op === 'mind') {
-      const text = parts.join(' ');
-      const r = await api('/v1/mind/tick', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
-      });
+      const r = await api('/v1/mind/tick', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: parts.join(' ') }) });
       updateTrayMind(r);
       return JSON.stringify(r, null, 2);
     }
     if (op === 'zyrion') {
-      const a = Number(parts[0]), b = Number(parts[1]);
-      const r = await api('/v1/zyrion', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ a, b }),
-      });
-      return JSON.stringify(r, null, 2);
+      return JSON.stringify(await api('/v1/zyrion', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ a: Number(parts[0]), b: Number(parts[1]) }) }), null, 2);
     }
     if (op === 'assert') {
-      const [s, r, o, c] = parts;
-      const res = await api('/v1/syllogism/assert', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ s, r, o, c: c != null ? Number(c) : 1 }),
-      });
-      return JSON.stringify(res, null, 2);
+      return JSON.stringify(await api('/v1/syllogism/assert', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ s: parts[0], r: parts[1], o: parts[2], c: 1 }) }), null, 2);
     }
     if (op === 'infer' || op === 'ask') {
-      const res = await api('/v1/syllogism/' + (op === 'ask' ? 'ask' : 'infer'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ s: parts[0], r: parts[1], o: parts[2] }),
-      });
-      return JSON.stringify(res, null, 2);
+      return JSON.stringify(await api('/v1/syllogism/' + op, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ s: parts[0], r: parts[1], o: parts[2] }) }), null, 2);
     }
     if (op === 'neural') {
-      const k = parts[0];
-      const v = Number(parts[1]);
-      const res = await api('/v1/neural', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: k, value: v }),
-      });
-      return JSON.stringify(res, null, 2);
+      return JSON.stringify(await api('/v1/neural', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: parts[0], value: Number(parts[1]) }) }), null, 2);
     }
-    if (op === 'neural-get') {
-      const res = await api('/v1/neural?key=' + encodeURIComponent(parts[0]));
-      return JSON.stringify(res, null, 2);
+    if (op === 'ls') {
+      const data = await api('/v1/fs/list?path=' + encodeURIComponent(parts[0] || ''));
+      return (data.entries || []).map((e) => e.name).join('\n');
     }
     return 'forma no reconocida: ' + op;
   }
 
   function updateTrayMind(r) {
     if (!r) return;
-    const d = r.decision || r.voice || r.estado || '—';
-    trayMind.textContent = 'Mind · ' + String(d).slice(0, 24);
+    trayMind.textContent = 'Mind · ' + String(r.decision || r.voice || '—').slice(0, 28);
   }
 
   function openMind() {
     const w = createWindow({
-      id: 'app-mind',
-      title: 'Mind · Zyrion · Neural · Silogismos',
-      width: 760,
-      height: 560,
+      id: 'app-mind', title: 'Mind · Zyrion · Neural · Silogismos', width: 760, height: 520,
       contentHTML: `
 <div class="cog-grid two">
-  <div class="card">
-    <h3>Mind · latido</h3>
-    <textarea id="mind-in" rows="3" placeholder="observa el escritorio · quién eres"></textarea>
-    <div class="row"><button type="button" class="btn btn-gold" id="btn-mind">Enviar latido</button></div>
+  <div class="card"><h3>Mind</h3>
+    <textarea id="mind-in" rows="2">escritorio alset</textarea>
+    <div class="row"><button type="button" class="btn btn-gold" id="btn-mind">Latido</button></div>
     <pre class="out" id="mind-out">—</pre>
   </div>
-  <div class="card">
-    <h3>Zyrion · ternario</h3>
-    <div class="row">
-      <label>a <input id="zyr-a" type="number" step="0.1" value="0.2" style="width:80px" /></label>
-      <label>b <input id="zyr-b" type="number" step="0.1" value="0.8" style="width:80px" /></label>
-    </div>
+  <div class="card"><h3>Zyrion</h3>
+    <div class="row"><input id="zyr-a" type="number" step="0.1" value="0.2" style="width:80px"/><input id="zyr-b" type="number" step="0.1" value="0.8" style="width:80px"/></div>
     <div class="row"><button type="button" class="btn btn-gold" id="btn-zyr">Evaluar</button></div>
     <pre class="out" id="zyr-out">—</pre>
   </div>
-  <div class="card">
-    <h3>Silogismos</h3>
-    <input id="syl-s" placeholder="sujeto" value="organismo" />
-    <input id="syl-r" placeholder="relación" value="tiene_capacidad" style="margin-top:6px" />
-    <input id="syl-o" placeholder="objeto" value="backup" style="margin-top:6px" />
-    <div class="row">
-      <button type="button" class="btn btn-ghost" id="btn-assert">Assert</button>
-      <button type="button" class="btn btn-ghost" id="btn-infer">Infer</button>
-      <button type="button" class="btn btn-ghost" id="btn-ask">Ask</button>
-    </div>
-    <pre class="out" id="syl-out">—</pre>
-  </div>
-  <div class="card">
-    <h3>Red neuronal (pesos)</h3>
-    <input id="neu-k" placeholder="clave" value="atencion.ui" />
-    <input id="neu-v" type="number" step="0.05" min="0" max="1" value="0.5" style="margin-top:6px" />
-    <div class="row">
-      <button type="button" class="btn btn-gold" id="btn-neu-set">Guardar peso</button>
-      <button type="button" class="btn btn-ghost" id="btn-neu-list">Listar</button>
-    </div>
-    <pre class="out" id="neu-out">—</pre>
-  </div>
-</div>
-<p style="color:var(--muted);font-size:12px;margin-top:12px">Estos servicios viven en el <strong>sistema</strong> (bridge). Las apps Studio/Editor pueden llamar las mismas rutas <code>/v1/mind/*</code>, <code>/v1/zyrion</code>, <code>/v1/syllogism/*</code>, <code>/v1/neural</code>.</p>`,
+</div>`,
     });
-    const root = w.el;
-    root.querySelector('#btn-mind').onclick = async () => {
-      const text = root.querySelector('#mind-in').value;
-      const r = await api('/v1/mind/tick', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
-      });
-      root.querySelector('#mind-out').textContent = JSON.stringify(r, null, 2);
+    w.el.querySelector('#btn-mind').onclick = async () => {
+      const r = await api('/v1/mind/tick', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: w.el.querySelector('#mind-in').value }) });
+      w.el.querySelector('#mind-out').textContent = JSON.stringify(r, null, 2);
       updateTrayMind(r);
     };
-    root.querySelector('#btn-zyr').onclick = async () => {
-      const a = Number(root.querySelector('#zyr-a').value);
-      const b = Number(root.querySelector('#zyr-b').value);
-      const r = await api('/v1/zyrion', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ a, b }),
-      });
-      root.querySelector('#zyr-out').textContent = JSON.stringify(r, null, 2);
-    };
-    const sylBody = () => ({
-      s: root.querySelector('#syl-s').value,
-      r: root.querySelector('#syl-r').value,
-      o: root.querySelector('#syl-o').value,
-      c: 1,
-    });
-    root.querySelector('#btn-assert').onclick = async () => {
-      const r = await api('/v1/syllogism/assert', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(sylBody()),
-      });
-      root.querySelector('#syl-out').textContent = JSON.stringify(r, null, 2);
-    };
-    root.querySelector('#btn-infer').onclick = async () => {
-      const r = await api('/v1/syllogism/infer', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(sylBody()),
-      });
-      root.querySelector('#syl-out').textContent = JSON.stringify(r, null, 2);
-    };
-    root.querySelector('#btn-ask').onclick = async () => {
-      const r = await api('/v1/syllogism/ask', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(sylBody()),
-      });
-      root.querySelector('#syl-out').textContent = JSON.stringify(r, null, 2);
-    };
-    root.querySelector('#btn-neu-set').onclick = async () => {
-      const r = await api('/v1/neural', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          key: root.querySelector('#neu-k').value,
-          value: Number(root.querySelector('#neu-v').value),
-        }),
-      });
-      root.querySelector('#neu-out').textContent = JSON.stringify(r, null, 2);
-    };
-    root.querySelector('#btn-neu-list').onclick = async () => {
-      const r = await api('/v1/neural');
-      root.querySelector('#neu-out').textContent = JSON.stringify(r, null, 2);
+    w.el.querySelector('#btn-zyr').onclick = async () => {
+      const r = await api('/v1/zyrion', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ a: Number(w.el.querySelector('#zyr-a').value), b: Number(w.el.querySelector('#zyr-b').value) }) });
+      w.el.querySelector('#zyr-out').textContent = JSON.stringify(r, null, 2);
     };
   }
 
   async function openOrganism() {
     const w = createWindow({
-      id: 'app-organism',
-      title: 'Organismo local',
-      width: 520,
-      height: 360,
-      contentHTML: `<p>Ejecuta un organismo AlsetOS vía el bridge.</p>
-        <div class="row"><button type="button" class="btn btn-gold" id="btn-run-org">Ejecutar</button></div>
-        <pre class="out" id="org-out">—</pre>`,
+      id: 'app-organism', title: 'Organismo', width: 480, height: 320,
+      contentHTML: `<button type="button" class="btn btn-gold" id="btn-run-org">Ejecutar</button><pre class="out" id="org-out">—</pre>`,
     });
     w.el.querySelector('#btn-run-org').onclick = async () => {
-      const r = await api('/v1/organism/run', { method: 'POST' });
-      w.el.querySelector('#org-out').textContent = JSON.stringify(r, null, 2);
+      w.el.querySelector('#org-out').textContent = JSON.stringify(await api('/v1/organism/run', { method: 'POST' }), null, 2);
     };
   }
 
   async function openStatus() {
-    const st = await api('/v1/status');
     createWindow({
-      id: 'app-status',
-      title: 'Estado del sistema',
-      width: 520,
-      height: 400,
-      contentHTML: `<pre class="status-pre">${JSON.stringify(st, null, 2)}</pre>`,
+      id: 'app-status', title: 'Estado', width: 520, height: 360,
+      contentHTML: `<pre class="status-pre">${JSON.stringify(await api('/v1/status'), null, 2)}</pre>`,
     });
   }
 
-  async function openFiles() {
-    const st = await api('/v1/fs/list');
-    createWindow({
-      id: 'app-files',
-      title: 'Archivos · data dir',
-      width: 480,
-      height: 360,
-      contentHTML: `<pre class="status-pre">${JSON.stringify(st, null, 2)}</pre>`,
-    });
-  }
-
-  // ——— Chrome ——
+  // start menu — ensure items exist in HTML; wire data-launch
   document.getElementById('btn-start').onclick = (e) => {
     e.stopPropagation();
     startMenu.classList.toggle('hidden');
   };
   document.addEventListener('click', (e) => {
-    if (!startMenu.contains(e.target) && e.target.id !== 'btn-start') {
-      startMenu.classList.add('hidden');
-    }
+    if (!startMenu.contains(e.target) && e.target.id !== 'btn-start') startMenu.classList.add('hidden');
   });
   document.querySelectorAll('[data-launch]').forEach((btn) => {
     btn.addEventListener('click', () => launch(btn.getAttribute('data-launch')));
   });
 
-  function clock() {
-    trayClock.textContent = new Date().toLocaleString();
-  }
-  setInterval(clock, 1000);
-  clock();
+  function clock() { trayClock.textContent = new Date().toLocaleString(); }
+  setInterval(clock, 1000); clock();
 
-  // Boot cognitive ping
-  api('/v1/mind/tick', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text: 'escritorio listo' }),
-  }).then(updateTrayMind).catch(() => {
-    trayMind.textContent = 'Mind · offline';
-  });
+  api('/v1/mind/tick', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: 'escritorio listo' }) })
+    .then(updateTrayMind).catch(() => { trayMind.textContent = 'Mind · offline'; });
 
   renderIcons();
 })();

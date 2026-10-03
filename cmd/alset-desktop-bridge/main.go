@@ -105,27 +105,17 @@ func main() {
 		}
 		writeJSON(w, map[string]any{"ok": true, "output": out, "organism": b.orgName, "rootcid": b.rootCID})
 	})
-	mux.HandleFunc("/v1/fs/list", func(w http.ResponseWriter, r *http.Request) {
-		dir := r.URL.Query().Get("path")
-		if dir == "" {
-			dir = dataDir
-		}
-		abs, err := filepath.Abs(dir)
-		if err != nil || !under(dataDir, abs) {
-			http.Error(w, "path not allowed", 403)
-			return
-		}
-		entries, err := os.ReadDir(abs)
-		if err != nil {
-			http.Error(w, err.Error(), 500)
-			return
-		}
-		var names []string
-		for _, e := range entries {
-			names = append(names, e.Name())
-		}
-		writeJSON(w, map[string]any{"path": abs, "entries": names})
-	})
+	mux.HandleFunc("/v1/fs/list", b.handleFSList)
+	mux.HandleFunc("/v1/fs/read", b.handleFSRead)
+	mux.HandleFunc("/v1/fs/write", b.handleFSWrite)
+	mux.HandleFunc("/v1/fs/mkdir", b.handleFSMkdir)
+	mux.HandleFunc("/v1/apps/list", b.handleAppsList)
+	mux.HandleFunc("/v1/apps/deploy", b.handleAppsDeploy)
+	mux.HandleFunc("/v1/apps/get", b.handleAppsGet)
+	// Installed apps as static files under /apps/<name>/
+	appsDir := filepath.Join(dataDir, "apps")
+	_ = os.MkdirAll(appsDir, 0o755)
+	mux.Handle("/apps/", http.StripPrefix("/apps/", http.FileServer(http.Dir(appsDir))))
 
 	// —— Cognition (system services for OS + apps) ——
 	mux.HandleFunc("/v1/mind/tick", b.handleMind)
@@ -137,9 +127,29 @@ func main() {
 
 	if web != "" {
 		log.Printf("tools web: %s", web)
+		// Absolute paths expected by Studio/Editor (same as standalone :5177)
+		mount := func(urlPath, dir string) {
+			if st, err := os.Stat(dir); err == nil && st.IsDir() {
+				mux.Handle(urlPath, http.StripPrefix(strings.TrimSuffix(urlPath, "/"), http.FileServer(http.Dir(dir))))
+				// also with trailing patterns via FileServer parent
+			}
+		}
+		// Serve full web tree at /tools/ (Studio index)
 		mux.Handle("/tools/", http.StripPrefix("/tools/", http.FileServer(http.Dir(web))))
-		mux.Handle("/studio/", http.StripPrefix("/studio/", http.FileServer(http.Dir(web))))
-		mux.Handle("/alset-editor/", http.StripPrefix("/alset-editor/", http.FileServer(http.Dir(filepath.Join(web, "alset-editor")))))
+		// Root-absolute asset mounts so /css /studio /runtime resolve inside desktop
+		for _, sub := range []string{"css", "studio", "runtime", "alset", "lispai", "alset-editor"} {
+			dir := filepath.Join(web, sub)
+			if st, err := os.Stat(dir); err == nil && st.IsDir() {
+				pfx := "/" + sub
+				mux.Handle(pfx+"/", http.StripPrefix(pfx, http.FileServer(http.Dir(dir))))
+				log.Printf("mount %s/ → %s", pfx, dir)
+			}
+		}
+		// Studio index also at /studio-app/ for clarity
+		mux.HandleFunc("/studio-app/", func(w http.ResponseWriter, r *http.Request) {
+			http.ServeFile(w, r, filepath.Join(web, "index.html"))
+		})
+		_ = mount
 	}
 	if sh != "" {
 		log.Printf("shell static: %s", sh)
@@ -353,6 +363,234 @@ func (b *bridge) runOrganism(alsetosBin string) (string, error) {
 	b.mu.Unlock()
 	return string(out), err
 }
+
+
+func (b *bridge) safePath(rel string) (string, error) {
+	if rel == "" || rel == "." {
+		return b.dataDir, nil
+	}
+	// allow absolute only if under dataDir
+	var candidate string
+	if filepath.IsAbs(rel) {
+		candidate = rel
+	} else {
+		candidate = filepath.Join(b.dataDir, rel)
+	}
+	abs, err := filepath.Abs(candidate)
+	if err != nil {
+		return "", err
+	}
+	if !under(b.dataDir, abs) {
+		return "", fmt.Errorf("path not allowed")
+	}
+	return abs, nil
+}
+
+func (b *bridge) handleFSList(w http.ResponseWriter, r *http.Request) {
+	rel := r.URL.Query().Get("path")
+	abs, err := b.safePath(rel)
+	if err != nil {
+		http.Error(w, err.Error(), 403)
+		return
+	}
+	entries, err := os.ReadDir(abs)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	type ent struct {
+		Name  string `json:"name"`
+		Dir   bool   `json:"dir"`
+		Size  int64  `json:"size,omitempty"`
+	}
+	var list []ent
+	for _, e := range entries {
+		item := ent{Name: e.Name(), Dir: e.IsDir()}
+		if fi, err := e.Info(); err == nil && !e.IsDir() {
+			item.Size = fi.Size()
+		}
+		list = append(list, item)
+	}
+	parent := ""
+	if abs != b.dataDir {
+		parent = filepath.Dir(abs)
+		if !under(b.dataDir, parent) {
+			parent = b.dataDir
+		}
+		// relative parent for UI
+		if relp, err := filepath.Rel(b.dataDir, parent); err == nil {
+			parent = relp
+		}
+	}
+	curRel, _ := filepath.Rel(b.dataDir, abs)
+	writeJSON(w, map[string]any{"path": abs, "rel": curRel, "parent": parent, "root": b.dataDir, "entries": list})
+}
+
+func (b *bridge) handleFSRead(w http.ResponseWriter, r *http.Request) {
+	abs, err := b.safePath(r.URL.Query().Get("path"))
+	if err != nil {
+		http.Error(w, err.Error(), 403)
+		return
+	}
+	data, err := os.ReadFile(abs)
+	if err != nil {
+		http.Error(w, err.Error(), 404)
+		return
+	}
+	if len(data) > 512*1024 {
+		http.Error(w, "file too large", 413)
+		return
+	}
+	writeJSON(w, map[string]any{"ok": true, "path": abs, "content": string(data)})
+}
+
+func (b *bridge) handleFSWrite(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST only", 405)
+		return
+	}
+	var body struct {
+		Path    string `json:"path"`
+		Content string `json:"content"`
+	}
+	_ = json.NewDecoder(io.LimitReader(r.Body, 2<<20)).Decode(&body)
+	abs, err := b.safePath(body.Path)
+	if err != nil {
+		http.Error(w, err.Error(), 403)
+		return
+	}
+	_ = os.MkdirAll(filepath.Dir(abs), 0o755)
+	if err := os.WriteFile(abs, []byte(body.Content), 0o644); err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	writeJSON(w, map[string]any{"ok": true, "path": abs})
+}
+
+func (b *bridge) handleFSMkdir(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST only", 405)
+		return
+	}
+	var body struct {
+		Path string `json:"path"`
+	}
+	_ = json.NewDecoder(io.LimitReader(r.Body, 1<<16)).Decode(&body)
+	abs, err := b.safePath(body.Path)
+	if err != nil {
+		http.Error(w, err.Error(), 403)
+		return
+	}
+	if err := os.MkdirAll(abs, 0o755); err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	writeJSON(w, map[string]any{"ok": true, "path": abs})
+}
+
+func (b *bridge) handleAppsList(w http.ResponseWriter, r *http.Request) {
+	dir := filepath.Join(b.dataDir, "apps")
+	_ = os.MkdirAll(dir, 0o755)
+	entries, _ := os.ReadDir(dir)
+	var apps []map[string]any
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		meta := map[string]any{"name": e.Name(), "url": "/apps/" + e.Name() + "/"}
+		if raw, err := os.ReadFile(filepath.Join(dir, e.Name(), "app.json")); err == nil {
+			var m map[string]any
+			if json.Unmarshal(raw, &m) == nil {
+				for k, v := range m {
+					meta[k] = v
+				}
+			}
+		}
+		apps = append(apps, meta)
+	}
+	writeJSON(w, map[string]any{"ok": true, "apps": apps})
+}
+
+func (b *bridge) handleAppsDeploy(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST only", 405)
+		return
+	}
+	var body struct {
+		Name  string `json:"name"`
+		Title string `json:"title"`
+		HTML  string `json:"html"`
+		Kind  string `json:"kind"` // html | alset-js
+	}
+	_ = json.NewDecoder(io.LimitReader(r.Body, 4<<20)).Decode(&body)
+	name := strings.TrimSpace(body.Name)
+	if name == "" {
+		name = "app"
+	}
+	name = strings.Map(func(r rune) rune {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
+			return r
+		}
+		return '-'
+	}, name)
+	dir := filepath.Join(b.dataDir, "apps", name)
+	_ = os.MkdirAll(dir, 0o755)
+	html := body.HTML
+	if html == "" {
+		// default calculator demo
+		html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Calculadora</title>
+<style>
+body{margin:0;font-family:system-ui;background:#0c1018;color:#f2f4f8;display:flex;justify-content:center;padding:24px}
+.calc{width:260px;background:#141824;border-radius:16px;padding:16px;border:1px solid rgba(255,255,255,.1)}
+.display{background:#080a0e;padding:16px;border-radius:10px;text-align:right;font-size:28px;margin-bottom:12px;min-height:40px}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+button{padding:14px;border:0;border-radius:10px;background:#1c2436;color:#fff;font-size:16px;cursor:pointer}
+button.op{background:#d4a017;color:#111}
+button.eq{background:#3ddc97;color:#111}
+</style></head><body>
+<div class="calc"><div class="display" id="d">0</div><div class="grid" id="g"></div></div>
+<script>
+let cur='0',op=null,acc=null;
+const d=document.getElementById('d');
+const keys=['7','8','9','/','4','5','6','*','1','2','3','-','0','.','=','+'];
+keys.forEach(k=>{
+  const b=document.createElement('button');
+  b.textContent=k;
+  if('/+-*'.includes(k))b.className='op';
+  if(k==='=')b.className='eq';
+  b.onclick=()=>{
+    if('0123456789.'.includes(k)){cur=cur==='0'&&k!=='.'?k:cur+k;d.textContent=cur;return;}
+    if(k==='='){if(op&&acc!=null){const n=Number(cur);let r=n;if(op==='+')r=acc+n;if(op==='-')r=acc-n;if(op==='*')r=acc*n;if(op==='/')r=acc/n;cur=String(r);acc=null;op=null;d.textContent=cur;}return;}
+    acc=Number(cur);op=k;cur='0';
+  };
+  document.getElementById('g').appendChild(b);
+});
+</script></body></html>`
+	}
+	if err := os.WriteFile(filepath.Join(dir, "index.html"), []byte(html), 0o644); err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	meta, _ := json.MarshalIndent(map[string]any{
+		"name": name, "title": body.Title, "kind": body.Kind, "deployed": time.Now().UTC(),
+	}, "", "  ")
+	_ = os.WriteFile(filepath.Join(dir, "app.json"), meta, 0o644)
+	writeJSON(w, map[string]any{"ok": true, "name": name, "url": "/apps/" + name + "/", "title": body.Title})
+}
+
+func (b *bridge) handleAppsGet(w http.ResponseWriter, r *http.Request) {
+	name := r.URL.Query().Get("name")
+	dir := filepath.Join(b.dataDir, "apps", name)
+	raw, err := os.ReadFile(filepath.Join(dir, "app.json"))
+	if err != nil {
+		http.Error(w, "not found", 404)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(raw)
+}
+
 
 func resolveDir(explicit string, cands []string) string {
 	if explicit != "" {

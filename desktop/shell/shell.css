@@ -185,3 +185,12 @@ html, body { margin: 0; height: 100%; overflow: hidden; font-family: var(--font)
   margin: 0; font-family: ui-monospace, monospace; font-size: 12px; color: var(--muted);
   white-space: pre-wrap;
 }
+.fs-list { display: flex; flex-direction: column; gap: 4px; max-height: 220px; overflow: auto; }
+.fs-row {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  text-align: left; padding: 8px 10px; border-radius: 8px;
+  background: transparent; border: 1px solid transparent; color: var(--text); cursor: pointer;
+}
+.fs-row:hover { background: rgba(255,255,255,0.06); border-color: var(--line); }
+.fs-row .sz { margin-left: auto; color: var(--muted); font-size: 11px; }
+.card label select, .card label input[type="color"] { margin-left: 8px; }
