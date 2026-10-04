@@ -7,34 +7,32 @@ import (
 )
 
 type builtinApp struct {
-	Name        string
-	Title       string
-	Glyph       string
-	MenuOnly    bool
-	HTML        string
+	Name     string
+	Title    string
+	Glyph    string
+	MenuOnly bool
+	HTML     string
 }
 
 func (b *bridge) seedBuiltinApps() {
 	apps := []builtinApp{
 		{Name: "org-manager", Title: "Organismos", Glyph: "◎", HTML: appHTMLOrgManager()},
 		{Name: "doc-reader", Title: "Documentos", Glyph: "📄", HTML: appHTMLDocReader()},
+		{Name: "notes", Title: "Notas", Glyph: "📝", HTML: appHTMLNotes()},
 		{Name: "audio-player", Title: "Audio", Glyph: "♫", MenuOnly: true, HTML: appHTMLAudio()},
 		{Name: "video-player", Title: "Video", Glyph: "▶", MenuOnly: true, HTML: appHTMLVideo()},
 		{Name: "image-viewer", Title: "Imágenes", Glyph: "🖼", HTML: appHTMLImage()},
 		{Name: "accounts", Title: "Cuentas", Glyph: "👤", HTML: appHTMLAccounts()},
 		{Name: "ipfs-store", Title: "IPFS Store", Glyph: "⬡", HTML: appHTMLIPFS()},
 		{Name: "files-ui", Title: "Archivos", Glyph: "📁", HTML: appHTMLFiles()},
-		{Name: "calculadora", Title: "Calculadora", Glyph: "🔢", HTML: ""}, // uses default calc in deploy
+		{Name: "calculadora", Title: "Calculadora", Glyph: "🔢", HTML: ""},
 	}
 	for _, a := range apps {
 		dir := filepath.Join(b.dataDir, "apps", a.Name)
-		if _, err := os.Stat(filepath.Join(dir, "index.html")); err == nil {
-			continue // don't overwrite user changes
-		}
+		// Always refresh builtin HTML so UI evolves with releases
 		_ = os.MkdirAll(dir, 0o755)
 		html := a.HTML
 		if html == "" {
-			// calculator from buildAppHTML empty tree path
 			html = buildAppHTML(a.Name, a.Title, map[string]any{})
 		}
 		_ = os.WriteFile(filepath.Join(dir, "index.html"), []byte(html), 0o644)
@@ -56,148 +54,453 @@ func shellApp(title, body string) string {
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>` + title + `</title>
 <style>
-:root{--bg:#0c1018;--panel:#141824;--line:rgba(255,255,255,.08);--gold:#f0c14b;--text:#f2f4f8;--muted:#8b93a7;--accent:#5b9fd4}
-*{box-sizing:border-box}body{margin:0;font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);padding:14px}
-h1{font-size:16px;color:var(--gold);margin:0 0 12px}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px}
-button,.btn{background:var(--gold);color:#111;border:0;border-radius:8px;padding:8px 12px;font-weight:600;cursor:pointer;margin:4px 4px 0 0}
-button.ghost{background:transparent;color:var(--muted);border:1px solid var(--line)}
-pre,textarea,input{width:100%;background:#080a0e;border:1px solid var(--line);border-radius:8px;color:var(--text);padding:8px;font-size:12px}
-pre{max-height:220px;overflow:auto;white-space:pre-wrap}
-.muted{color:var(--muted);font-size:12px}
+:root{--bg:#0b0f16;--panel:#131926;--panel2:#1a2233;--line:rgba(255,255,255,.08);--gold:#f0c14b;--text:#eef1f6;--muted:#8b93a7;--accent:#5b9fd4;--ok:#3ddc97;--danger:#e85d5d}
+*{box-sizing:border-box}html,body{height:100%}
+body{margin:0;font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);display:flex;flex-direction:column;min-height:100%}
+header.app{padding:10px 14px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;background:linear-gradient(180deg,#151c2a,#0f141e)}
+header.app h1{font-size:14px;margin:0;color:var(--gold);letter-spacing:.04em;font-weight:700}
+header.app .sub{color:var(--muted);font-size:11px;margin-left:auto}
+main{flex:1;padding:12px;overflow:auto;display:flex;flex-direction:column;gap:10px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}
+.card h3{margin:0 0 8px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
 .row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
-list-item, .item{display:block;padding:8px;border-radius:8px;border:1px solid transparent;cursor:pointer}
+.col{display:flex;flex-direction:column;gap:8px}
+button,.btn{background:var(--gold);color:#111;border:0;border-radius:8px;padding:8px 12px;font-weight:600;cursor:pointer;font-size:12px}
+button.ghost{background:transparent;color:var(--muted);border:1px solid var(--line)}
+button.danger{background:var(--danger);color:#fff}
+button:disabled{opacity:.45;cursor:not-allowed}
+input,textarea,select{width:100%;background:#080a0e;border:1px solid var(--line);border-radius:8px;color:var(--text);padding:8px 10px;font-size:13px}
+textarea{min-height:120px;resize:vertical;font-family:ui-monospace,monospace;line-height:1.4}
+pre{margin:0;max-height:240px;overflow:auto;white-space:pre-wrap;font-size:11px;color:var(--muted)}
+.muted{color:var(--muted);font-size:12px}
+.item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;border:1px solid transparent;cursor:pointer}
 .item:hover{background:rgba(255,255,255,.05);border-color:var(--line)}
+.item.active{background:rgba(240,193,75,.12);border-color:rgba(240,193,75,.35)}
+.item .name{flex:1;font-size:13px}
+.item .meta{font-size:11px;color:var(--muted)}
+.split{display:grid;grid-template-columns:220px 1fr;gap:10px;min-height:320px}
+@media(max-width:560px){.split{grid-template-columns:1fr}}
+.list{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:auto;max-height:420px}
+.toast{position:fixed;bottom:12px;right:12px;background:var(--panel2);border:1px solid var(--line);padding:8px 12px;border-radius:8px;font-size:12px;opacity:0;transition:.2s;z-index:9}
+.toast.show{opacity:1}
+.badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:10px;background:rgba(93,159,212,.2);color:var(--accent)}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th,td{text-align:left;padding:8px;border-bottom:1px solid var(--line)}
+th{color:var(--muted);font-weight:600}
+img.preview{max-width:100%;max-height:280px;border-radius:10px;background:#000}
+audio,video{width:100%;margin-top:8px}
 </style></head><body>
-<h1>` + title + `</h1>
-` + body + `
+<header class="app"><h1>` + title + `</h1><span class="sub">AlsetOS · organismo app</span></header>
+<div class="toast" id="toast"></div>
+<script>
+const tok=()=>localStorage.getItem('alset_token')||'';
+async function api(path,opts={}){
+  const h=Object.assign({'Content-Type':'application/json'},opts.headers||{});
+  if(tok())h['X-Alset-Token']=tok();
+  const r=await fetch(path,Object.assign({},opts,{headers:h}));
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(j.error||j.message||r.statusText||String(r.status));
+  return j;
+}
+function toast(m){const t=document.getElementById('toast');if(!t)return;t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200)}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+</script>
+<main>` + body + `</main>
 </body></html>`
 }
 
-func appHTMLOrgManager() string {
-	return shellApp("Administrador de organismos", `
-<p class="muted">Todo en AlsetOS es un organismo: apps, volúmenes, red, cuentas, IPFS.</p>
-<div class="row">
-<button onclick="load('')">Todos</button>
-<button class="ghost" onclick="load('app')">Apps</button>
-<button class="ghost" onclick="load('volume')">Volúmenes</button>
-<button class="ghost" onclick="load('network')">Red</button>
-<button class="ghost" onclick="load('ipfs')">IPFS</button>
+// bodyScriptClose: if body already has scripts, shellApp embeds body as main content only.
+// We restructure: body argument should NOT include closing - shellApp wraps body in main.
+// Fix: shellApp already put body inside main. Scripts must be inside body param.
+
+
+func appHTMLFiles() string {
+	body := `
+<div class="split">
+  <div class="col">
+    <div class="row">
+      <button type="button" onclick="go('')">Raíz</button>
+      <button type="button" class="ghost" onclick="up()">↑</button>
+      <button type="button" class="ghost" onclick="refresh()">↻</button>
+    </div>
+    <div class="list" id="list"></div>
+    <div class="card">
+      <h3>Nuevo</h3>
+      <input id="newName" placeholder="nombre.txt o carpeta"/>
+      <div class="row" style="margin-top:8px">
+        <button type="button" onclick="createFile()">Archivo</button>
+        <button type="button" class="ghost" onclick="createDir()">Carpeta</button>
+      </div>
+    </div>
+  </div>
+  <div class="col">
+    <div class="card">
+      <div class="row"><strong id="curPath" class="muted">/</strong>
+        <button type="button" class="ghost" id="btnSave" disabled onclick="save()">Guardar</button>
+        <button type="button" class="danger" id="btnDel" disabled onclick="del()">Eliminar</button>
+      </div>
+      <textarea id="editor" placeholder="Selecciona un archivo de texto…" disabled></textarea>
+    </div>
+  </div>
 </div>
-<pre id="out">Cargando…</pre>
 <script>
-async function load(kind){
-  const q=kind?('?kind='+kind):'';
-  const r=await fetch('/v1/organisms'+q); const j=await r.json();
-  document.getElementById('out').textContent=JSON.stringify(j.organisms||j,null,2);
+let cur='', selected=null, isDir=false;
+async function refresh(){
+  const j=await api('/v1/fs/list?path='+encodeURIComponent(cur));
+  const list=document.getElementById('list'); list.innerHTML='';
+  document.getElementById('curPath').textContent='/'+(cur||'');
+  (j.entries||j.items||[]).forEach(e=>{
+    const name=e.name||e;
+    const dir=!!(e.dir||e.is_dir);
+    const el=document.createElement('div');
+    el.className='item'+(selected===name?' active':'');
+    el.innerHTML='<span class="name">'+(dir?'📁 ':'📄 ')+esc(name)+'</span><span class="meta">'+(dir?'dir':'file')+'</span>';
+    el.onclick=()=>select(name,dir);
+    el.ondblclick=()=>{if(dir)go(join(cur,name)); else select(name,false)};
+    list.appendChild(el);
+  });
 }
-load('');
-</script>`)
+function join(a,b){return a?a.replace(/\/$/,'')+'/'+b:b}
+async function go(p){cur=p||'';selected=null;isDir=false;document.getElementById('editor').value='';document.getElementById('editor').disabled=true;document.getElementById('btnSave').disabled=true;document.getElementById('btnDel').disabled=true;await refresh()}
+async function up(){
+  if(!cur)return go('');
+  const parts=cur.split('/').filter(Boolean);parts.pop();
+  return go(parts.join('/'));
+}
+async function select(name,dir){
+  selected=name;isDir=dir;document.getElementById('btnDel').disabled=false;
+  if(dir){document.getElementById('editor').value='(carpeta)';document.getElementById('editor').disabled=true;document.getElementById('btnSave').disabled=true;await refresh();return}
+  const path=join(cur,name);
+  try{
+    const j=await api('/v1/fs/read?path='+encodeURIComponent(path));
+    document.getElementById('editor').disabled=false;
+    document.getElementById('editor').value=j.content??'';
+    document.getElementById('btnSave').disabled=false;
+  }catch(e){toast(e.message);document.getElementById('editor').disabled=true}
+  await refresh();
+}
+async function save(){
+  if(!selected||isDir)return;
+  const path=join(cur,selected);
+  await api('/v1/fs/write',{method:'POST',body:JSON.stringify({path,content:document.getElementById('editor').value})});
+  toast('Guardado '+path);
+}
+async function del(){
+  if(!selected)return;
+  if(!confirm('¿Eliminar '+selected+'?'))return;
+  const path=join(cur,selected);
+  await api('/v1/fs/delete',{method:'POST',body:JSON.stringify({path})});
+  selected=null;document.getElementById('editor').value='';toast('Eliminado');await refresh();
+}
+async function createFile(){
+  const n=document.getElementById('newName').value.trim();if(!n)return;
+  const path=join(cur,n);
+  await api('/v1/fs/write',{method:'POST',body:JSON.stringify({path,content:''})});
+  document.getElementById('newName').value='';await refresh();await select(n,false);toast('Creado '+n);
+}
+async function createDir(){
+  const n=document.getElementById('newName').value.trim();if(!n)return;
+  await api('/v1/fs/mkdir',{method:'POST',body:JSON.stringify({path:join(cur,n)})});
+  document.getElementById('newName').value='';await refresh();toast('Carpeta '+n);
+}
+refresh().catch(e=>toast(e.message));
+</script>`
+	return shellApp("Archivos", body)
 }
 
 func appHTMLDocReader() string {
-	return shellApp("Lector de documentos", `
-<p class="muted">Abre .txt y previsualiza rutas del data dir. DOCX/PDF: muestra metadatos / texto si es legible.</p>
-<input id="path" placeholder="ruta relativa ej. readme.txt"/>
-<div class="row"><button onclick="openDoc()">Abrir</button></div>
-<pre id="out"></pre>
+	body := `
+<div class="split">
+  <div class="col">
+    <div class="card">
+      <h3>Biblioteca (docs/)</h3>
+      <div class="row">
+        <button type="button" onclick="listDocs()">Actualizar</button>
+        <button type="button" class="ghost" onclick="newDoc()">Nuevo .txt</button>
+      </div>
+      <div class="list" id="list" style="margin-top:8px;max-height:360px"></div>
+    </div>
+  </div>
+  <div class="col">
+    <div class="card">
+      <div class="row">
+        <input id="docName" placeholder="documento.txt" style="flex:1"/>
+        <button type="button" onclick="saveDoc()">Guardar</button>
+        <button type="button" class="danger" onclick="delDoc()">Eliminar</button>
+      </div>
+      <textarea id="editor" style="min-height:340px;margin-top:8px" placeholder="Escribe o abre un documento…"></textarea>
+      <p class="muted">CRUD sobre archivos de texto en la carpeta docs del data dir. Formatos binarios (docx/pdf) se listan; el contenido binario no se edita aquí.</p>
+    </div>
+  </div>
+</div>
 <script>
-async function openDoc(){
-  const p=document.getElementById('path').value;
-  const r=await fetch('/v1/fs/read?path='+encodeURIComponent(p));
-  const j=await r.json();
-  document.getElementById('out').textContent=j.content||JSON.stringify(j,null,2);
+const ROOT='docs';
+async function ensure(){try{await api('/v1/fs/mkdir',{method:'POST',body:JSON.stringify({path:ROOT})})}catch(e){}}
+async function listDocs(){
+  await ensure();
+  const j=await api('/v1/fs/list?path='+encodeURIComponent(ROOT));
+  const list=document.getElementById('list');list.innerHTML='';
+  (j.entries||[]).forEach(e=>{
+    const name=e.name||e;
+    const el=document.createElement('div');el.className='item';
+    el.innerHTML='<span class="name">📄 '+esc(name)+'</span>';
+    el.onclick=()=>openDoc(name);
+    list.appendChild(el);
+  });
 }
-</script>`)
+async function openDoc(name){
+  document.getElementById('docName').value=name;
+  const j=await api('/v1/fs/read?path='+encodeURIComponent(ROOT+'/'+name));
+  document.getElementById('editor').value=j.content??'';
+  toast('Abierto '+name);
+}
+async function saveDoc(){
+  let name=document.getElementById('docName').value.trim()||'sin-titulo.txt';
+  if(!/\.[a-z0-9]+$/i.test(name))name+='.txt';
+  document.getElementById('docName').value=name;
+  await ensure();
+  await api('/v1/fs/write',{method:'POST',body:JSON.stringify({path:ROOT+'/'+name,content:document.getElementById('editor').value})});
+  toast('Guardado');await listDocs();
+}
+async function delDoc(){
+  const name=document.getElementById('docName').value.trim();if(!name)return;
+  if(!confirm('¿Eliminar '+name+'?'))return;
+  await api('/v1/fs/delete',{method:'POST',body:JSON.stringify({path:ROOT+'/'+name})});
+  document.getElementById('editor').value='';document.getElementById('docName').value='';
+  toast('Eliminado');await listDocs();
+}
+async function newDoc(){
+  document.getElementById('docName').value='nuevo-'+Date.now()+'.txt';
+  document.getElementById('editor').value='';
+  document.getElementById('editor').focus();
+}
+listDocs().catch(e=>toast(e.message));
+</script>`
+	return shellApp("Documentos", body)
 }
 
-func appHTMLAudio() string {
-	return shellApp("Reproductor de audio", `
-<p class="muted">Reproduce archivos de audio del sistema de archivos (ruta o URL).</p>
-<input id="src" placeholder="URL o /apps/.../file.mp3"/>
-<audio id="a" controls style="width:100%;margin-top:12px"></audio>
-<div class="row"><button onclick="play()">Cargar</button></div>
-<script>function play(){const a=document.getElementById('a');a.src=document.getElementById('src').value;a.play();}</script>`)
+func appHTMLNotes() string {
+	body := `
+<div class="split">
+  <div class="list" id="list"></div>
+  <div class="col">
+    <div class="card">
+      <div class="row">
+        <input id="title" placeholder="Título de la nota" style="flex:1"/>
+        <button type="button" onclick="save()">Guardar</button>
+        <button type="button" class="ghost" onclick="create()">Nueva</button>
+        <button type="button" class="danger" onclick="remove()">Eliminar</button>
+      </div>
+      <textarea id="body" style="min-height:300px;margin-top:8px" placeholder="Contenido…"></textarea>
+      <p class="muted" id="meta"></p>
+    </div>
+  </div>
+</div>
+<script>
+const DIR='notes';
+let current=null;
+async function ensure(){try{await api('/v1/fs/mkdir',{method:'POST',body:JSON.stringify({path:DIR})})}catch(e){}}
+async function refresh(){
+  await ensure();
+  const j=await api('/v1/fs/list?path='+encodeURIComponent(DIR));
+  const list=document.getElementById('list');list.innerHTML='';
+  (j.entries||[]).filter(e=>String(e.name||e).endsWith('.json')).forEach(e=>{
+    const name=e.name||e;
+    const el=document.createElement('div');el.className='item'+(current===name?' active':'');
+    el.innerHTML='<span class="name">📝 '+esc(name.replace(/\.json$/,''))+'</span>';
+    el.onclick=()=>load(name);
+    list.appendChild(el);
+  });
+}
+async function load(name){
+  current=name;
+  const j=await api('/v1/fs/read?path='+encodeURIComponent(DIR+'/'+name));
+  let data={};try{data=JSON.parse(j.content||'{}')}catch(e){data={title:name,body:j.content}}
+  document.getElementById('title').value=data.title||'';
+  document.getElementById('body').value=data.body||'';
+  document.getElementById('meta').textContent='Archivo: '+name+(data.updated?' · '+data.updated:'');
+  await refresh();
+}
+async function save(){
+  const title=document.getElementById('title').value.trim()||'Sin título';
+  if(!current)current=slug(title)+'.json';
+  const payload={title,body:document.getElementById('body').value,updated:new Date().toISOString()};
+  await ensure();
+  await api('/v1/fs/write',{method:'POST',body:JSON.stringify({path:DIR+'/'+current,content:JSON.stringify(payload,null,2)})});
+  toast('Nota guardada');await refresh();
+}
+async function create(){current=null;document.getElementById('title').value='';document.getElementById('body').value='';document.getElementById('meta').textContent='Nueva nota';}
+async function remove(){
+  if(!current)return;if(!confirm('¿Eliminar nota?'))return;
+  await api('/v1/fs/delete',{method:'POST',body:JSON.stringify({path:DIR+'/'+current})});
+  current=null;document.getElementById('title').value='';document.getElementById('body').value='';
+  toast('Eliminada');await refresh();
+}
+function slug(s){return s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40)||('nota-'+Date.now())}
+refresh().catch(e=>toast(e.message));
+</script>`
+	return shellApp("Notas", body)
 }
 
-func appHTMLVideo() string {
-	return shellApp("Reproductor de video", `
-<p class="muted">mp4, webm y formatos soportados por el navegador.</p>
-<input id="src" placeholder="URL del video"/>
-<video id="v" controls style="width:100%;max-height:360px;margin-top:12px;background:#000"></video>
-<div class="row"><button onclick="play()">Cargar</button></div>
-<script>function play(){const v=document.getElementById('v');v.src=document.getElementById('src').value;v.play();}</script>`)
+func appHTMLOrgManager() string {
+	body := `
+<div class="row">
+  <button type="button" onclick="load('')">Todos</button>
+  <button type="button" class="ghost" onclick="load('app')">Apps</button>
+  <button type="button" class="ghost" onclick="load('volume')">Volúmenes</button>
+  <button type="button" class="ghost" onclick="load('network')">Red</button>
+  <button type="button" class="ghost" onclick="load('ipfs')">IPFS</button>
+  <button type="button" class="ghost" onclick="load('user')">Usuarios</button>
+</div>
+<div class="card">
+  <table>
+    <thead><tr><th>Nombre</th><th>Tipo</th><th>Estado</th><th>RootCID</th><th></th></tr></thead>
+    <tbody id="tb"></tbody>
+  </table>
+</div>
+<div class="card"><h3>Detalle</h3><pre id="detail">Selecciona un organismo</pre></div>
+<script>
+async function load(kind){
+  const q=kind?('?kind='+encodeURIComponent(kind)):'';
+  const j=await api('/v1/organisms'+q);
+  const tb=document.getElementById('tb');tb.innerHTML='';
+  (j.organisms||[]).forEach(o=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML='<td>'+esc(o.name)+'</td><td><span class="badge">'+esc(o.kind)+'</span></td><td>'+esc(o.state)+'</td><td class="muted">'+esc((o.rootcid||'').slice(0,28))+'</td><td><button type="button" class="ghost" data-id="'+esc(o.id)+'">Ver</button></td>';
+    tr.querySelector('button').onclick=async()=>{
+      const d=await api('/v1/organisms/get?id='+encodeURIComponent(o.id));
+      document.getElementById('detail').textContent=JSON.stringify(d.organism||d,null,2);
+    };
+    tb.appendChild(tr);
+  });
 }
-
-func appHTMLImage() string {
-	return shellApp("Visor de imágenes", `
-<p class="muted">jpg png gif webp — URL o ruta servida.</p>
-<input id="src" placeholder="URL de imagen"/>
-<div class="row"><button onclick="show()">Mostrar</button></div>
-<img id="i" style="max-width:100%;margin-top:12px;border-radius:12px" alt=""/>
-<script>function show(){document.getElementById('i').src=document.getElementById('src').value}</script>`)
+load('').catch(e=>toast(e.message));
+</script>`
+	return shellApp("Organismos", body)
 }
 
 func appHTMLAccounts() string {
-	return shellApp("Cuentas de usuario", `
-<p class="muted">Cuenta por defecto: <strong>Master</strong> / master (rol master).</p>
-<div class="card">
-<input id="name" value="Master"/><input id="pass" type="password" value="master" style="margin-top:6px"/>
-<div class="row"><button onclick="login()">Entrar</button><button class="ghost" onclick="me()">Sesión</button><button class="ghost" onclick="list()">Listar (master)</button></div>
+	body := `
+<div class="split">
+  <div class="card">
+    <h3>Sesión</h3>
+    <input id="name" value="Master" placeholder="usuario"/>
+    <input id="pass" type="password" value="master" style="margin-top:6px" placeholder="clave"/>
+    <div class="row" style="margin-top:8px">
+      <button type="button" onclick="login()">Entrar</button>
+      <button type="button" class="ghost" onclick="me()">Mi sesión</button>
+    </div>
+    <pre id="sess" style="margin-top:10px"></pre>
+  </div>
+  <div class="card">
+    <h3>Cuentas (Master)</h3>
+    <div class="row">
+      <button type="button" onclick="listAcc()">Listar</button>
+    </div>
+    <table style="margin-top:8px"><thead><tr><th>ID</th><th>Nombre</th><th>Rol</th><th>Organismo</th></tr></thead>
+    <tbody id="tb"></tbody></table>
+    <p class="muted">Cuenta por defecto <strong>Master</strong> / master — control total del sistema. Cada cuenta es un organismo.</p>
+  </div>
 </div>
-<pre id="out"></pre>
 <script>
 async function login(){
-  const r=await fetch('/v1/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({name:name.value,pass:pass.value})});
-  const j=await r.json(); out.textContent=JSON.stringify(j,null,2);
-  if(j.token) localStorage.setItem('alset_token',j.token);
+  const j=await api('/v1/auth/login',{method:'POST',body:JSON.stringify({name:name.value,pass:pass.value})});
+  if(j.token)localStorage.setItem('alset_token',j.token);
+  sess.textContent=JSON.stringify(j,null,2);toast('Sesión iniciada');
 }
 async function me(){
-  const t=localStorage.getItem('alset_token')||'';
-  const r=await fetch('/v1/auth/me',{headers:{'X-Alset-Token':t}}); out.textContent=JSON.stringify(await r.json(),null,2);
+  sess.textContent=JSON.stringify(await api('/v1/auth/me'),null,2);
 }
-async function list(){
-  const t=localStorage.getItem('alset_token')||'';
-  const r=await fetch('/v1/auth/accounts',{headers:{'X-Alset-Token':t}}); out.textContent=JSON.stringify(await r.json(),null,2);
+async function listAcc(){
+  const j=await api('/v1/auth/accounts');
+  const tb=document.getElementById('tb');tb.innerHTML='';
+  (j.accounts||[]).forEach(a=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML='<td>'+esc(a.id)+'</td><td>'+esc(a.name)+'</td><td>'+esc(a.role)+'</td><td class="muted">'+esc(a.organism_cid||'')+'</td>';
+    tb.appendChild(tr);
+  });
 }
-</script>`)
+me().catch(()=>{});listAcc().catch(()=>{});
+</script>`
+	return shellApp("Cuentas", body)
 }
 
 func appHTMLIPFS() string {
-	return shellApp("IPFS Store (nativo)", `
-<p class="muted">Almacén content-addressed local (suelo IPFS de Alset). API: /v1/ipfs/*</p>
-<textarea id="c" rows="4" placeholder="contenido a guardar"></textarea>
-<input id="n" placeholder="nombre" value="nota.txt" style="margin-top:6px"/>
-<div class="row"><button onclick="add()">Add</button><button class="ghost" onclick="list()">Listar</button></div>
-<pre id="out"></pre>
+	body := `
+<div class="split">
+  <div class="card">
+    <h3>Añadir contenido</h3>
+    <input id="n" placeholder="nombre" value="nota.txt"/>
+    <textarea id="c" style="margin-top:6px" placeholder="contenido…"></textarea>
+    <div class="row" style="margin-top:8px">
+      <button type="button" onclick="add()">Guardar (CID)</button>
+      <button type="button" class="ghost" onclick="list()">Actualizar lista</button>
+    </div>
+  </div>
+  <div class="card">
+    <h3>Almacén</h3>
+    <div class="list" id="list" style="max-height:280px"></div>
+    <pre id="out" style="margin-top:8px"></pre>
+  </div>
+</div>
 <script>
 async function add(){
-  const r=await fetch('/v1/ipfs/add',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({name:n.value,content:c.value})});
-  out.textContent=JSON.stringify(await r.json(),null,2);
+  const j=await api('/v1/ipfs/add',{method:'POST',body:JSON.stringify({name:n.value,content:c.value})});
+  out.textContent=JSON.stringify(j,null,2);toast('CID '+j.cid);await list();
 }
-async function list(){ out.textContent=JSON.stringify(await (await fetch('/v1/ipfs/list')).json(),null,2); }
-list();
-</script>`)
+async function list(){
+  const j=await api('/v1/ipfs/list');
+  const list=document.getElementById('list');list.innerHTML='';
+  (j.items||[]).forEach(it=>{
+    const el=document.createElement('div');el.className='item';
+    el.innerHTML='<span class="name">⬡ '+esc(it.name||it.cid)+'</span><span class="meta">'+esc((it.cid||'').slice(0,20))+'</span>';
+    el.onclick=async()=>{
+      const g=await api('/v1/ipfs/get?cid='+encodeURIComponent(it.cid));
+      out.textContent=typeof g.content==='string'?g.content:JSON.stringify(g,null,2);
+    };
+    list.appendChild(el);
+  });
+}
+list().catch(e=>toast(e.message));
+</script>`
+	return shellApp("IPFS Store", body)
 }
 
-func appHTMLFiles() string {
-	return shellApp("Gestor de archivos", `
-<p class="muted">Explorador del data dir (organismos tipo file/volume).</p>
-<div class="row"><button onclick="go('')">Raíz datos</button><button class="ghost" id="up">↑</button></div>
-<pre id="out"></pre>
-<script>
-let cur='';
-async function go(p){
-  cur=p||'';
-  const j=await (await fetch('/v1/fs/list?path='+encodeURIComponent(cur))).json();
-  out.textContent=JSON.stringify(j,null,2);
+func appHTMLAudio() string {
+	body := `
+<div class="card">
+  <h3>Reproductor</h3>
+  <input id="src" placeholder="URL o ruta servida (ej. /apps/...)"/>
+  <div class="row" style="margin-top:8px">
+    <button type="button" onclick="play()">Cargar</button>
+  </div>
+  <audio id="a" controls></audio>
+  <p class="muted">Formatos según el navegador: mp3, ogg, wav…</p>
+</div>
+<script>function play(){const a=document.getElementById('a');a.src=document.getElementById('src').value;a.play()}</script>`
+	return shellApp("Audio", body)
 }
-document.getElementById('up').onclick=async()=>{
-  const j=await (await fetch('/v1/fs/list?path='+encodeURIComponent(cur))).json();
-  go(j.parent===j.root?'':(j.parent||''));
-};
-go('');
-</script>`)
+
+func appHTMLVideo() string {
+	body := `
+<div class="card">
+  <h3>Reproductor</h3>
+  <input id="src" placeholder="URL del video (mp4, webm…)"/>
+  <div class="row" style="margin-top:8px"><button type="button" onclick="play()">Cargar</button></div>
+  <video id="v" controls></video>
+</div>
+<script>function play(){const v=document.getElementById('v');v.src=document.getElementById('src').value;v.play()}</script>`
+	return shellApp("Video", body)
+}
+
+func appHTMLImage() string {
+	body := `
+<div class="card">
+  <h3>Visor</h3>
+  <input id="src" placeholder="URL de imagen jpg/png/gif/webp"/>
+  <div class="row" style="margin-top:8px"><button type="button" onclick="show()">Mostrar</button></div>
+  <img class="preview" id="i" alt="vista"/>
+</div>
+<script>function show(){document.getElementById('i').src=document.getElementById('src').value}</script>`
+	return shellApp("Imágenes", body)
 }

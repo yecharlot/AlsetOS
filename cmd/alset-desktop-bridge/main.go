@@ -117,6 +117,7 @@ func main() {
 	mux.HandleFunc("/v1/fs/read", b.handleFSRead)
 	mux.HandleFunc("/v1/fs/write", b.handleFSWrite)
 	mux.HandleFunc("/v1/fs/mkdir", b.handleFSMkdir)
+	mux.HandleFunc("/v1/fs/delete", b.handleFSDelete)
 	
 	mux.HandleFunc("/v1/auth/login", b.handleAuthLogin)
 	mux.HandleFunc("/v1/auth/me", b.handleAuthMe)
@@ -511,6 +512,43 @@ func (b *bridge) handleFSMkdir(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, map[string]any{"ok": true, "path": abs})
+}
+
+func (b *bridge) handleFSDelete(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost && r.Method != http.MethodDelete {
+		http.Error(w, "POST or DELETE", 405)
+		return
+	}
+	if b.auth != nil {
+		if _, err := b.auth.require(r, roleUser); err != nil {
+			http.Error(w, err.Error(), 403)
+			return
+		}
+	}
+	var body struct {
+		Path string `json:"path"`
+	}
+	_ = json.NewDecoder(io.LimitReader(r.Body, 1<<16)).Decode(&body)
+	if body.Path == "" {
+		body.Path = r.URL.Query().Get("path")
+	}
+	abs, err := b.safePath(body.Path)
+	if err != nil {
+		http.Error(w, err.Error(), 403)
+		return
+	}
+	if abs == b.dataDir {
+		http.Error(w, "cannot delete data root", 400)
+		return
+	}
+	if err := os.RemoveAll(abs); err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	if b.auditLog != nil {
+		b.audit("master", "fs.delete", body.Path)
+	}
+	writeJSON(w, map[string]any{"ok": true, "deleted": body.Path})
 }
 
 func (b *bridge) handleAppsList(w http.ResponseWriter, r *http.Request) {

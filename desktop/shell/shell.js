@@ -381,12 +381,19 @@ Studio/Editor dentro del SO. Despliega apps y ábrelas aquí.</p>`,
   }
 
   function openInstalledApp(name, title) {
+    const sizes = {
+      'files-ui': [720, 520], 'doc-reader': [760, 540], 'notes': [720, 520],
+      'org-manager': [700, 500], 'accounts': [640, 480], 'ipfs-store': [680, 500],
+      'calculadora': [360, 480], 'image-viewer': [560, 480],
+      'audio-player': [480, 320], 'video-player': [640, 480],
+    };
+    const [w, h] = sizes[name] || [640, 520];
     createWindow({
       id: 'installed-' + name,
       title: title || name,
-      width: 400,
-      height: 480,
-      iframeSrc: '/apps/' + name + '/',
+      width: w,
+      height: h,
+      iframeSrc: '/apps/' + encodeURIComponent(name) + '/',
     });
   }
 
@@ -394,7 +401,14 @@ Studio/Editor dentro del SO. Despliega apps y ábrelas aquí.</p>`,
   const _launch = launch;
   launch = function (id) {
     if (id && id.startsWith('app:')) {
-      openInstalledApp(id.slice(4), id.slice(4));
+      const name = id.slice(4);
+      const labels = {
+        'files-ui': 'Archivos', 'doc-reader': 'Documentos', 'notes': 'Notas',
+        'org-manager': 'Organismos', 'accounts': 'Cuentas', 'ipfs-store': 'IPFS Store',
+        'calculadora': 'Calculadora', 'image-viewer': 'Imágenes',
+        'audio-player': 'Audio', 'video-player': 'Video',
+      };
+      openInstalledApp(name, labels[name] || name);
       return;
     }
     return _launch(id);
