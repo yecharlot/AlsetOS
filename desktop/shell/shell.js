@@ -79,6 +79,10 @@
       btn.innerHTML = `<span class="glyph">${ic.glyph}</span><span class="label">${ic.label}</span>`;
       enableIconDrag(btn, ic);
       btn.addEventListener('dblclick', () => launch(ic.id));
+      btn.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        showIconMenu(e.clientX, e.clientY, ic);
+      });
       btn.addEventListener('click', () => {
         if (btn._dragged) { btn._dragged = false; return; }
         document.querySelectorAll('.desk-icon').forEach((x) => x.classList.remove('selected'));
@@ -662,10 +666,80 @@ help · ls · cat path · open studio|editor|files|apps|settings
   });
 
   function clock() { trayClock.textContent = new Date().toLocaleString(); }
+  document.getElementById('tray-net')?.addEventListener('click', () => openNetTray());
+  // refresh net tray label
+  async function refreshNetChip() {
+    try {
+      const net = await api('/v1/network');
+      const up = (net.interfaces || []).filter((i) => i.state === 'up').length;
+      const el = document.getElementById('tray-net');
+      if (el) el.textContent = '🌐 ' + up + ' up';
+    } catch (_) {}
+  }
+  refreshNetChip();
+  setInterval(refreshNetChip, 15000);
   setInterval(clock, 1000); clock();
 
   api('/v1/mind/tick', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: 'escritorio listo' }) })
     .then(updateTrayMind).catch(() => { trayMind.textContent = 'Mind · offline'; });
+
+
+
+  function showIconMenu(x, y, ic) {
+    document.querySelectorAll('.ctx-menu').forEach((n) => n.remove());
+    const m = document.createElement('div');
+    m.className = 'ctx-menu';
+    m.style.left = x + 'px';
+    m.style.top = y + 'px';
+    const open = document.createElement('button');
+    open.textContent = 'Abrir';
+    open.onclick = () => { m.remove(); launch(ic.id); };
+    const del = document.createElement('button');
+    del.textContent = 'Quitar icono';
+    del.onclick = () => {
+      m.remove();
+      iconState = iconState.filter((i) => i.id !== ic.id);
+      saveIcons(iconState);
+      renderIcons();
+    };
+    m.appendChild(open);
+    m.appendChild(del);
+    if (ic.id.startsWith('app:')) {
+      const un = document.createElement('button');
+      un.textContent = 'Desinstalar app';
+      un.onclick = async () => {
+        m.remove();
+        const name = ic.id.slice(4);
+        await api('/v1/apps/uninstall', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name }),
+        });
+        iconState = iconState.filter((i) => i.id !== ic.id);
+        saveIcons(iconState);
+        renderIcons();
+        closeWin('installed-' + name);
+      };
+      m.appendChild(un);
+    }
+    document.body.appendChild(m);
+    const once = () => { m.remove(); document.removeEventListener('click', once); };
+    setTimeout(() => document.addEventListener('click', once), 10);
+  }
+
+  async function openNetTray() {
+    const net = await api('/v1/network');
+    const vol = await api('/v1/volumes');
+    createWindow({
+      id: 'app-net-tray',
+      title: 'Red y volúmenes',
+      width: 520,
+      height: 420,
+      contentHTML: `<div class="card"><h3>Interfaces</h3><pre class="status-pre">${JSON.stringify(net.interfaces || net, null, 2)}</pre></div>
+        <div class="card"><h3>Volúmenes</h3><pre class="status-pre">${JSON.stringify(vol.volumes || vol, null, 2)}</pre></div>
+        <p class="muted">Cada interfaz y volumen es un organismo (kind network|volume).</p>`,
+    });
+  }
 
 
   function saveWindowsSession() {
@@ -747,8 +821,13 @@ help · ls · cat path · open studio|editor|files|apps|settings
     try {
       const data = await api('/v1/apps/list');
       (data.apps || []).forEach((a) => {
+        if (a.menu_only) return; // audio/video only in start menu
+        if (a.desktop === false) return;
         const iconId = 'app:' + a.name;
         if (!iconState.find((i) => i.id === iconId)) {
+          // only auto-pin a few builtins to avoid clutter
+          const pin = ['org-manager', 'files-ui', 'calculadora'].includes(a.name) || !a.builtin;
+          if (!pin) return;
           iconState.push({
             id: iconId,
             label: (a.title || a.name || '').slice(0, 14),

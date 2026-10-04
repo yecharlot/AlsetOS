@@ -41,15 +41,18 @@ type fact struct {
 }
 
 type bridge struct {
-	dataDir string
-	webDir  string
-	mu      sync.Mutex
-	orgName string
-	rootCID string
-	lastMsg string
-	facts   []fact
-	neural  map[string]float64
-	mente   mind.Mente
+	dataDir  string
+	webDir   string
+	mu       sync.Mutex
+	orgName  string
+	rootCID  string
+	lastMsg  string
+	facts    []fact
+	neural   map[string]float64
+	mente    mind.Mente
+	auth     *authStore
+	orgs     *orgRegistry
+	auditLog *auditLog
 }
 
 func main() {
@@ -80,15 +83,20 @@ func main() {
 	}
 
 	b := &bridge{
-		dataDir: dataDir,
-		webDir:  web,
-		orgName: "desktop-local",
-		neural:  map[string]float64{"atencion.ui": 0.5, "preferencia.studio": 0.6},
+		dataDir:  dataDir,
+		webDir:   web,
+		orgName:  "desktop-local",
+		neural:   map[string]float64{"atencion.ui": 0.5, "preferencia.studio": 0.6},
 		facts: []fact{
 			{S: "organismo", R: "tiene_capacidad", O: "backup", C: 1},
 			{S: "alsetos", R: "es", O: "sistema", C: 1},
 		},
+		auth:     newAuthStore(dataDir),
+		orgs:     newOrgRegistry(dataDir),
+		auditLog: newAuditLog(dataDir),
 	}
+	b.seedBuiltinApps()
+	b.refreshSystemOrganisms()
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/health", func(w http.ResponseWriter, r *http.Request) {
@@ -109,6 +117,22 @@ func main() {
 	mux.HandleFunc("/v1/fs/read", b.handleFSRead)
 	mux.HandleFunc("/v1/fs/write", b.handleFSWrite)
 	mux.HandleFunc("/v1/fs/mkdir", b.handleFSMkdir)
+	
+	mux.HandleFunc("/v1/auth/login", b.handleAuthLogin)
+	mux.HandleFunc("/v1/auth/me", b.handleAuthMe)
+	mux.HandleFunc("/v1/auth/accounts", b.handleAuthAccounts)
+	mux.HandleFunc("/v1/organisms", b.handleOrganismsList)
+	mux.HandleFunc("/v1/organisms/get", b.handleOrganismsGet)
+	mux.HandleFunc("/v1/volumes", b.handleVolumes)
+	mux.HandleFunc("/v1/network", b.handleNetwork)
+	mux.HandleFunc("/v1/ipfs/add", b.handleIPFSAdd)
+	mux.HandleFunc("/v1/ipfs/list", b.handleIPFSList)
+	mux.HandleFunc("/v1/ipfs/get", b.handleIPFSGet)
+	mux.HandleFunc("/v1/audit", b.handleAuditList)
+	mux.HandleFunc("/v1/apps/uninstall", b.handleAppsUninstall)
+	mux.HandleFunc("/v1/mcp/tools", b.handleMCPTools)
+	mux.HandleFunc("/v1/mcp/call", b.handleMCPCall)
+
 	mux.HandleFunc("/v1/apps/list", b.handleAppsList)
 	mux.HandleFunc("/v1/apps/deploy", b.handleAppsDeploy)
 	mux.HandleFunc("/v1/apps/get", b.handleAppsGet)
@@ -553,12 +577,52 @@ func (b *bridge) handleAppsDeploy(w http.ResponseWriter, r *http.Request) {
 		"glyph": "📦", "desktop": true,
 	}, "", "  ")
 	_ = os.WriteFile(filepath.Join(dir, "app.json"), meta, 0o644)
+	b.orgs.upsert(&sysOrganism{
+		ID: "app:" + name, Kind: "app", Name: title, State: "installed",
+		RootCID: "cid:alset-app:" + name,
+		Meta: map[string]any{"url": "/apps/" + name + "/"},
+	})
+	b.orgs.save()
+	b.audit("master", "apps.deploy", name)
 	writeJSON(w, map[string]any{
 		"ok": true, "name": name, "title": title,
 		"url": "/apps/" + name + "/",
 		"rootcid": "cid:alset-app:" + name,
 	})
 }
+
+func (b *bridge) handleAppsUninstall(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost && r.Method != http.MethodDelete {
+		http.Error(w, "POST or DELETE", 405)
+		return
+	}
+	if _, err := b.auth.require(r, roleUser); err != nil {
+		http.Error(w, err.Error(), 403)
+		return
+	}
+	var body struct {
+		Name string `json:"name"`
+	}
+	_ = json.NewDecoder(io.LimitReader(r.Body, 1<<16)).Decode(&body)
+	name := sanitizeAppName(body.Name)
+	if name == "" {
+		http.Error(w, "name required", 400)
+		return
+	}
+	dir := filepath.Join(b.dataDir, "apps", name)
+	// protect? allow uninstall even builtins
+	if err := os.RemoveAll(dir); err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	b.orgs.mu.Lock()
+	delete(b.orgs.All, "app:"+name)
+	b.orgs.mu.Unlock()
+	b.orgs.save()
+	b.audit("master", "apps.uninstall", name)
+	writeJSON(w, map[string]any{"ok": true, "uninstalled": name})
+}
+
 
 func (b *bridge) handleStudioDeploy(w http.ResponseWriter, r *http.Request) {
 	// Alias: Studio posts alset-app/v1 tree here
