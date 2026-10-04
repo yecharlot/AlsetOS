@@ -207,3 +207,46 @@ html, body { margin: 0; height: 100%; overflow: hidden; font-family: var(--font)
   border: 0; color: var(--text); padding: 8px 10px; border-radius: 8px; cursor: pointer; font-size: 12px;
 }
 .ctx-menu button:hover { background: rgba(255,255,255,0.07); }
+
+.gate {
+  position: fixed; inset: 0; z-index: 9999;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: radial-gradient(ellipse at 50% 30%, #1a2438 0%, #070a10 70%);
+  color: var(--text);
+}
+.gate.hidden { display: none !important; }
+#os.hidden { display: none !important; }
+.splash-mark {
+  font-size: 64px; color: var(--gold);
+  filter: drop-shadow(0 0 24px rgba(240,193,75,.35));
+  animation: pulse 1.6s ease-in-out infinite;
+}
+.splash-mark.small { font-size: 40px; animation: none; }
+.splash-title { font-size: 28px; font-weight: 700; letter-spacing: .12em; margin-top: 12px; }
+.splash-sub { color: var(--muted); font-size: 13px; margin-top: 6px; }
+.splash-bar {
+  width: 180px; height: 3px; margin-top: 28px; background: rgba(255,255,255,.08);
+  border-radius: 2px; overflow: hidden;
+}
+.splash-bar span {
+  display: block; height: 100%; width: 40%; background: var(--gold);
+  animation: load 1.2s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.7} }
+@keyframes load { 0%{transform:translateX(-100%)} 100%{transform:translateX(250%)} }
+.login-card {
+  width: min(340px, 92vw); background: var(--panel);
+  border: 1px solid var(--line2); border-radius: 16px; padding: 24px;
+  box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 8px;
+}
+.login-card h2 { margin: 4px 0 0; font-size: 18px; }
+.login-card label { font-size: 11px; color: var(--muted); margin-top: 6px; }
+.login-card input {
+  background: #080a0e; border: 1px solid var(--line); border-radius: 8px;
+  color: var(--text); padding: 10px 12px; font-size: 14px;
+}
+.btn-login {
+  margin-top: 12px; background: var(--gold); color: #111; border: 0;
+  border-radius: 10px; padding: 12px; font-weight: 700; cursor: pointer;
+}
+.login-err { color: #e85d5d; font-size: 12px; min-height: 1em; }

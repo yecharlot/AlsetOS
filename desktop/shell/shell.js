@@ -5,6 +5,7 @@
   const ICON_KEY = 'alset-desktop-icons-v3';
   const THEME_KEY = 'alset-desktop-theme-v1';
   const WIN_KEY = 'alset-desktop-windows-v1';
+  const SESSION_AUTH = 'alset-desktop-auth-v1';
   const iconLayer = document.getElementById('icon-layer');
   const windowLayer = document.getElementById('window-layer');
   const taskButtons = document.getElementById('task-buttons');
@@ -400,6 +401,23 @@ Studio/Editor dentro del SO. Despliega apps y ábrelas aquí.</p>`,
   // Patch launch for app: icons
   const _launch = launch;
   launch = function (id) {
+    if (id === 'logout') {
+      try { localStorage.removeItem(SESSION_AUTH); localStorage.removeItem('alset_token'); } catch (_) {}
+      location.reload();
+      return;
+    }
+    if (id === 'shutdown') {
+      if (confirm('¿Apagar el equipo?')) {
+        api('/v1/power/shutdown', { method: 'POST' }).catch(() => {});
+      }
+      return;
+    }
+    if (id === 'reboot') {
+      if (confirm('¿Reiniciar el equipo?')) {
+        api('/v1/power/reboot', { method: 'POST' }).catch(() => {});
+      }
+      return;
+    }
     if (id && id.startsWith('app:')) {
       const name = id.slice(4);
       const labels = {
@@ -742,19 +760,58 @@ help · ls · cat path · open studio|editor|files|apps|settings
   }
 
   async function openNetTray() {
-    const net = await api('/v1/network');
-    const vol = await api('/v1/volumes');
+    let net = {}, vol = {}, wifi = {};
+    try { net = await api('/v1/network'); } catch (_) {}
+    try { vol = await api('/v1/volumes'); } catch (_) {}
+    try { wifi = await api('/v1/wifi/scan'); } catch (_) {}
+    const nets = (wifi.networks || []).map((n) =>
+      `<div class="item wifi-row" data-ssid="${(n.ssid || '').replace(/"/g, '')}">
+        <span>${n.ssid || '—'}</span>
+        <span class="muted">${n.signal || ''} ${n.security || ''}</span>
+      </div>`
+    ).join('') || '<p class="muted">Sin redes detectadas (o sin nmcli)</p>';
     createWindow({
       id: 'app-net-tray',
-      title: 'Red y volúmenes',
+      title: 'Red · Wi‑Fi · Volúmenes',
       width: 520,
-      height: 420,
-      contentHTML: `<div class="card"><h3>Interfaces</h3><pre class="status-pre">${JSON.stringify(net.interfaces || net, null, 2)}</pre></div>
-        <div class="card"><h3>Volúmenes</h3><pre class="status-pre">${JSON.stringify(vol.volumes || vol, null, 2)}</pre></div>
-        <p class="muted">Cada interfaz y volumen es un organismo (kind network|volume).</p>`,
+      height: 520,
+      contentHTML: `
+        <div class="card"><h3>Wi‑Fi / Hotspot</h3>
+          <div id="wifi-list">${nets}</div>
+          <div class="row" style="margin-top:8px">
+            <input id="wifi-ssid" placeholder="SSID" style="flex:1"/>
+            <input id="wifi-pass" type="password" placeholder="Clave" style="flex:1"/>
+            <button type="button" class="btn btn-gold" id="wifi-connect">Conectar</button>
+          </div>
+          <p class="muted" id="wifi-status"></p>
+        </div>
+        <div class="card"><h3>Interfaces</h3><pre class="status-pre">${JSON.stringify(net.interfaces || [], null, 2)}</pre></div>
+        <div class="card"><h3>Volúmenes</h3><pre class="status-pre">${JSON.stringify(vol.volumes || [], null, 2)}</pre></div>`,
     });
+    setTimeout(() => {
+      document.querySelectorAll('.wifi-row').forEach((el) => {
+        el.addEventListener('click', () => {
+          const ss = document.getElementById('wifi-ssid');
+          if (ss) ss.value = el.getAttribute('data-ssid') || '';
+        });
+      });
+      document.getElementById('wifi-connect')?.addEventListener('click', async () => {
+        const ssid = document.getElementById('wifi-ssid')?.value || '';
+        const pass = document.getElementById('wifi-pass')?.value || '';
+        const st = document.getElementById('wifi-status');
+        try {
+          const j = await api('/v1/wifi/connect', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ssid, pass }),
+          });
+          if (st) st.textContent = j.ok ? 'Conectado' : (j.error || JSON.stringify(j));
+        } catch (e) {
+          if (st) st.textContent = e.message || String(e);
+        }
+      });
+    }, 50);
   }
-
 
   function saveWindowsSession() {
     const list = [];
@@ -856,7 +913,62 @@ help · ls · cat path · open studio|editor|files|apps|settings
     } catch (_) {}
   }
 
-  renderIcons();
-  syncInstalledAppIcons().then(() => restoreWindowsSession());
+
+  // —— Splash + Login Master ——
+  const splash = document.getElementById('splash');
+  const login = document.getElementById('login');
+  const osEl = document.getElementById('os');
+
+  function showDesktop() {
+    splash?.classList.add('hidden');
+    login?.classList.add('hidden');
+    osEl?.classList.remove('hidden');
+    renderIcons();
+    syncInstalledAppIcons().then(() => restoreWindowsSession());
+  }
+
+  function showLogin() {
+    splash?.classList.add('hidden');
+    login?.classList.remove('hidden');
+    osEl?.classList.add('hidden');
+  }
+
+  async function tryLogin() {
+    const user = document.getElementById('login-user')?.value || 'Master';
+    const pass = document.getElementById('login-pass')?.value || '';
+    const err = document.getElementById('login-err');
+    try {
+      const j = await api('/v1/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: user, pass }),
+      });
+      if (!j.ok && !j.token) throw new Error('Credenciales inválidas');
+      if (j.token) localStorage.setItem('alset_token', j.token);
+      localStorage.setItem(SESSION_AUTH, JSON.stringify({ user, role: j.role || 'master', at: Date.now() }));
+      showDesktop();
+    } catch (e) {
+      if (err) err.textContent = e.message || 'Error de acceso';
+    }
+  }
+
+  document.getElementById('login-btn')?.addEventListener('click', tryLogin);
+  document.getElementById('login-pass')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') tryLogin();
+  });
+
+  // Splash then login or restore session
+  setTimeout(() => {
+    let sess = null;
+    try { sess = JSON.parse(localStorage.getItem(SESSION_AUTH) || 'null'); } catch (_) {}
+    // require login every boot for security on shared machine — only skip if same session < 8h
+    const fresh = sess && sess.at && (Date.now() - sess.at) < 8 * 3600 * 1000;
+    if (fresh && sess.user) {
+      showDesktop();
+    } else {
+      showLogin();
+    }
+  }, 1600);
+
 })();
 

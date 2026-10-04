@@ -468,39 +468,178 @@ list().catch(e=>toast(e.message));
 
 func appHTMLAudio() string {
 	body := `
-<div class="card">
-  <h3>Reproductor</h3>
-  <input id="src" placeholder="URL o ruta servida (ej. /apps/...)"/>
-  <div class="row" style="margin-top:8px">
-    <button type="button" onclick="play()">Cargar</button>
+<div class="split">
+  <div class="col">
+    <div class="card">
+      <h3>Explorar medios</h3>
+      <select id="rootSel"></select>
+      <div class="list" id="browser" style="margin-top:8px;max-height:280px"></div>
+    </div>
   </div>
-  <audio id="a" controls></audio>
-  <p class="muted">Formatos según el navegador: mp3, ogg, wav…</p>
+  <div class="card">
+    <h3>Reproductor</h3>
+    <p class="muted" id="now">Ningún archivo</p>
+    <audio id="a" controls></audio>
+  </div>
 </div>
-<script>function play(){const a=document.getElementById('a');a.src=document.getElementById('src').value;a.play()}</script>`
+<script>
+window.__mediaPick=(url,path,name)=>{document.getElementById('a').src=url;document.getElementById('a').play();document.getElementById('now').textContent=name||path;toast(name)};
+
+async function mediaRoots(){return (await api('/v1/media/roots')).roots||[]}
+let mPath='';
+async function mediaGo(path,filter){
+  mPath=path||'';
+  const j=await api('/v1/media/list?path='+encodeURIComponent(mPath)+'&filter='+(filter||'all'));
+  const box=document.getElementById('browser');
+  box.innerHTML='';
+  const up=document.createElement('div');up.className='item';up.innerHTML='<span class="name">↑ Subir</span>';
+  up.onclick=()=>{
+    if(!mPath||mPath==='.')return;
+    const parts=mPath.replace(/\/$/,'').split('/');parts.pop();
+    mediaGo(parts.join('/')||'',filter);
+  };
+  box.appendChild(up);
+  (j.entries||[]).forEach(e=>{
+    const el=document.createElement('div');el.className='item';
+    el.innerHTML='<span class="name">'+(e.dir?'📁 ':'📄 ')+esc(e.name)+'</span>';
+    el.onclick=()=>{
+      if(e.dir)mediaGo(e.path,filter);
+      else if(e.url){window.__mediaPick&&window.__mediaPick(e.url,e.path,e.name)}
+    };
+    box.appendChild(el);
+  });
+}
+async function mediaInit(filter){
+  const roots=await mediaRoots();
+  const sel=document.getElementById('rootSel');
+  sel.innerHTML='';
+  roots.forEach(r=>{
+    const o=document.createElement('option');o.value=r.path;o.textContent=r.label;sel.appendChild(o);
+  });
+  sel.onchange=()=>mediaGo(sel.value,filter);
+  if(roots[0])mediaGo(roots[0].path,filter);
+}
+
+mediaInit('audio').catch(e=>toast(e.message));
+</script>`
 	return shellApp("Audio", body)
 }
 
 func appHTMLVideo() string {
 	body := `
-<div class="card">
-  <h3>Reproductor</h3>
-  <input id="src" placeholder="URL del video (mp4, webm…)"/>
-  <div class="row" style="margin-top:8px"><button type="button" onclick="play()">Cargar</button></div>
-  <video id="v" controls></video>
+<div class="split">
+  <div class="col">
+    <div class="card">
+      <h3>Explorar</h3>
+      <select id="rootSel"></select>
+      <div class="list" id="browser" style="margin-top:8px;max-height:280px"></div>
+    </div>
+  </div>
+  <div class="card">
+    <h3>Reproductor</h3>
+    <p class="muted" id="now">Ningún archivo</p>
+    <video id="v" controls></video>
+  </div>
 </div>
-<script>function play(){const v=document.getElementById('v');v.src=document.getElementById('src').value;v.play()}</script>`
+<script>
+window.__mediaPick=(url,path,name)=>{document.getElementById('v').src=url;document.getElementById('v').play();document.getElementById('now').textContent=name||path;toast(name)};
+
+async function mediaRoots(){return (await api('/v1/media/roots')).roots||[]}
+let mPath='';
+async function mediaGo(path,filter){
+  mPath=path||'';
+  const j=await api('/v1/media/list?path='+encodeURIComponent(mPath)+'&filter='+(filter||'all'));
+  const box=document.getElementById('browser');
+  box.innerHTML='';
+  const up=document.createElement('div');up.className='item';up.innerHTML='<span class="name">↑ Subir</span>';
+  up.onclick=()=>{
+    if(!mPath||mPath==='.')return;
+    const parts=mPath.replace(/\/$/,'').split('/');parts.pop();
+    mediaGo(parts.join('/')||'',filter);
+  };
+  box.appendChild(up);
+  (j.entries||[]).forEach(e=>{
+    const el=document.createElement('div');el.className='item';
+    el.innerHTML='<span class="name">'+(e.dir?'📁 ':'📄 ')+esc(e.name)+'</span>';
+    el.onclick=()=>{
+      if(e.dir)mediaGo(e.path,filter);
+      else if(e.url){window.__mediaPick&&window.__mediaPick(e.url,e.path,e.name)}
+    };
+    box.appendChild(el);
+  });
+}
+async function mediaInit(filter){
+  const roots=await mediaRoots();
+  const sel=document.getElementById('rootSel');
+  sel.innerHTML='';
+  roots.forEach(r=>{
+    const o=document.createElement('option');o.value=r.path;o.textContent=r.label;sel.appendChild(o);
+  });
+  sel.onchange=()=>mediaGo(sel.value,filter);
+  if(roots[0])mediaGo(roots[0].path,filter);
+}
+
+mediaInit('video').catch(e=>toast(e.message));
+</script>`
 	return shellApp("Video", body)
 }
 
 func appHTMLImage() string {
 	body := `
-<div class="card">
-  <h3>Visor</h3>
-  <input id="src" placeholder="URL de imagen jpg/png/gif/webp"/>
-  <div class="row" style="margin-top:8px"><button type="button" onclick="show()">Mostrar</button></div>
-  <img class="preview" id="i" alt="vista"/>
+<div class="split">
+  <div class="col">
+    <div class="card">
+      <h3>Explorar imágenes</h3>
+      <select id="rootSel"></select>
+      <div class="list" id="browser" style="margin-top:8px;max-height:320px"></div>
+    </div>
+  </div>
+  <div class="card">
+    <h3>Vista</h3>
+    <p class="muted" id="now">Selecciona una imagen</p>
+    <img class="preview" id="i" alt=""/>
+  </div>
 </div>
-<script>function show(){document.getElementById('i').src=document.getElementById('src').value}</script>`
+<script>
+window.__mediaPick=(url,path,name)=>{document.getElementById('i').src=url;document.getElementById('now').textContent=name||path;toast(name)};
+
+async function mediaRoots(){return (await api('/v1/media/roots')).roots||[]}
+let mPath='';
+async function mediaGo(path,filter){
+  mPath=path||'';
+  const j=await api('/v1/media/list?path='+encodeURIComponent(mPath)+'&filter='+(filter||'all'));
+  const box=document.getElementById('browser');
+  box.innerHTML='';
+  const up=document.createElement('div');up.className='item';up.innerHTML='<span class="name">↑ Subir</span>';
+  up.onclick=()=>{
+    if(!mPath||mPath==='.')return;
+    const parts=mPath.replace(/\/$/,'').split('/');parts.pop();
+    mediaGo(parts.join('/')||'',filter);
+  };
+  box.appendChild(up);
+  (j.entries||[]).forEach(e=>{
+    const el=document.createElement('div');el.className='item';
+    el.innerHTML='<span class="name">'+(e.dir?'📁 ':'📄 ')+esc(e.name)+'</span>';
+    el.onclick=()=>{
+      if(e.dir)mediaGo(e.path,filter);
+      else if(e.url){window.__mediaPick&&window.__mediaPick(e.url,e.path,e.name)}
+    };
+    box.appendChild(el);
+  });
+}
+async function mediaInit(filter){
+  const roots=await mediaRoots();
+  const sel=document.getElementById('rootSel');
+  sel.innerHTML='';
+  roots.forEach(r=>{
+    const o=document.createElement('option');o.value=r.path;o.textContent=r.label;sel.appendChild(o);
+  });
+  sel.onchange=()=>mediaGo(sel.value,filter);
+  if(roots[0])mediaGo(roots[0].path,filter);
+}
+
+mediaInit('image').catch(e=>toast(e.message));
+</script>`
 	return shellApp("Imágenes", body)
 }
+

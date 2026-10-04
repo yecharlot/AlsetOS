@@ -7,7 +7,26 @@
   <link rel="stylesheet" href="shell.css" />
 </head>
 <body>
-  <div id="os">
+  <div id="splash" class="gate">
+    <div class="splash-mark">⬡</div>
+    <div class="splash-title">AlsetOS</div>
+    <div class="splash-sub">Desktop · organismos digitales</div>
+    <div class="splash-bar"><span></span></div>
+  </div>
+  <div id="login" class="gate hidden">
+    <div class="login-card">
+      <div class="splash-mark small">⬡</div>
+      <h2>Iniciar sesión</h2>
+      <p class="muted">Cuenta Master por defecto</p>
+      <label>Usuario</label>
+      <input id="login-user" value="Master" autocomplete="username" />
+      <label>Contraseña</label>
+      <input id="login-pass" type="password" value="master" autocomplete="current-password" />
+      <button type="button" id="login-btn" class="btn-login">Entrar</button>
+      <p id="login-err" class="login-err"></p>
+    </div>
+  </div>
+  <div id="os" class="hidden">
     <!-- Wallpaper + desktop surface -->
     <div id="desktop" aria-label="Escritorio Alset">
       <div id="icon-layer"></div>
@@ -28,6 +47,10 @@
       <button type="button" data-launch="status">▤ Estado</button>
       <hr />
       <button type="button" data-launch="about">ℹ Acerca de</button>
+      <hr />
+      <button type="button" data-launch="logout">↩ Cerrar sesión</button>
+      <button type="button" data-launch="shutdown">⏻ Apagar</button>
+      <button type="button" data-launch="reboot">↻ Reiniciar</button>
       <hr />
       <div class="start-brand" style="padding-top:4px">Apps del sistema</div>
       <button type="button" data-launch="app:org-manager">◎ Organismos</button>
