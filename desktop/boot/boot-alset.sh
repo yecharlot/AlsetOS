@@ -1,51 +1,88 @@
 #!/bin/sh
+# AlsetOS Desktop — bridge + kiosk (sin escritorio TinyCore visible)
 export PATH="/opt/alset/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
 export DISPLAY="${DISPLAY:-:0}"
+export HOME="${HOME:-/home/tc}"
 ALSET_ROOT=/opt/alset
-DATA="${HOME:-/home/tc}/.alset-desktop"
-mkdir -p "$DATA"
+DATA="$HOME/.alset-desktop"
+URL="http://127.0.0.1:7420/"
+mkdir -p "$DATA" /tmp
 
-# Wait until X is up (max ~60s)
+log() { echo "$(date -u +%H:%M:%S) $*" >> /tmp/alset-boot.log; }
+log "boot-alset start DISPLAY=$DISPLAY"
+
+# Wait for X (up to ~90s)
 i=0
-while [ $i -lt 30 ]; do
-  if [ -S /tmp/.X11-unix/X0 ] || xset q >/dev/null 2>&1; then
-    break
-  fi
-  i=$((i+1))
+while [ $i -lt 45 ]; do
+  if [ -S /tmp/.X11-unix/X0 ] 2>/dev/null; then log "X socket ok"; break; fi
+  if xset q >/dev/null 2>&1; then log "xset ok"; break; fi
+  i=$((i + 1))
   sleep 2
 done
 
-if [ -x "$ALSET_ROOT/bin/alset-desktop-bridge" ]; then
-  "$ALSET_ROOT/bin/alset-desktop-bridge" \
-    -addr 0.0.0.0:7420 \
-    -shell "$ALSET_ROOT/shell" \
-    -web "$ALSET_ROOT/web" \
-    -alsetos "$ALSET_ROOT/bin/alsetos" \
-    -data "$DATA" \
-    >/tmp/alset-bridge.log 2>&1 &
-  echo $! >/tmp/alset-bridge.pid
+# Start bridge if not running
+if ! wget -q -O /dev/null --timeout=2 "$URL" 2>/dev/null \
+  && ! curl -sf --max-time 2 "$URL" >/dev/null 2>&1; then
+  if [ -x "$ALSET_ROOT/bin/alset-desktop-bridge" ]; then
+    log "starting bridge"
+    "$ALSET_ROOT/bin/alset-desktop-bridge" \
+      -addr 0.0.0.0:7420 \
+      -shell "$ALSET_ROOT/shell" \
+      -web "$ALSET_ROOT/web" \
+      -alsetos "$ALSET_ROOT/bin/alsetos" \
+      -data "$DATA" \
+      >>/tmp/alset-bridge.log 2>&1 &
+    echo $! >/tmp/alset-bridge.pid
+  else
+    log "ERROR: bridge binary missing"
+  fi
 fi
 
-URL="http://127.0.0.1:7420/"
-# Give bridge a moment
-sleep 2
+# Wait until bridge answers
+j=0
+while [ $j -lt 30 ]; do
+  if wget -q -O /dev/null --timeout=2 "$URL" 2>/dev/null; then log "bridge up"; break; fi
+  if curl -sf --max-time 2 "$URL" >/dev/null 2>&1; then log "bridge up curl"; break; fi
+  j=$((j + 1))
+  sleep 1
+done
 
-open_browser() {
-  if command -v netsurf-gtk >/dev/null 2>&1; then netsurf-gtk "$URL" &
-  elif command -v netsurf >/dev/null 2>&1; then netsurf "$URL" &
-  elif command -v dillo >/dev/null 2>&1; then dillo "$URL" &
-  elif command -v firefox >/dev/null 2>&1; then firefox "$URL" &
-  elif command -v midori >/dev/null 2>&1; then midori "$URL" &
+# Hide typical TC desktop noise if present
+killall wbar 2>/dev/null || true
+
+open_kiosk() {
+  log "open_kiosk $URL"
+  # Prefer browsers that can feel fullscreen
+  if command -v chromium >/dev/null 2>&1; then
+    chromium --kiosk --noerrdialogs --disable-session-crashed-bubble \
+      --check-for-update-interval=31536000 --app="$URL" >>/tmp/alset-browser.log 2>&1 &
+  elif command -v chromium-browser >/dev/null 2>&1; then
+    chromium-browser --kiosk --app="$URL" >>/tmp/alset-browser.log 2>&1 &
+  elif command -v google-chrome >/dev/null 2>&1; then
+    google-chrome --kiosk --app="$URL" >>/tmp/alset-browser.log 2>&1 &
+  elif command -v firefox >/dev/null 2>&1; then
+    firefox -kiosk "$URL" >>/tmp/alset-browser.log 2>&1 &
+  elif command -v netsurf-gtk >/dev/null 2>&1; then
+    netsurf-gtk "$URL" >>/tmp/alset-browser.log 2>&1 &
+  elif command -v netsurf >/dev/null 2>&1; then
+    netsurf "$URL" >>/tmp/alset-browser.log 2>&1 &
+  elif command -v midori >/dev/null 2>&1; then
+    midori -e Fullscreen -a "$URL" >>/tmp/alset-browser.log 2>&1 &
+  elif command -v dillo >/dev/null 2>&1; then
+    dillo "$URL" >>/tmp/alset-browser.log 2>&1 &
   else
-    echo "NO_BROWSER $URL" >/tmp/alset-desktop.url
-    # last resort: show message in aterm if present
+    log "NO_BROWSER"
+    echo "$URL" >/tmp/alset-desktop.url
     if command -v aterm >/dev/null 2>&1; then
-      aterm -e sh -c "echo AlsetOS Desktop; echo Abre un navegador en $URL; echo; echo Si no hay navegador: tce-load -wi netsurf; sleep 30" &
+      aterm -geometry 100x30 -e sh -c "echo AlsetOS; echo Abre navegador en $URL; sleep 60" &
     fi
   fi
 }
 
-open_browser
-# retry once later if X was late
-sleep 5
-open_browser
+open_kiosk
+# Reintentos si X o el browser fallan al inicio
+sleep 4
+open_kiosk
+sleep 8
+open_kiosk
+log "boot-alset done"

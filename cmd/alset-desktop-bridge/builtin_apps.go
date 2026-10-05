@@ -25,6 +25,7 @@ func (b *bridge) seedBuiltinApps() {
 		{Name: "accounts", Title: "Cuentas", Glyph: "👤", HTML: appHTMLAccounts()},
 		{Name: "ipfs-store", Title: "IPFS Store", Glyph: "⬡", HTML: appHTMLIPFS()},
 		{Name: "files-ui", Title: "Archivos", Glyph: "📁", HTML: appHTMLFiles()},
+		{Name: "seed", Title: "Seed", Glyph: "🌱", HTML: appHTMLSeed()},
 		{Name: "calculadora", Title: "Calculadora", Glyph: "🔢", HTML: ""},
 	}
 	for _, a := range apps {
@@ -643,3 +644,31 @@ mediaInit('image').catch(e=>toast(e.message));
 	return shellApp("Imágenes", body)
 }
 
+func appHTMLSeed() string {
+	b := ""
+	b += "<div class=\"col\" style=\"height:100%;gap:0\">"
+	b += "<div class=\"card\" style=\"margin:0;border-radius:0;border-left:0;border-right:0;border-top:0\"><div class=\"row\">"
+	b += "<button type=\"button\" class=\"ghost\" onclick=\"goHome()\">Seed</button>"
+	b += "<button type=\"button\" class=\"ghost\" onclick=\"goBack()\">Back</button>"
+	b += "<button type=\"button\" class=\"ghost\" onclick=\"goFwd()\">Fwd</button>"
+	b += "<button type=\"button\" class=\"ghost\" onclick=\"reload()\">Reload</button>"
+	b += "<input id=\"url\" placeholder=\"https:// or /apps/name/\" style=\"flex:1\" onkeydown=\"if(event.key==='Enter')navigate()\"/>"
+	b += "<button type=\"button\" onclick=\"navigate()\">Go</button></div>"
+	b += "<div class=\"row\" style=\"margin-top:8px\" id=\"quick\"></div></div>"
+	b += "<iframe id=\"frame\" style=\"flex:1;width:100%;border:0;min-height:360px;background:#0a0e16\" sandbox=\"allow-same-origin allow-scripts allow-forms allow-popups allow-modals\"></iframe>"
+	b += "<p class=\"muted\" style=\"margin:6px 12px\">Seed - Alset browser - local apps and web</p></div>"
+	b += "<script>\n"
+	b += "const frame=document.getElementById('frame');const urlEl=document.getElementById('url');let hist=[],hi=-1;\n"
+	b += "function setUrl(u){urlEl.value=u;}\n"
+	b += "function load(u,push){if(!u)return;if(u.indexOf('seed:')===0){goHome();return;}if(u.indexOf('http')!==0&&u.charAt(0)!=='/')u='https://'+u;if(push!==false){hist=hist.slice(0,hi+1);hist.push(u);hi=hist.length-1;}setUrl(u);frame.src=u;}\n"
+	b += "function navigate(){load(urlEl.value.trim());}\n"
+	b += "function goBack(){if(hi>0){hi--;load(hist[hi],false);}}\n"
+	b += "function goFwd(){if(hi<hist.length-1){hi++;load(hist[hi],false);}}\n"
+	b += "function reload(){frame.src=frame.src;}\n"
+	b += "function goHome(){setUrl('seed://home');frame.src='/';}\n"
+	b += "window.loadFromHome=function(u){load(u);};\n"
+	b += "async function quick(){var q=document.getElementById('quick');q.innerHTML='';var links=[['Home','/'],['Studio','/tools/'],['Editor','/alset-editor/']];try{var j=await api('/v1/apps/list');(j.apps||[]).slice(0,8).forEach(function(a){links.push([a.title||a.name,a.url||('/apps/'+a.name+'/']);});}catch(e){}links.forEach(function(pair){var b=document.createElement('button');b.type='button';b.className='ghost';b.textContent=pair[0];b.onclick=function(){load(pair[1]);};q.appendChild(b);});}\n"
+	b += "quick();load('/tools/',false);\n"
+	b += "</script>"
+	return shellApp("Seed", b)
+}

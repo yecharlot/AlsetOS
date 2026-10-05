@@ -1,0 +1,18 @@
+#!/bin/sh
+# Sustituye la sesión gráfica de TinyCore: sin FLWM, solo Alset Desktop kiosk
+export PATH="/opt/alset/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+export DISPLAY="${DISPLAY:-:0}"
+export HOME="${HOME:-/home/tc}"
+[ -x /opt/alset/boot-alset.sh ] && /opt/alset/boot-alset.sh
+# Mantener sesión viva mientras el bridge exista; reiniciar browser si cae
+while true; do
+  sleep 15
+  if [ -f /tmp/alset-bridge.pid ] && kill -0 "$(cat /tmp/alset-bridge.pid)" 2>/dev/null; then
+    # bridge ok — si no hay browser, reabrir
+    if ! pgrep -f "netsurf|chromium|firefox|midori|dillo" >/dev/null 2>&1; then
+      /opt/alset/boot-alset.sh
+    fi
+  else
+    [ -x /opt/alset/boot-alset.sh ] && /opt/alset/boot-alset.sh
+  fi
+done

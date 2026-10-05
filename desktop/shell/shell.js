@@ -371,8 +371,11 @@ Studio/Editor dentro del SO. Despliega apps y ábrelas aquí.</p>`,
         body: JSON.stringify({ name: 'calculadora', title: 'Calculadora', kind: 'html' }),
       });
       // add desktop icon if missing
+      if (!iconState.find((i) => i.id === 'app:seed')) {
+        iconState.push({ id: 'app:seed', label: 'Seed', glyph: '🌱', x: 216, y: 24 });
+      }
       if (!iconState.find((i) => i.id === 'app:calculadora')) {
-        iconState.push({ id: 'app:calculadora', label: 'Calculadora', glyph: '🔢', x: 216, y: 24 });
+        iconState.push({ id: 'app:calculadora', label: 'Calculadora', glyph: '🔢', x: 216, y: 120 });
         saveIcons(iconState);
         renderIcons();
       }
@@ -385,7 +388,7 @@ Studio/Editor dentro del SO. Despliega apps y ábrelas aquí.</p>`,
     const sizes = {
       'files-ui': [720, 520], 'doc-reader': [760, 540], 'notes': [720, 520],
       'org-manager': [700, 500], 'accounts': [640, 480], 'ipfs-store': [680, 500],
-      'calculadora': [360, 480], 'image-viewer': [560, 480],
+      'calculadora': [360, 480], 'seed': [900, 620], 'image-viewer': [560, 480],
       'audio-player': [480, 320], 'video-player': [640, 480],
     };
     const [w, h] = sizes[name] || [640, 520];
@@ -423,7 +426,7 @@ Studio/Editor dentro del SO. Despliega apps y ábrelas aquí.</p>`,
       const labels = {
         'files-ui': 'Archivos', 'doc-reader': 'Documentos', 'notes': 'Notas',
         'org-manager': 'Organismos', 'accounts': 'Cuentas', 'ipfs-store': 'IPFS Store',
-        'calculadora': 'Calculadora', 'image-viewer': 'Imágenes',
+        'calculadora': 'Calculadora', 'seed': 'Seed', 'image-viewer': 'Imágenes',
         'audio-player': 'Audio', 'video-player': 'Video',
       };
       openInstalledApp(name, labels[name] || name);
@@ -897,7 +900,7 @@ help · ls · cat path · open studio|editor|files|apps|settings
         const iconId = 'app:' + a.name;
         if (!iconState.find((i) => i.id === iconId)) {
           // only auto-pin a few builtins to avoid clutter
-          const pin = ['org-manager', 'files-ui', 'calculadora'].includes(a.name) || !a.builtin;
+          const pin = ['org-manager', 'files-ui', 'seed', 'calculadora'].includes(a.name) || !a.builtin;
           if (!pin) return;
           iconState.push({
             id: iconId,
