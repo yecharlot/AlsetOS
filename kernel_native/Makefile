@@ -13,9 +13,16 @@ src/kernel.o: src/kernel.c | build
 build/alsetos-kernel.bin: $(OBJS)
 	$(CC) $(LDFLAGS) -o $@ $(OBJS)
 	@echo "OK $@"
+# -vga std es obligatorio para Bochs VBE / texto
 run: build/alsetos-kernel.bin
-	qemu-system-i386 -kernel build/alsetos-kernel.bin -m 128M -display gtk 2>/dev/null \
-	|| qemu-system-i386 -kernel build/alsetos-kernel.bin -m 128M
+	@echo "QEMU: -vga std (si ves negro, prueba run-curses)"
+	qemu-system-i386 -kernel build/alsetos-kernel.bin -m 128M -vga std \
+	  -display gtk 2>/dev/null \
+	|| qemu-system-i386 -kernel build/alsetos-kernel.bin -m 128M -vga std \
+	  -display sdl 2>/dev/null \
+	|| qemu-system-i386 -kernel build/alsetos-kernel.bin -m 128M -vga std
+run-curses: build/alsetos-kernel.bin
+	qemu-system-i386 -kernel build/alsetos-kernel.bin -m 128M -vga std -display curses
 iso: build/alsetos-kernel.bin
 	@command -v grub-mkrescue >/dev/null 2>&1 || { echo "need grub-mkrescue"; exit 1; }
 	mkdir -p build/isodir/boot/grub

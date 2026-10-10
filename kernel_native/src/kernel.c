@@ -75,6 +75,7 @@ static struct OCB ocbs[MAX_OCB];
 static int n_ocb,actor_i,n_pulso,focus_win;
 static u32 nodo_id,nonce;
 static u32 *fb; static u32 fb_w,fb_h,fb_pitch; static int fb_ok;
+static volatile u16 *const VGA = (volatile u16 *)0xB8000;
 static int mouse_x,mouse_y;
 static u8 mouse_btn,mouse_cycle,mouse_pkt[3];
 static int drag_win=-1,drag_ox,drag_oy,menu_open,orges_seq;
@@ -132,24 +133,104 @@ static int pulso(int from,int to){
 #define VBE_DAT 0x01CF
 static void vbe_write(u16 i,u16 v){outw(VBE_IDX,i);outw(VBE_DAT,v);}
 static u16 vbe_read(u16 i){outw(VBE_IDX,i);return inw(VBE_DAT);}
-static int fb_init_bochs(int w,int h){
-    vbe_write(0,0xB0C0); if(vbe_read(0)<0xB0C0)return 0;
-    vbe_write(4,0); vbe_write(1,(u16)w); vbe_write(2,(u16)h); vbe_write(3,32); vbe_write(4,0x41);
-    fb_w=(u32)w; fb_h=(u32)h; fb_pitch=(u32)w*4; fb=(u32*)(u32)0xE0000000u; fb_ok=1; return 1;
+/* Probar si el LFB responde a lectura/escritura */
+static int fb_probe_addr(u32 addr, u32 pixels) {
+    volatile u32 *p = (volatile u32 *)addr;
+    u32 save0 = p[0], save1 = p[1];
+    p[0] = 0xA11E70ADu;
+    p[1] = 0xB01DFACEu;
+    u32 r0 = p[0], r1 = p[1];
+    p[0] = save0; p[1] = save1;
+    if (r0 != 0xA11E70ADu || r1 != 0xB01DFACEu) return 0;
+    /* pintar esquina para validar visualmente */
+    for (u32 i = 0; i < 64 && i < pixels; i++) p[i] = 0xFF3DDC97u;
+    return 1;
 }
-static int fb_init_multiboot(u32 magic,u32 info){
-    if(magic!=0x2BADB002u||!info)return 0;
-    u32 *mi=(u32*)info; if(!(mi[0]&(1u<<12)))return 0;
-    u32 *f=(u32*)(info+88); u32 addr=f[0];
-    fb_pitch=f[2]; fb_w=f[3]; fb_h=f[4];
-    u8 bpp=*((u8*)(info+108));
-    if(!addr||fb_w<320||(bpp!=32&&bpp!=24))return 0;
-    fb=(u32*)addr; fb_ok=1; return 1;
+
+static int fb_try_bases(u32 w, u32 h) {
+    static const u32 bases[] = {
+        0xE0000000u, 0xFD000000u, 0xF0000000u, 0xD0000000u, 0x80000000u, 0
+    };
+    fb_w = w; fb_h = h; fb_pitch = w * 4;
+    u32 pixels = w * h;
+    for (int i = 0; bases[i]; i++) {
+        if (fb_probe_addr(bases[i], pixels)) {
+            fb = (u32 *)bases[i];
+            fb_ok = 1;
+            return 1;
+        }
+    }
+    return 0;
 }
-static int fb_init(u32 magic,u32 info){
-    if(fb_init_multiboot(magic,info))return 1;
-    if(fb_init_bochs(800,600))return 1;
-    return fb_init_bochs(640,480);
+
+static int fb_init_bochs(int w, int h) {
+    vbe_write(0, 0xB0C0);
+    u16 id = vbe_read(0);
+    if (id < 0xB0C0) return 0;
+    vbe_write(4, 0); /* disable */
+    vbe_write(1, (u16)w);
+    vbe_write(2, (u16)h);
+    vbe_write(3, 32);
+    vbe_write(6, (u16)w); /* virt width */
+    vbe_write(7, (u16)h); /* virt height */
+    vbe_write(8, 0); /* x off */
+    vbe_write(9, 0); /* y off */
+    vbe_write(4, 0x41); /* enable + LFB */
+    return fb_try_bases((u32)w, (u32)h);
+}
+
+static int fb_init_multiboot(u32 magic, u32 info) {
+    if (magic != 0x2BADB002u || !info) return 0;
+    u32 *mi = (u32 *)info;
+    if (!(mi[0] & (1u << 12))) return 0;
+    u32 *f = (u32 *)(info + 88);
+    u32 addr = f[0];
+    fb_pitch = f[2];
+    fb_w = f[3];
+    fb_h = f[4];
+    u8 bpp = *((u8 *)(info + 108));
+    if (!addr || fb_w < 320 || (bpp != 32 && bpp != 24)) return 0;
+    if (!fb_probe_addr(addr, fb_w * fb_h)) return 0;
+    fb = (u32 *)addr;
+    fb_ok = 1;
+    return 1;
+}
+
+static int fb_init(u32 magic, u32 info) {
+    if (fb_init_multiboot(magic, info)) return 1;
+    if (fb_init_bochs(800, 600)) return 1;
+    if (fb_init_bochs(640, 480)) return 1;
+    if (fb_init_bochs(1024, 768)) return 1;
+    return 0;
+}
+
+/* Fallback: UI mínima en VGA texto 80x25 (siempre visible con -vga std) */
+static void vga_put(int x, int y, char c, u8 a) {
+    if (x < 0 || x >= 80 || y < 0 || y >= 25) return;
+    VGA[y * 80 + x] = (u16)(a << 8) | (u8)c;
+}
+static void vga_fill(u8 a) {
+    for (int i = 0; i < 80 * 25; i++) VGA[i] = (u16)(a << 8) | ' ';
+}
+static void vga_str(int x, int y, const char *s, u8 a) {
+    for (int i = 0; s[i] && x + i < 80; i++) vga_put(x + i, y, s[i], a);
+}
+static void vga_desktop(void) {
+    vga_fill(0x1F);
+    for (int x = 0; x < 80; x++) vga_put(x, 0, ' ', 0x3F);
+    vga_str(2, 0, "AlsetOS Desktop (VGA texto — sin LFB grafico)", 0x3F);
+    vga_str(2, 2, "Maestro > Desktop > ORGES (modo seguro)", 0x1A);
+    vga_str(2, 4, "Framebuffer lineal no disponible en este QEMU.", 0x1E);
+    vga_str(2, 5, "Prueba: qemu-system-i386 -vga std -m 128M -kernel ...", 0x1E);
+    vga_str(2, 7, "Organismos activos:", 0x1B);
+    int row = 8;
+    for (int i = 0; i < n_ocb && row < 22; i++) {
+        if (!ocbs[i].alive) continue;
+        vga_str(4, row, ocbs[i].nombre, 0x1F);
+        row++;
+    }
+    vga_str(2, 23, "Reinicia con -vga std. Si ves esto, el kernel SI arranco.", 0x1A);
+    vga_str(2, 24, "Ctrl-Alt-G libera el raton en QEMU.", 0x18);
 }
 
 static void put_px(int x,int y,u32 c){
@@ -347,14 +428,23 @@ static void boot_organisms(void){
     actor_i=buscar("Desktop");
 }
 
-static volatile u16 *const VGA=(volatile u16*)0xB8000;
 static void vga_msg(const char *s){for(int i=0;s[i]&&i<1600;i++)VGA[i]=(u16)(0x0A<<8)|(u8)s[i];}
 
 void kernel_main(u32 magic,u32 mb_info){
     nodo_id=fnv("AlsetOS-FB2")^0xA15E00FCu;
+    /* Mensaje inmediato en VGA texto (antes de intentar gráficos) */
+    vga_msg("AlsetOS arrancando... buscando framebuffer");
     mouse_init(); mouse_x=400; mouse_y=300;
-    if(!fb_init(magic,mb_info)){vga_msg("AlsetOS: sin framebuffer. QEMU -vga std."); for(;;)__asm__ __volatile__("hlt");}
     boot_organisms();
+    if (!fb_init(magic, mb_info)) {
+        /* No colgar en negro: Desktop en VGA texto */
+        vga_desktop();
+        for (;;) {
+            if (!(inb(0x64) & 1)) { pausa(); continue; }
+            inb(0x60); /* consumir teclas */
+            vga_desktop();
+        }
+    }
     {int fi=buscar("Framebuffer"); if(fi>=0){ocbs[fi].w=(int)fb_w;ocbs[fi].h=(int)fb_h;}}
     compositor_tick();
     for(;;){
