@@ -43,6 +43,28 @@ Controles en QEMU:
 
 Cerrar la ventana de QEMU para salir.
 
+### Si `make run` falla con PVH ELF Note
+
+Eso pasa si solo tienes `qemu-system-x86_64` y se usa `-kernel` con un Multiboot 32-bit.
+
+```bash
+sudo apt install -y qemu-system-x86   # incluye qemu-system-i386
+cd kernel_native
+make clean && make && make run
+```
+
+Alternativa con ISO (GRUB):
+
+```bash
+sudo apt install -y grub-pc-bin grub-common xorriso
+cd kernel_native
+make iso
+qemu-system-x86_64 -cdrom build/AlsetOS-Kernel.iso -m 64M
+```
+
+Importante: si ya estás dentro de `kernel_native`, no ejecutes otra vez `cd kernel_native`.
+
+
 ### B) Escritorio rico + ORGES Studio (desarrollo y export)
 
 ```bash
