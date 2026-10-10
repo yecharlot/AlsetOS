@@ -1,13 +1,14 @@
-# AlsetOS Kernel Native (integrado)
+# AlsetOS Kernel nativo
 
-Kernel multiboot **sin SO anfitrión**. Al arrancar instancia organismos:
+Todo es organismo. Sin SO anfitrión.
 
-- Master, Desktop, Studio, PulseBus (ORGES de infraestructura)
-
-UI VGA interactiva (teclado en QEMU). Modelo descentralizado-first (NodeID local, Pulse, Peers).
-
-```bash
-make && make run
+```
+Maestro → Framebuffer → Compositor → Desktop → Ventana / Texto / Lista
 ```
 
-Guía completa: [docs/GUIA_ALSETOS.md](../docs/GUIA_ALSETOS.md)
+```bash
+cd kernel_native && make && make run
+# ISO: make iso  (requiere grub-mkrescue)
+```
+
+Controles: **M** menú · **1** ventana · **2** texto · **3** lista · **Enter** pulso · **Tab** siguiente · ratón arrastre.

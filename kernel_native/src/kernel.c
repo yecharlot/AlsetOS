@@ -1,790 +1,390 @@
 /*
- * AlsetOS Genesis — organismos-dispositivo + shell en español + UI gráfica VGA
- * Paradigma: organismo / Pulse / capacidades / Zyrion. Sin Unix.
+ * AlsetOS Kernel nativo — framebuffer + compositor + ORGES
+ * Maestro → Framebuffer → Compositor → Desktop → Ventana/Texto/Lista
  */
 typedef unsigned char u8;
 typedef unsigned short u16;
 typedef unsigned int u32;
 
-#define COLS 80
-#define ROWS 25
-#define MAX_OCB 32
-#define MAX_PULSE 64
-#define MAX_LINE 76
-#define MAX_GOALS 4
-#define MAX_GOAL_LEN 14
-#define RAMDISK_SECTORS 32
-#define RAMDISK_SECSIZE 128
+#define MAX_OCB 48
+#define MAX_NAME 16
+#define MAX_TITLE 28
+#define MAX_TEXT 96
+#define MAX_LIST 6
+#define MAX_LIST_ITEM 20
 
-#define ATR_NORM 0x0F
-#define ATR_DIM  0x08
-#define ATR_ACC  0x0A
-#define ATR_TITLE 0x0B
-#define ATR_ERR  0x0C
-#define ATR_WARN 0x0E
-#define ATR_INV  0x1F
-#define ATR_SHELL 0x0E
-
-/* Caps */
-#define CAP_PULSO_ENV  0x01
-#define CAP_PULSO_REC  0x02
+#define CAP_PULSO_ENV   0x01
+#define CAP_PULSO_REC   0x02
 #define CAP_ORGES_CREAR 0x04
-#define CAP_ORGES_DESTR 0x08
-#define CAP_CAPS_OTORG 0x10
-#define CAP_NODO_ADMIN 0x20
-#define CAP_ZYRION     0x40
-#define CAP_DISP_LEER  0x80
-#define CAP_DISP_ESCR  0x100
-#define CAP_DISP_CTRL  0x200
-#define CAP_ALL        0xFFFFFFFFu
+#define CAP_ZYRION      0x40
+#define CAP_DISP_LEER   0x80
+#define CAP_DISP_ESCR   0x100
+#define CAP_DISP_CTRL   0x200
+#define CAP_DESKTOP     0x400
+#define CAP_COMPOSE     0x800
+#define CAP_FB          0x1000
+#define CAP_ALL         0xFFFFFFFFu
 
-/* Tipos de organismo */
-#define K_MASTER 1
-#define K_SHELL  2
-#define K_ORGES  3
-#define K_PAR    4
-#define K_BUS    5
-#define K_DISP   6
+#define K_MASTER   1
+#define K_SHELL    2
+#define K_ORGES    3
+#define K_BUS      5
+#define K_DISP     6
+#define K_DESKTOP  7
+#define K_FB       8
+#define K_COMPOSE  9
+#define K_WINDOW   10
+#define K_TEXT     11
+#define K_LIST     12
 
-static inline u8 inb(u16 p) {
-    u8 v; __asm__ __volatile__("inb %1,%0" : "=a"(v) : "Nd"(p)); return v;
-}
-static inline void outb(u16 p, u8 v) {
-    __asm__ __volatile__("outb %0,%1" : : "a"(v), "Nd"(p));
-}
-static void pausa(void) {
-    for (volatile int i = 0; i < 3000; i++)
-        __asm__ __volatile__("pause");
-}
+#define COL_BG       0xFF0B1220u
+#define COL_PANEL    0xFF151E32u
+#define COL_TASK     0xFF1A2744u
+#define COL_ACCENT   0xFF3DDC97u
+#define COL_TITLE    0xFF5B8DEEu
+#define COL_TEXT     0xFFE8EEF8u
+#define COL_DIM      0xFF8A9BB5u
+#define COL_WIN_BG   0xFF1C2538u
+#define COL_WIN_TOP  0xFF243044u
+#define COL_DANGER   0xFFE05C5Cu
+#define COL_CURSOR   0xFFFFFFFFu
+#define COL_ICON     0xFF4FC3F7u
+#define COL_MENU     0xFF1E2A40u
+#define COL_SEL      0xFF2E4A6Eu
 
-/* ——— VGA texto ——— */
-static volatile u16 *const VGA = (volatile u16*)0xB8000;
-static int tx, ty;
+static inline u8 inb(u16 p){u8 v;__asm__ __volatile__("inb %1,%0":"=a"(v):"Nd"(p));return v;}
+static inline void outb(u16 p,u8 v){__asm__ __volatile__("outb %0,%1"::"a"(v),"Nd"(p));}
+static inline void outw(u16 p,u16 v){__asm__ __volatile__("outw %0,%1"::"a"(v),"Nd"(p));}
+static inline u16 inw(u16 p){u16 v;__asm__ __volatile__("inw %1,%0":"=a"(v):"Nd"(p));return v;}
+static void pausa(void){for(volatile int i=0;i<600;i++)__asm__ __volatile__("pause");}
 
-static void vput(int x, int y, char c, u8 a) {
-    if (x >= 0 && x < COLS && y >= 0 && y < ROWS)
-        VGA[y * COLS + x] = (u16)(a << 8) | (u8)c;
-}
-static void scroll(void) {
-    for (int y = 1; y < ROWS - 1; y++)
-        for (int x = 0; x < COLS; x++)
-            VGA[(y - 1) * COLS + x] = VGA[y * COLS + x];
-    for (int x = 0; x < COLS; x++)
-        VGA[(ROWS - 2) * COLS + x] = (u16)(ATR_NORM << 8) | ' ';
-    if (ty > 0) ty--;
-}
-static void tclear(void) {
-    for (int i = 0; i < COLS * (ROWS - 1); i++)
-        VGA[i] = (u16)(ATR_NORM << 8) | ' ';
-    tx = ty = 0;
-}
-static void twrite(const char *s, u8 a) {
-    while (*s) {
-        if (*s == '\n') {
-            tx = 0; ty++;
-            if (ty >= ROWS - 1) { scroll(); ty = ROWS - 2; }
-            s++; continue;
-        }
-        vput(tx, ty, *s, a);
-        if (++tx >= COLS) { tx = 0; ty++; if (ty >= ROWS - 1) { scroll(); ty = ROWS - 2; } }
-        s++;
-    }
-}
-static void tprint(const char *s) { twrite(s, ATR_NORM); }
-static void tacc(const char *s) { twrite(s, ATR_ACC); }
-static void terr(const char *s) { twrite(s, ATR_ERR); }
-static void tdim(const char *s) { twrite(s, ATR_DIM); }
-static void thex(u32 v) {
-    const char *h = "0123456789ABCDEF";
-    char b[11] = "0x";
-    for (int i = 0; i < 8; i++) b[2 + i] = h[(v >> (28 - i * 4)) & 0xF];
-    b[10] = 0; tacc(b);
-}
-static void barra_estado(const char *actor, const char *modo) {
-    for (int x = 0; x < COLS; x++) vput(x, ROWS - 1, ' ', ATR_INV);
-    const char *p = "AlsetOS | ";
-    int x = 0;
-    for (; p[x]; x++) vput(x, ROWS - 1, p[x], ATR_INV);
-    for (int i = 0; modo[i] && x < 20; i++, x++) vput(x, ROWS - 1, modo[i], ATR_INV);
-    vput(x++, ROWS - 1, ' ', ATR_INV);
-    const char *a = "actor=";
-    for (int i = 0; a[i]; i++, x++) vput(x, ROWS - 1, a[i], ATR_INV);
-    for (int i = 0; actor[i] && x < COLS - 1; i++, x++) vput(x, ROWS - 1, actor[i], ATR_INV);
-}
-
-/* ——— Organismos ——— */
 struct OCB {
-    u32 magic, oid, kind, caps;
-    u32 pin, pout;
-    u8 alive;
-    char nombre[16];
-    char metas[MAX_GOALS][MAX_GOAL_LEN];
-    int n_metas;
-    /* dispositivo */
-    u32 disp_clase; /* 1 teclado 2 raton 3 memoria 4 disco 5 red 6 extraible */
-    u32 disp_estado; /* flags runtime */
-    u32 disp_dato;   /* contador/bytes */
+    u32 magic,oid,kind,caps,pin,pout;
+    u8 alive,visible,focused;
+    char nombre[MAX_NAME];
+    char titulo[MAX_TITLE];
+    int x,y,w,h;
+    u32 color,disp_clase,disp_dato;
+    char text[MAX_TEXT];
+    int text_len;
+    char items[MAX_LIST][MAX_LIST_ITEM];
+    int n_items,sel_item;
 };
 
 static struct OCB ocbs[MAX_OCB];
-static int n_ocb, actor_i, n_pulso;
-static u32 nodo_id, nonce;
-static char linea[MAX_LINE];
-static int lin_len;
-static int modo_grafico; /* 0 consola 1 grafico texto-UI */
+static int n_ocb,actor_i,n_pulso,focus_win;
+static u32 nodo_id,nonce;
+static u32 *fb; static u32 fb_w,fb_h,fb_pitch; static int fb_ok;
+static int mouse_x,mouse_y;
+static u8 mouse_btn,mouse_cycle,mouse_pkt[3];
+static int drag_win=-1,drag_ox,drag_oy,menu_open,orges_seq;
 
-/* Ramdisk simple (organismo Disco) */
-static u8 ramdisk[RAMDISK_SECTORS * RAMDISK_SECSIZE];
+/* Fuente 8x8: generamos glifos simples en runtime para no inflar el binario */
+static u8 font_row(int ch, int row) {
+    /* patrón mínimo legible para dígitos/letras */
+    static const u8 dig[10][8] = {
+        {0x3C,0x66,0x6E,0x76,0x66,0x66,0x3C,0},{0x18,0x38,0x18,0x18,0x18,0x18,0x7E,0},
+        {0x3C,0x66,0x60,0x30,0x18,0x0C,0x7E,0},{0x3C,0x66,0x60,0x38,0x60,0x66,0x3C,0},
+        {0x30,0x38,0x3C,0x36,0x7E,0x30,0x30,0},{0x7E,0x06,0x3E,0x60,0x60,0x66,0x3C,0},
+        {0x38,0x0C,0x06,0x3E,0x66,0x66,0x3C,0},{0x7E,0x60,0x30,0x18,0x0C,0x0C,0x0C,0},
+        {0x3C,0x66,0x66,0x3C,0x66,0x66,0x3C,0},{0x3C,0x66,0x66,0x7C,0x60,0x30,0x1C,0}
+    };
+    if (ch >= '0' && ch <= '9') return dig[ch-'0'][row];
+    if (ch == ' ') return 0;
+    if (ch == '-') return row==3 ? 0x7E : 0;
+    if (ch == '_') return row==7 ? 0x7E : 0;
+    if (ch == '.') return row>=6 ? 0x18 : 0;
+    if (ch == '>') { static const u8 g[8]={0x00,0x18,0x0C,0x06,0x0C,0x18,0x00,0}; return g[row]; }
+    if (ch == '<') { static const u8 g[8]={0x00,0x18,0x30,0x60,0x30,0x18,0x00,0}; return g[row]; }
+    if (ch == '/') { static const u8 g[8]={0x40,0x20,0x10,0x08,0x04,0x02,0x01,0}; return g[row]; }
+    if (ch == '=') return (row==2||row==5)?0x7E:0;
+    if (ch == ':') return (row==2||row==5)?0x18:0;
+    /* letras: forma bloque simple + bit de identidad */
+    u8 base = (u8)((ch & 0x1F) * 7);
+    if (row == 0 || row == 6) return 0x3C;
+    if (row == 1 || row == 5) return 0x66;
+    return (u8)(0x42 | ((base >> row) & 0x3C));
+}
 
-/* Ratón PS/2 */
-static int mouse_x = 40, mouse_y = 12;
-static u8 mouse_btn;
-static int mouse_cycle;
-static u8 mouse_pkt[3];
+static u32 fnv(const char *s){u32 h=2166136261u;while(*s){h^=(u8)*s++;h*=16777619u;}return h;}
+static void cpy(char *d,const char *s,int n){int i=0;for(;i<n-1&&s[i];i++)d[i]=s[i];d[i]=0;}
+static int igual(const char *a,const char *b){while(*a&&*b&&*a==*b){a++;b++;}return !*a&&!*b;}
+static int buscar(const char *n){for(int i=0;i<n_ocb;i++)if(ocbs[i].alive&&igual(ocbs[i].nombre,n))return i;return -1;}
+static int tiene_cap(int i,u32 c){if(i<0||!ocbs[i].alive)return 0;if(ocbs[i].kind==K_MASTER)return 1;return (ocbs[i].caps&c)!=0;}
+static int ocb_add(const char *n,u32 kind,u32 caps){
+    if(n_ocb>=MAX_OCB)return -1; if(buscar(n)>=0)return -2;
+    struct OCB *o=&ocbs[n_ocb];
+    o->magic=0x4F434200; o->oid=fnv(n)^nodo_id^(u32)n_ocb;
+    o->kind=kind; o->caps=caps; o->pin=o->pout=0; o->alive=1;
+    o->x=40;o->y=50;o->w=260;o->h=160; o->visible=1;o->focused=0;
+    o->color=COL_WIN_BG; o->disp_clase=o->disp_dato=0;
+    o->text[0]=0;o->text_len=0;o->n_items=0;o->sel_item=0;o->titulo[0]=0;
+    cpy(o->nombre,n,MAX_NAME); return n_ocb++;
+}
+static int pulso(int from,int to){
+    if(from<0||to<0)return -1;
+    if(!tiene_cap(from,CAP_PULSO_ENV))return -2;
+    if(!tiene_cap(to,CAP_PULSO_REC))return -3;
+    ocbs[from].pout++; ocbs[to].pin++; nonce++; n_pulso++; return 0;
+}
 
-static u32 fnv(const char *s) {
-    u32 h = 2166136261u;
-    while (*s) { h ^= (u8)*s++; h *= 16777619u; }
-    return h;
+#define VBE_IDX 0x01CE
+#define VBE_DAT 0x01CF
+static void vbe_write(u16 i,u16 v){outw(VBE_IDX,i);outw(VBE_DAT,v);}
+static u16 vbe_read(u16 i){outw(VBE_IDX,i);return inw(VBE_DAT);}
+static int fb_init_bochs(int w,int h){
+    vbe_write(0,0xB0C0); if(vbe_read(0)<0xB0C0)return 0;
+    vbe_write(4,0); vbe_write(1,(u16)w); vbe_write(2,(u16)h); vbe_write(3,32); vbe_write(4,0x41);
+    fb_w=(u32)w; fb_h=(u32)h; fb_pitch=(u32)w*4; fb=(u32*)(u32)0xE0000000u; fb_ok=1; return 1;
 }
-static void cpy(char *d, const char *s, int n) {
-    int i = 0; for (; i < n - 1 && s[i]; i++) d[i] = s[i]; d[i] = 0;
+static int fb_init_multiboot(u32 magic,u32 info){
+    if(magic!=0x2BADB002u||!info)return 0;
+    u32 *mi=(u32*)info; if(!(mi[0]&(1u<<12)))return 0;
+    u32 *f=(u32*)(info+88); u32 addr=f[0];
+    fb_pitch=f[2]; fb_w=f[3]; fb_h=f[4];
+    u8 bpp=*((u8*)(info+108));
+    if(!addr||fb_w<320||(bpp!=32&&bpp!=24))return 0;
+    fb=(u32*)addr; fb_ok=1; return 1;
 }
-static int igual(const char *a, const char *b) {
-    while (*a && *b && *a == *b) { a++; b++; }
-    return !*a && !*b;
+static int fb_init(u32 magic,u32 info){
+    if(fb_init_multiboot(magic,info))return 1;
+    if(fb_init_bochs(800,600))return 1;
+    return fb_init_bochs(640,480);
 }
-static int buscar(const char *n) {
-    for (int i = 0; i < n_ocb; i++)
-        if (ocbs[i].alive && igual(ocbs[i].nombre, n)) return i;
+
+static void put_px(int x,int y,u32 c){
+    if(!fb_ok||x<0||y<0||(u32)x>=fb_w||(u32)y>=fb_h)return;
+    ((u32*)((u8*)fb+(u32)y*fb_pitch))[x]=c;
+}
+static void fill_rect(int x,int y,int w,int h,u32 c){
+    if(!fb_ok||w<=0||h<=0)return;
+    if(x<0){w+=x;x=0;} if(y<0){h+=y;y=0;}
+    if((u32)(x+w)>fb_w)w=(int)fb_w-x; if((u32)(y+h)>fb_h)h=(int)fb_h-y;
+    for(int yy=0;yy<h;yy++){u32 *row=(u32*)((u8*)fb+(u32)(y+yy)*fb_pitch);for(int xx=0;xx<w;xx++)row[x+xx]=c;}
+}
+static void draw_rect(int x,int y,int w,int h,u32 c){
+    fill_rect(x,y,w,1,c); fill_rect(x,y+h-1,w,1,c); fill_rect(x,y,1,h,c); fill_rect(x+w-1,y,1,h,c);
+}
+static void draw_char(int x,int y,char ch,u32 fg){
+    for(int row=0;row<8;row++){
+        u8 bits=font_row((int)(u8)ch,row);
+        for(int col=0;col<8;col++) if(bits&(1<<col)) put_px(x+col,y+row,fg);
+    }
+}
+static void draw_text(int x,int y,const char *s,u32 fg){
+    while(*s&&(u32)x+8<=fb_w){draw_char(x,y,*s++,fg);x+=8;}
+}
+
+static int is_win(int i){
+    u32 k=ocbs[i].kind;
+    return k==K_WINDOW||k==K_SHELL||k==K_TEXT||k==K_LIST||k==K_ORGES;
+}
+static void focus_set(int i){
+    for(int j=0;j<n_ocb;j++) ocbs[j].focused=0;
+    if(i>=0&&i<n_ocb&&ocbs[i].alive){ocbs[i].focused=1;focus_win=i;actor_i=i;}
+}
+static int hit_window(int mx,int my){
+    if(focus_win>=0&&focus_win<n_ocb&&is_win(focus_win)){
+        struct OCB *o=&ocbs[focus_win];
+        if(o->alive&&o->visible&&mx>=o->x&&mx<o->x+o->w&&my>=o->y&&my<o->y+o->h) return focus_win;
+    }
+    for(int i=n_ocb-1;i>=0;i--){
+        if(!ocbs[i].alive||!ocbs[i].visible||!is_win(i))continue;
+        struct OCB *o=&ocbs[i];
+        if(mx>=o->x&&mx<o->x+o->w&&my>=o->y&&my<o->y+o->h) return i;
+    }
     return -1;
 }
-static int tiene_cap(int i, u32 c) {
-    if (i < 0 || !ocbs[i].alive) return 0;
-    if (ocbs[i].kind == K_MASTER) return 1;
-    return (ocbs[i].caps & c) != 0;
-}
-static int ocb_add(const char *n, u32 kind, u32 caps, u32 dclase) {
-    if (n_ocb >= MAX_OCB) return -1;
-    if (buscar(n) >= 0) return -2;
-    struct OCB *o = &ocbs[n_ocb];
-    o->magic = 0x4F434200;
-    o->oid = fnv(n) ^ nodo_id ^ (u32)n_ocb;
-    o->kind = kind; o->caps = caps;
-    o->pin = o->pout = 0; o->alive = 1; o->n_metas = 0;
-    o->disp_clase = dclase; o->disp_estado = 1; o->disp_dato = 0;
-    cpy(o->nombre, n, 16);
-    return n_ocb++;
+
+static int crear_orges(u32 kind,const char *base){
+    int di=buscar("Desktop");
+    if(di<0||!tiene_cap(di,CAP_ORGES_CREAR))return -1;
+    char name[MAX_NAME]; int n=0;
+    while(base[n]&&n<10){name[n]=base[n];n++;}
+    name[n++]='0'+(char)((orges_seq%9)+1); name[n]=0; orges_seq++;
+    int id=ocb_add(name,kind,CAP_PULSO_ENV|CAP_PULSO_REC);
+    if(id<0)return id;
+    ocbs[id].x=60+(orges_seq*28)%220; ocbs[id].y=50+(orges_seq*20)%140;
+    ocbs[id].w=(kind==K_LIST)?240:300; ocbs[id].h=(kind==K_TEXT)?200:170;
+    cpy(ocbs[id].titulo,name,MAX_TITLE);
+    if(kind==K_TEXT){cpy(ocbs[id].text,"texto...",MAX_TEXT);ocbs[id].text_len=8;}
+    if(kind==K_LIST){
+        cpy(ocbs[id].items[0],"alpha",MAX_LIST_ITEM);
+        cpy(ocbs[id].items[1],"beta",MAX_LIST_ITEM);
+        cpy(ocbs[id].items[2],"gamma",MAX_LIST_ITEM);
+        ocbs[id].n_items=3;
+    }
+    if(kind==K_WINDOW||kind==K_ORGES){cpy(ocbs[id].text,"ORGES nativa",MAX_TEXT);ocbs[id].text_len=12;}
+    focus_set(id); pulso(di,id); return id;
 }
 
-/* Zyrion */
-typedef enum { Z_V = 0, Z_F = 1, Z_I = 2 } Z;
-static const char *zn(Z z) { return z == Z_V ? "V" : (z == Z_F ? "F" : "I"); }
-static Z z_and(Z a, Z b) {
-    if (a == Z_F || b == Z_F) return Z_F;
-    if (a == Z_I || b == Z_I) return Z_I;
-    return Z_V;
-}
-static Z z_or(Z a, Z b) {
-    if (a == Z_V || b == Z_V) return Z_V;
-    if (a == Z_I || b == Z_I) return Z_I;
-    return Z_F;
-}
-static Z z_not(Z a) { return a == Z_V ? Z_F : (a == Z_F ? Z_V : Z_I); }
-static Z z_parse(const char *s) {
-    if (igual(s, "V") || igual(s, "v") || igual(s, "verdadero")) return Z_V;
-    if (igual(s, "F") || igual(s, "f") || igual(s, "falso")) return Z_F;
-    return Z_I;
-}
-
-static int pulso(int from, int to, u32 tipo) {
-    if (from < 0 || to < 0) return -1;
-    if (!tiene_cap(from, CAP_PULSO_ENV)) return -2;
-    if (!tiene_cap(to, CAP_PULSO_REC)) return -3;
-    ocbs[from].pout++; ocbs[to].pin++;
-    nonce++; n_pulso++;
-    return 0;
-}
-
-static int partir(char *s, char *argv[], int max) {
-    int n = 0, i = 0;
-    while (s[i] && n < max) {
-        while (s[i] == ' ' || s[i] == '\t') i++;
-        if (!s[i]) break;
-        argv[n++] = &s[i];
-        while (s[i] && s[i] != ' ' && s[i] != '\t') i++;
-        if (s[i]) s[i++] = 0;
-    }
-    return n;
-}
-
-static u32 parse_cap(const char *s) {
-    if (igual(s, "pulso.env") || igual(s, "env")) return CAP_PULSO_ENV;
-    if (igual(s, "pulso.rec") || igual(s, "rec")) return CAP_PULSO_REC;
-    if (igual(s, "orges.crear") || igual(s, "crear")) return CAP_ORGES_CREAR;
-    if (igual(s, "orges.destr") || igual(s, "destr")) return CAP_ORGES_DESTR;
-    if (igual(s, "caps.otorg") || igual(s, "otorg")) return CAP_CAPS_OTORG;
-    if (igual(s, "nodo.admin") || igual(s, "admin")) return CAP_NODO_ADMIN;
-    if (igual(s, "zyrion")) return CAP_ZYRION;
-    if (igual(s, "disp.leer") || igual(s, "leer")) return CAP_DISP_LEER;
-    if (igual(s, "disp.escr") || igual(s, "escr")) return CAP_DISP_ESCR;
-    if (igual(s, "disp.ctrl") || igual(s, "ctrl")) return CAP_DISP_CTRL;
-    if (igual(s, "todo")) return CAP_ALL;
-    return 0;
-}
-
-static const char *clase_nombre(u32 c) {
-    if (c == 1) return "teclado";
-    if (c == 2) return "raton";
-    if (c == 3) return "memoria";
-    if (c == 4) return "disco";
-    if (c == 5) return "red";
-    if (c == 6) return "extraible";
-    return "-";
-}
-
-static void mostrar_org(int i) {
-    struct OCB *o = &ocbs[i];
-    tprint("  ");
-    tacc(o->nombre);
-    tprint(" oid="); thex(o->oid);
-    tprint(" tipo=");
-    if (o->kind == K_MASTER) tprint("MAESTRO");
-    else if (o->kind == K_SHELL) tprint("CONSOLA");
-    else if (o->kind == K_ORGES) tprint("ORGES");
-    else if (o->kind == K_PAR) tprint("PAR");
-    else if (o->kind == K_BUS) tprint("BUS");
-    else if (o->kind == K_DISP) { tprint("DISP:"); tprint(clase_nombre(o->disp_clase)); }
-    else tprint("?");
-    tprint(" caps="); thex(o->caps);
-    tprint("\n");
-}
-
-static void cmd_ayuda(void) {
-    tacc("AlsetOS Genesis — shell en español\n");
-    tdim("Organismo · Pulso · Capacidades · Zyrion · Dispositivos\n\n");
-    tprint("  ayuda                         — esta ayuda\n");
-    tprint("  nodo                          — identidad del nodo\n");
-    tprint("  organismos | lista            — listar OCB\n");
-    tprint("  dispositivos | disp           — solo organismos-dispositivo\n");
-    tprint("  actor <nombre>                — cambiar organismo activo\n");
-    tprint("  capacidades | caps            — caps del actor\n");
-    tprint("  crear orges <nom> [metas..]   — nuevo ORGES\n");
-    tprint("  crear par <nombre>            — peer descentralizado\n");
-    tprint("  pulso <destino> [tipo]        — enviar Pulso\n");
-    tprint("  otorgar <org> <cap>           — Master otorga capacidad\n");
-    tprint("  metas <nombre>                — metas de un ORGES\n");
-    tprint("  estado <disp>                 — estado de dispositivo\n");
-    tprint("  leer <disp> [args]            — leer via organismo-disp\n");
-    tprint("  escribir disco <sec> <texto>  — escribir ramdisk\n");
-    tprint("  zyrion <A> y|o|no <B>         — logica ternaria\n");
-    tprint("  interfaz consola | grafica    — cambiar UI\n");
-    tprint("  limpiar                       — limpiar pantalla\n");
-    tprint("\nCaps: pulso.env pulso.rec orges.crear orges.destr\n");
-    tprint("      caps.otorg nodo.admin zyrion disp.leer disp.escr disp.ctrl\n");
-    tprint("Abreviaturas: lista, disp, caps, env, rec, crear, otorg, leer, escr, ctrl\n");
-}
-
-static void cmd_estado_disp(int i) {
-    struct OCB *o = &ocbs[i];
-    if (o->kind != K_DISP) { terr("no es dispositivo\n"); return; }
-    tprint("dispositivo "); tacc(o->nombre);
-    tprint(" clase="); tprint(clase_nombre(o->disp_clase));
-    tprint(" activo="); tprint(o->disp_estado ? "si" : "no");
-    tprint(" dato="); thex(o->disp_dato);
-    tprint("\n");
-    if (o->disp_clase == 3) {
-        tprint("  memoria informativa del nodo ( contador de lecturas )\n");
-    }
-    if (o->disp_clase == 4) {
-        tprint("  disco RAM: ");
-        thex(RAMDISK_SECTORS);
-        tprint(" sectores x ");
-        thex(RAMDISK_SECSIZE);
-        tprint(" bytes\n");
-    }
-    if (o->disp_clase == 5) {
-        tprint("  red: interfaz local (sin enlace externo en esta fase)\n");
-    }
-    if (o->disp_clase == 1) {
-        tprint("  teclado: eventos="); thex(o->disp_dato); tprint("\n");
-    }
-    if (o->disp_clase == 2) {
-        tprint("  raton x="); thex((u32)mouse_x);
-        tprint(" y="); thex((u32)mouse_y);
-        tprint(" boton="); thex(mouse_btn); tprint("\n");
-    }
-}
-
-static void cmd_leer(char *argv[], int argc) {
-    if (argc < 2) { terr("uso: leer <dispositivo> [sector]\n"); return; }
-    int i = buscar(argv[1]);
-    if (i < 0) { terr("no existe\n"); return; }
-    if (!tiene_cap(actor_i, CAP_DISP_LEER) && !tiene_cap(actor_i, CAP_DISP_CTRL)) {
-        terr("denegado: falta disp.leer\n"); return;
-    }
-    if (!tiene_cap(i, CAP_DISP_LEER) && ocbs[i].kind == K_DISP) {
-        /* el dispositivo debe poder ser leido — caps en el org disp */
-    }
-    struct OCB *o = &ocbs[i];
-    o->disp_dato++;
-    if (o->kind != K_DISP) {
-        /* leer organismo normal: resumen */
-        mostrar_org(i);
-        return;
-    }
-    if (o->disp_clase == 4) {
-        u32 sec = 0;
-        if (argc >= 3) {
-            sec = 0;
-            for (const char *p = argv[2]; *p; p++) {
-                if (*p >= '0' && *p <= '9') sec = sec * 10 + (u32)(*p - '0');
-            }
+static void compose_window(int i){
+    struct OCB *o=&ocbs[i];
+    if(!o->alive||!o->visible||!is_win(i))return;
+    int x=o->x,y=o->y,w=o->w,h=o->h;
+    if(w<100)w=100; if(h<80)h=80;
+    u32 border=o->focused?COL_ACCENT:COL_TITLE;
+    fill_rect(x,y,w,h,o->color); fill_rect(x,y,w,24,COL_WIN_TOP);
+    draw_rect(x,y,w,h,border);
+    draw_text(x+8,y+8,o->titulo[0]?o->titulo:o->nombre,COL_TEXT);
+    fill_rect(x+w-22,y+4,16,16,COL_DANGER); draw_text(x+w-18,y+8,"x",COL_TEXT);
+    if(o->kind==K_TEXT){
+        fill_rect(x+8,y+32,w-16,h-48,COL_PANEL);
+        draw_text(x+12,y+40,o->text,COL_TEXT);
+        if(o->focused) draw_text(x+12+o->text_len*8,y+40,"_",COL_ACCENT);
+    } else if(o->kind==K_LIST){
+        draw_text(x+10,y+32,"Lista",COL_DIM);
+        for(int k=0;k<o->n_items;k++){
+            if(k==o->sel_item) fill_rect(x+8,y+48+k*16,w-16,14,COL_SEL);
+            draw_text(x+12,y+48+k*16,o->items[k],(k==o->sel_item&&o->focused)?COL_ACCENT:COL_TEXT);
         }
-        if (sec >= RAMDISK_SECTORS) { terr("sector fuera de rango\n"); return; }
-        tprint("sector "); thex(sec); tprint(": \"");
-        u8 *p = &ramdisk[sec * RAMDISK_SECSIZE];
-        for (int k = 0; k < 32 && p[k]; k++) {
-            char t[2] = { (char)p[k], 0 };
-            if (p[k] >= 32 && p[k] < 127) tprint(t);
-            else tprint(".");
-        }
-        tprint("\"\n");
-        pulso(actor_i, i, 10);
-        return;
+    } else if(o->kind==K_SHELL){
+        draw_text(x+10,y+40,"Consola",COL_DIM);
+        draw_text(x+10,y+56,"Shell nativo",COL_TEXT);
+        draw_text(x+10,y+80,"M=menu",COL_DIM);
+    } else {
+        draw_text(x+10,y+40,"ORGES",COL_DIM);
+        draw_text(x+10,y+56,o->text[0]?o->text:o->nombre,COL_ACCENT);
     }
-    if (o->disp_clase == 3) {
-        tprint("memoria: lecturas="); thex(o->disp_dato);
-        tprint("  (heap kernel no expuesto; contador de acceso)\n");
-        pulso(actor_i, i, 11);
-        return;
-    }
-    if (o->disp_clase == 5) {
-        tprint("red: estado=local  paquetes="); thex(o->disp_dato); tprint("\n");
-        pulso(actor_i, i, 12);
-        return;
-    }
-    cmd_estado_disp(i);
-    pulso(actor_i, i, 13);
 }
 
-static void cmd_escribir(char *argv[], int argc) {
-    if (argc < 4 || !igual(argv[1], "disco")) {
-        terr("uso: escribir disco <sector> <texto>\n"); return;
+static void compositor_tick(void){
+    if(!fb_ok)return;
+    int ci=buscar("Compositor"); if(ci>=0) ocbs[ci].disp_dato++;
+    fill_rect(0,0,(int)fb_w,(int)fb_h,COL_BG);
+    fill_rect(0,0,(int)fb_w,36,COL_PANEL);
+    draw_text(12,12,"AlsetOS Desktop",COL_ACCENT);
+    draw_text(160,12,"Maestro>FB>Compositor>Desktop",COL_DIM);
+    int ix=16,iy=48;
+    for(int i=0;i<n_ocb;i++){
+        if(!ocbs[i].alive||ocbs[i].kind!=K_DISP)continue;
+        fill_rect(ix,iy,72,52,COL_PANEL); draw_rect(ix,iy,72,52,COL_ICON);
+        draw_text(ix+6,iy+12,ocbs[i].nombre,COL_TEXT);
+        draw_text(ix+6,iy+28,"DISP",COL_DIM);
+        iy+=60; if(iy>(int)fb_h-100){iy=48;ix+=84;}
     }
-    if (!tiene_cap(actor_i, CAP_DISP_ESCR)) {
-        terr("denegado: falta disp.escr\n"); return;
+    for(int i=0;i<n_ocb;i++) if(i!=focus_win) compose_window(i);
+    if(focus_win>=0) compose_window(focus_win);
+    if(menu_open){
+        fill_rect(8,40,200,130,COL_MENU); draw_rect(8,40,200,130,COL_ACCENT);
+        draw_text(20,52,"Menu Desktop",COL_ACCENT);
+        draw_text(20,76,"1 Ventana",COL_TEXT);
+        draw_text(20,92,"2 Texto",COL_TEXT);
+        draw_text(20,108,"3 Lista",COL_TEXT);
+        draw_text(20,124,"Enter Pulso",COL_DIM);
+        draw_text(20,140,"M cerrar",COL_DIM);
     }
-    int di = buscar("Disco");
-    if (di < 0) { terr("sin organismo Disco\n"); return; }
-    u32 sec = 0;
-    for (const char *p = argv[2]; *p; p++)
-        if (*p >= '0' && *p <= '9') sec = sec * 10 + (u32)(*p - '0');
-    if (sec >= RAMDISK_SECTORS) { terr("sector fuera de rango\n"); return; }
-    u8 *dst = &ramdisk[sec * RAMDISK_SECSIZE];
-    for (int i = 0; i < RAMDISK_SECSIZE; i++) dst[i] = 0;
-    const char *txt = argv[3];
-    for (int i = 0; i < RAMDISK_SECSIZE - 1 && txt[i]; i++) dst[i] = (u8)txt[i];
-    ocbs[di].disp_dato++;
-    pulso(actor_i, di, 20);
-    tprint("escrito en Disco sector "); thex(sec); tprint("\n");
+    int th=40,ty=(int)fb_h-th;
+    fill_rect(0,ty,(int)fb_w,th,COL_TASK); fill_rect(0,ty,(int)fb_w,2,COL_ACCENT);
+    draw_text(10,ty+14,"Desktop",COL_ACCENT);
+    int sx=90;
+    for(int i=0;i<n_ocb;i++){
+        if(!ocbs[i].alive||!is_win(i))continue;
+        draw_text(sx,ty+14,ocbs[i].nombre,(i==focus_win)?COL_ACCENT:COL_DIM);
+        sx+=80; if(sx>(int)fb_w-160)break;
+    }
+    draw_text((int)fb_w-200,ty+14,"M menu 1/2/3 ORGES",COL_DIM);
+    for(int i=0;i<12;i++){put_px(mouse_x,mouse_y+i,COL_CURSOR);put_px(mouse_x+1,mouse_y+i,COL_CURSOR);}
+    for(int i=0;i<8;i++) put_px(mouse_x+i,mouse_y+i,COL_ACCENT);
 }
 
-/* ——— Interfaz gráfica (VGA texto enriquecido + ratón) ——— */
-static void dibujar_grafica(void) {
-    for (int i = 0; i < COLS * ROWS; i++)
-        VGA[i] = (u16)(0x1F << 8) | ' ';
-    /* marco */
-    for (int x = 0; x < COLS; x++) {
-        vput(x, 0, ' ', 0x3F);
-        vput(x, ROWS - 1, ' ', 0x3F);
-    }
-    const char *tit = " AlsetOS Genesis  |  Panel de organismos-dispositivo ";
-    for (int i = 0; tit[i] && i < COLS; i++) vput(i, 0, tit[i], 0x3F);
-
-    /* columna izquierda: dispositivos */
-    vput(0, 1, ' ', 0x1E);
-    const char *h1 = " DISPOSITIVOS ";
-    for (int i = 0; h1[i]; i++) vput(1 + i, 2, h1[i], 0x1E);
-    int row = 3;
-    for (int i = 0; i < n_ocb && row < ROWS - 3; i++) {
-        if (ocbs[i].kind != K_DISP) continue;
-        u8 atr = (i == actor_i) ? 0x2F : 0x1F;
-        vput(1, row, (i == actor_i) ? '>' : ' ', atr);
-        for (int k = 0; ocbs[i].nombre[k] && k < 14; k++)
-            vput(3 + k, row, ocbs[i].nombre[k], atr);
-        row++;
-    }
-
-    /* panel derecho */
-    const char *h2 = " ORGANISMOS / ORGES ";
-    for (int i = 0; h2[i]; i++) vput(22 + i, 2, h2[i], 0x1B);
-    row = 3;
-    for (int i = 0; i < n_ocb && row < 16; i++) {
-        if (ocbs[i].kind == K_DISP) continue;
-        u8 atr = (i == actor_i) ? 0x2F : 0x0F;
-        vput(22, row, (i == actor_i) ? '>' : ' ', atr);
-        for (int k = 0; ocbs[i].nombre[k] && k < 12; k++)
-            vput(24 + k, row, ocbs[i].nombre[k], atr);
-        const char *tp = "?";
-        if (ocbs[i].kind == K_MASTER) tp = "MAESTRO";
-        else if (ocbs[i].kind == K_SHELL) tp = "CONSOLA";
-        else if (ocbs[i].kind == K_ORGES) tp = "ORGES";
-        else if (ocbs[i].kind == K_PAR) tp = "PAR";
-        else if (ocbs[i].kind == K_BUS) tp = "BUS";
-        for (int k = 0; tp[k]; k++) vput(38 + k, row, tp[k], atr);
-        row++;
-    }
-
-    /* info */
-    const char *inf = "Clic o teclas:  Tab cambia foco lista | Enter pulso al seleccionado";
-    for (int i = 0; inf[i] && i < COLS - 1; i++) vput(i, ROWS - 3, inf[i], 0x08);
-    const char *inf2 = "F1 consola | F2 grafica | 1 crear ORGES demo | W/S mover seleccion";
-    for (int i = 0; inf2[i] && i < COLS - 1; i++) vput(i, ROWS - 2, inf2[i], 0x08);
-
-    /* cursor ratón */
-    if (mouse_x < 0) mouse_x = 0;
-    if (mouse_x >= COLS) mouse_x = COLS - 1;
-    if (mouse_y < 0) mouse_y = 0;
-    if (mouse_y >= ROWS) mouse_y = ROWS - 1;
-    vput(mouse_x, mouse_y, 'X', 0x4F);
-
-    barra_estado(ocbs[actor_i].nombre, "GRAFICA");
+static void mouse_init(void){
+    outb(0x64,0xA8); outb(0x64,0x20); u8 s=inb(0x60); s|=2;
+    outb(0x64,0x60); outb(0x60,s); outb(0x64,0xD4); outb(0x60,0xF4);
 }
-
-static void prompt(void) {
-    twrite(ocbs[actor_i].nombre, ATR_SHELL);
-    twrite(" > ", ATR_SHELL);
-}
-
-static void ejecutar(char *buf);
-
-static void graf_seleccion_click(void) {
-    /* clic en columna dispositivos (x 1-18) o organismos (x 22+) */
-    int row = mouse_y;
-    if (row < 3 || row > ROWS - 4) return;
-    int idx_disp = 0;
-    int idx_org = 0;
-    for (int i = 0; i < n_ocb; i++) {
-        if (ocbs[i].kind == K_DISP) {
-            if (3 + idx_disp == row && mouse_x < 20) {
-                actor_i = i;
-                dibujar_grafica();
-                return;
+static void mouse_feed(u8 sc){
+    mouse_pkt[mouse_cycle++]=sc; if(mouse_cycle<3)return; mouse_cycle=0;
+    if(!(mouse_pkt[0]&0x08))return;
+    mouse_btn=mouse_pkt[0]&7;
+    mouse_x+=(int)(signed char)mouse_pkt[1]; mouse_y-=(int)(signed char)mouse_pkt[2];
+    if(mouse_x<0)mouse_x=0; if(mouse_y<0)mouse_y=0;
+    if((u32)mouse_x>=fb_w)mouse_x=(int)fb_w-1; if((u32)mouse_y>=fb_h)mouse_y=(int)fb_h-1;
+    int mi=buscar("Raton"); if(mi>=0) ocbs[mi].disp_dato++;
+    if(mouse_btn&1){
+        if(drag_win<0){
+            int hit=hit_window(mouse_x,mouse_y);
+            if(hit>=0){ focus_set(hit);
+                if(mouse_y<ocbs[hit].y+24){drag_win=hit;drag_ox=mouse_x-ocbs[hit].x;drag_oy=mouse_y-ocbs[hit].y;}
             }
-            idx_disp++;
         } else {
-            if (3 + idx_org == row && mouse_x >= 20) {
-                actor_i = i;
-                dibujar_grafica();
-                return;
-            }
-            idx_org++;
+            ocbs[drag_win].x=mouse_x-drag_ox; ocbs[drag_win].y=mouse_y-drag_oy;
+            if(ocbs[drag_win].y<36) ocbs[drag_win].y=36;
         }
-    }
+    } else drag_win=-1;
+    compositor_tick();
 }
 
-static void ejecutar(char *buf) {
-    char *argv[14];
-    int argc = partir(buf, argv, 14);
-    if (argc == 0) return;
-
-    if (igual(argv[0], "ayuda") || igual(argv[0], "aid") || igual(argv[0], "?")) {
-        cmd_ayuda(); return;
-    }
-    if (igual(argv[0], "limpiar") || igual(argv[0], "cls")) {
-        tclear(); return;
-    }
-    if (igual(argv[0], "nodo")) {
-        tprint("NodoID "); thex(nodo_id);
-        tprint("  actor="); tacc(ocbs[actor_i].nombre); tprint("\n");
-        return;
-    }
-    if (igual(argv[0], "organismos") || igual(argv[0], "lista") || igual(argv[0], "ls")) {
-        tprint("Organismos del nodo:\n");
-        for (int i = 0; i < n_ocb; i++) if (ocbs[i].alive) mostrar_org(i);
-        return;
-    }
-    if (igual(argv[0], "dispositivos") || igual(argv[0], "disp")) {
-        tprint("Organismos-dispositivo:\n");
-        for (int i = 0; i < n_ocb; i++)
-            if (ocbs[i].alive && ocbs[i].kind == K_DISP) {
-                mostrar_org(i);
-                tdim("    clase="); tdim(clase_nombre(ocbs[i].disp_clase));
-                tprint(" estado="); tprint(ocbs[i].disp_estado ? "activo" : "inactivo");
-                tprint("\n");
-            }
-        return;
-    }
-    if (igual(argv[0], "actor") && argc >= 2) {
-        int i = buscar(argv[1]);
-        if (i < 0) { terr("organismo desconocido\n"); return; }
-        actor_i = i;
-        tprint("actor = "); tacc(ocbs[i].nombre); tprint("\n");
-        return;
-    }
-    if (igual(argv[0], "capacidades") || igual(argv[0], "caps")) {
-        tprint("caps de "); tacc(ocbs[actor_i].nombre);
-        tprint(": "); thex(ocbs[actor_i].caps); tprint("\n");
-        return;
-    }
-    if (igual(argv[0], "crear") && argc >= 3) {
-        if (!tiene_cap(actor_i, CAP_ORGES_CREAR)) {
-            terr("denegado: falta orges.crear\n"); return;
-        }
-        u32 kind = K_ORGES; u32 caps = CAP_PULSO_REC | CAP_PULSO_ENV;
-        if (igual(argv[1], "par")) { kind = K_PAR; }
-        else if (!igual(argv[1], "orges")) {
-            terr("uso: crear orges|par <nombre> [metas..]\n"); return;
-        }
-        int id = ocb_add(argv[2], kind, caps, 0);
-        if (id == -2) { terr("nombre duplicado\n"); return; }
-        if (id < 0) { terr("tabla llena\n"); return; }
-        for (int a = 3; a < argc && ocbs[id].n_metas < MAX_GOALS; a++) {
-            cpy(ocbs[id].metas[ocbs[id].n_metas], argv[a], MAX_GOAL_LEN);
-            ocbs[id].n_metas++;
-        }
-        tprint("creado "); tacc(argv[2]); tprint(" oid="); thex(ocbs[id].oid); tprint("\n");
-        return;
-    }
-    if (igual(argv[0], "pulso") && argc >= 2) {
-        int to = buscar(argv[1]);
-        if (to < 0) { terr("destino desconocido\n"); return; }
-        int r = pulso(actor_i, to, 1);
-        if (r == -2) { terr("denegado: falta pulso.env\n"); return; }
-        if (r == -3) { terr("denegado: destino sin pulso.rec\n"); return; }
-        tprint("Pulso "); tacc(ocbs[actor_i].nombre); tprint(" -> ");
-        tacc(ocbs[to].nombre); tprint(" nonce="); thex(nonce); tprint("\n");
-        return;
-    }
-    if (igual(argv[0], "otorgar") && argc >= 3) {
-        if (!tiene_cap(actor_i, CAP_CAPS_OTORG) && ocbs[actor_i].kind != K_MASTER) {
-            terr("denegado: falta caps.otorg\n"); return;
-        }
-        int t = buscar(argv[1]);
-        if (t < 0) { terr("no existe\n"); return; }
-        u32 c = parse_cap(argv[2]);
-        if (!c) { terr("capacidad desconocida\n"); return; }
-        ocbs[t].caps |= c;
-        tprint("otorgado "); tprint(argv[2]); tprint(" a "); tacc(argv[1]); tprint("\n");
-        return;
-    }
-    if (igual(argv[0], "metas") && argc >= 2) {
-        int i = buscar(argv[1]);
-        if (i < 0) { terr("no existe\n"); return; }
-        if (!ocbs[i].n_metas) { tdim("(sin metas)\n"); return; }
-        for (int g = 0; g < ocbs[i].n_metas; g++) {
-            tprint("  - "); tprint(ocbs[i].metas[g]); tprint("\n");
-        }
-        return;
-    }
-    if (igual(argv[0], "estado") && argc >= 2) {
-        int i = buscar(argv[1]);
-        if (i < 0) { terr("no existe\n"); return; }
-        cmd_estado_disp(i);
-        return;
-    }
-    if (igual(argv[0], "leer")) { cmd_leer(argv, argc); return; }
-    if (igual(argv[0], "escribir")) { cmd_escribir(argv, argc); return; }
-    if (igual(argv[0], "zyrion") && argc >= 2) {
-        if (!tiene_cap(actor_i, CAP_ZYRION) && ocbs[actor_i].kind != K_MASTER) {
-            terr("denegado: falta zyrion\n"); return;
-        }
-        if (argc >= 3 && igual(argv[1], "no")) {
-            Z a = z_parse(argv[2]);
-            tprint("no "); tprint(zn(a)); tprint(" = "); tacc(zn(z_not(a))); tprint("\n");
-            return;
-        }
-        if (argc >= 4) {
-            Z a = z_parse(argv[1]); Z b = z_parse(argv[3]); Z r = Z_I;
-            if (igual(argv[2], "y")) r = z_and(a, b);
-            else if (igual(argv[2], "o")) r = z_or(a, b);
-            else { terr("uso: zyrion V y I | zyrion no I\n"); return; }
-            tprint(zn(a)); tprint(" "); tprint(argv[2]); tprint(" ");
-            tprint(zn(b)); tprint(" = "); tacc(zn(r)); tprint("\n");
-            return;
-        }
-        terr("uso: zyrion V y I\n"); return;
-    }
-    if (igual(argv[0], "interfaz") && argc >= 2) {
-        if (igual(argv[1], "grafica") || igual(argv[1], "gui")) {
-            modo_grafico = 1;
-            dibujar_grafica();
-            return;
-        }
-        if (igual(argv[1], "consola") || igual(argv[1], "cli")) {
-            modo_grafico = 0;
-            tclear();
-            tacc("Consola AlsetOS\n");
-            prompt();
-            return;
-        }
-    }
-    terr("comando desconocido (ayuda)\n");
+static void text_append(int i,char ch){
+    if(i<0||ocbs[i].kind!=K_TEXT||ocbs[i].text_len>=MAX_TEXT-1)return;
+    if(igual(ocbs[i].text,"texto...")){ocbs[i].text[0]=0;ocbs[i].text_len=0;}
+    ocbs[i].text[ocbs[i].text_len++]=ch; ocbs[i].text[ocbs[i].text_len]=0;
+}
+static void text_backspace(int i){
+    if(i<0||ocbs[i].kind!=K_TEXT||ocbs[i].text_len<=0)return;
+    ocbs[i].text[--ocbs[i].text_len]=0;
+}
+static char sc_ascii(u8 sc){
+    static const char map[]="??1234567890-=??qwertyuiop[]\n?asdfghjkl;'`?\\zxcvbnm,./?*? ";
+    if(sc>=sizeof(map)-1)return 0; char c=map[sc]; return (c=='?'||c=='\n')?0:c;
 }
 
-/* ——— PS/2 teclado + ratón ——— */
-static void kbd_init(void) {
-    for (int i = 0; i < 256; i++) {
-        if (!(inb(0x64) & 1)) break;
-        (void)inb(0x60);
-    }
-    outb(0x64, 0xAE); /* kbd enable */
-    /* intentar habilitar ratón auxiliar */
-    outb(0x64, 0xA8);
-    outb(0x64, 0xD4);
-    outb(0x60, 0xF4);
+static void boot_organisms(void){
+    n_ocb=n_pulso=0; nonce=0; focus_win=-1; menu_open=0; orges_seq=0;
+    ocb_add("Maestro",K_MASTER,CAP_ALL);
+    ocb_add("Framebuffer",K_FB,CAP_PULSO_REC|CAP_FB|CAP_DISP_LEER|CAP_DISP_ESCR);
+    ocb_add("Compositor",K_COMPOSE,CAP_PULSO_ENV|CAP_PULSO_REC|CAP_COMPOSE|CAP_FB);
+    ocb_add("Desktop",K_DESKTOP,CAP_PULSO_ENV|CAP_PULSO_REC|CAP_DESKTOP|CAP_ORGES_CREAR|CAP_COMPOSE);
+    ocb_add("Consola",K_SHELL,CAP_PULSO_ENV|CAP_PULSO_REC|CAP_ZYRION);
+    {int c=buscar("Consola"); ocbs[c].x=100;ocbs[c].y=70;ocbs[c].w=300;ocbs[c].h=180; cpy(ocbs[c].titulo,"Consola",MAX_TITLE);}
+    ocb_add("BusPulso",K_BUS,CAP_PULSO_ENV|CAP_PULSO_REC);
+    ocb_add("Teclado",K_DISP,CAP_PULSO_REC|CAP_DISP_LEER|CAP_DISP_CTRL); ocbs[buscar("Teclado")].disp_clase=1;
+    ocb_add("Raton",K_DISP,CAP_PULSO_REC|CAP_DISP_LEER|CAP_DISP_CTRL); ocbs[buscar("Raton")].disp_clase=2;
+    ocb_add("Disco",K_DISP,CAP_PULSO_REC|CAP_DISP_LEER|CAP_DISP_ESCR); ocbs[buscar("Disco")].disp_clase=4;
+    ocb_add("Red",K_DISP,CAP_PULSO_REC|CAP_DISP_LEER); ocbs[buscar("Red")].disp_clase=5;
+    crear_orges(K_WINDOW,"Studio");
+    crear_orges(K_TEXT,"Notas");
+    crear_orges(K_LIST,"Tareas");
+    actor_i=buscar("Desktop");
 }
 
-static char sc_ascii(u8 sc) {
-    static const char map[64] = {
-        0,0,'1','2','3','4','5','6','7','8','9','0','-','=',0,'\t',
-        'q','w','e','r','t','y','u','i','o','p','[',']','\n',0,
-        'a','s','d','f','g','h','j','k','l',';','\'',0,0,'\\',
-        'z','x','c','v','b','n','m',',','.','/',0,0,0,' '
-    };
-    if (sc >= 64) return 0;
-    return map[sc];
-}
+static volatile u16 *const VGA=(volatile u16*)0xB8000;
+static void vga_msg(const char *s){for(int i=0;s[i]&&i<1600;i++)VGA[i]=(u16)(0x0A<<8)|(u8)s[i];}
 
-static void mouse_feed(u8 b) {
-    mouse_pkt[mouse_cycle++] = b;
-    if (mouse_cycle < 3) return;
-    mouse_cycle = 0;
-    if (!(mouse_pkt[0] & 0x08)) return; /* resync */
-    mouse_btn = mouse_pkt[0] & 0x07;
-    int dx = (int)(signed char)mouse_pkt[1];
-    int dy = (int)(signed char)mouse_pkt[2];
-    mouse_x += dx / 2;
-    mouse_y -= dy / 2;
-    if (mouse_x < 0) mouse_x = 0;
-    if (mouse_x >= COLS) mouse_x = COLS - 1;
-    if (mouse_y < 0) mouse_y = 0;
-    if (mouse_y >= ROWS) mouse_y = ROWS - 1;
-    int mi = buscar("Raton");
-    if (mi >= 0) ocbs[mi].disp_dato++;
-    if (modo_grafico) {
-        dibujar_grafica();
-        if (mouse_btn & 1)
-            graf_seleccion_click();
-    }
-}
-
-static void boot(void) {
-    nodo_id = fnv("AlsetGenesis") ^ 0xA15E0002u;
-    n_ocb = n_pulso = 0; nonce = 0; modo_grafico = 0;
-    for (int i = 0; i < (int)sizeof(ramdisk); i++) ramdisk[i] = 0;
-
-    ocb_add("Maestro",  K_MASTER, CAP_ALL, 0);
-    ocb_add("Consola",  K_SHELL,
-            CAP_PULSO_ENV | CAP_PULSO_REC | CAP_ZYRION | CAP_ORGES_CREAR |
-            CAP_DISP_LEER | CAP_DISP_ESCR | CAP_DISP_CTRL, 0);
-    ocb_add("BusPulso", K_BUS, CAP_PULSO_ENV | CAP_PULSO_REC, 0);
-
-    /* organismos-dispositivo: el hardware se modela como organismo */
-    ocb_add("Teclado",   K_DISP, CAP_PULSO_REC | CAP_DISP_LEER | CAP_DISP_CTRL, 1);
-    ocb_add("Raton",     K_DISP, CAP_PULSO_REC | CAP_DISP_LEER | CAP_DISP_CTRL, 2);
-    ocb_add("Memoria",   K_DISP, CAP_PULSO_REC | CAP_DISP_LEER | CAP_DISP_CTRL, 3);
-    ocb_add("Disco",     K_DISP, CAP_PULSO_REC | CAP_DISP_LEER | CAP_DISP_ESCR | CAP_DISP_CTRL, 4);
-    ocb_add("Red",       K_DISP, CAP_PULSO_REC | CAP_DISP_LEER | CAP_DISP_CTRL, 5);
-    ocb_add("Extraible", K_DISP, CAP_PULSO_REC | CAP_DISP_LEER | CAP_DISP_CTRL, 6);
-
-    actor_i = buscar("Consola");
-}
-
-void kernel_main(u32 magic, u32 mb_info) {
-    (void)magic; (void)mb_info;
-    kbd_init();
-    boot();
-    tclear();
-    tacc("AlsetOS Genesis\n");
-    tdim("Organismos-dispositivo · Pulso · Capacidades · UI consola/grafica\n\n");
-    tprint("NodoID "); thex(nodo_id); tprint("\n");
-    tprint("Escribe "); tacc("ayuda"); tprint(" o "); tacc("interfaz grafica"); tprint("\n\n");
-    barra_estado(ocbs[actor_i].nombre, "CONSOLA");
-    prompt();
-    lin_len = 0;
-
-    for (;;) {
-        if (!(inb(0x64) & 1)) { pausa(); continue; }
-        u8 st = inb(0x64);
-        u8 sc = inb(0x60);
-
-        /* ratón: bit 5 de status indica origen auxiliar en muchos controladores */
-        if (st & 0x20) {
-            mouse_feed(sc);
-            continue;
+void kernel_main(u32 magic,u32 mb_info){
+    nodo_id=fnv("AlsetOS-FB2")^0xA15E00FCu;
+    mouse_init(); mouse_x=400; mouse_y=300;
+    if(!fb_init(magic,mb_info)){vga_msg("AlsetOS: sin framebuffer. QEMU -vga std."); for(;;)__asm__ __volatile__("hlt");}
+    boot_organisms();
+    {int fi=buscar("Framebuffer"); if(fi>=0){ocbs[fi].w=(int)fb_w;ocbs[fi].h=(int)fb_h;}}
+    compositor_tick();
+    for(;;){
+        if(!(inb(0x64)&1)){pausa();continue;}
+        u8 st=inb(0x64); u8 sc=inb(0x60);
+        if(st&0x20){mouse_feed(sc);continue;}
+        if(sc==0xE0||(sc&0x80))continue;
+        int ki=buscar("Teclado"); if(ki>=0) ocbs[ki].disp_dato++;
+        if(sc==0x32){menu_open=!menu_open; compositor_tick(); continue;}
+        if(sc==0x02){crear_orges(K_WINDOW,"Orges"); menu_open=0; compositor_tick(); continue;}
+        if(sc==0x03){crear_orges(K_TEXT,"Texto"); menu_open=0; compositor_tick(); continue;}
+        if(sc==0x04){crear_orges(K_LIST,"Lista"); menu_open=0; compositor_tick(); continue;}
+        if(sc==0x1C){int from=buscar("Desktop"); if(from>=0&&focus_win>=0)pulso(from,focus_win); compositor_tick(); continue;}
+        if(sc==0x0F){
+            int start=focus_win+1;
+            for(int k=0;k<n_ocb;k++){int i=(start+k)%n_ocb; if(ocbs[i].alive&&is_win(i)){focus_set(i);break;}}
+            compositor_tick(); continue;
         }
-
-        if (sc == 0xE0) continue;
-        if (sc & 0x80) continue;
-
-        int ki = buscar("Teclado");
-        if (ki >= 0) ocbs[ki].disp_dato++;
-
-        /* F1 = consola, F2 = grafica */
-        if (sc == 0x3B) { /* F1 */
-            modo_grafico = 0;
-            tclear();
-            tacc("Consola\n");
-            prompt();
-            continue;
+        if(sc==0x0E){text_backspace(focus_win); compositor_tick(); continue;}
+        if(focus_win>=0&&ocbs[focus_win].kind==K_LIST){
+            if(sc==0x48&&ocbs[focus_win].sel_item>0){ocbs[focus_win].sel_item--; compositor_tick(); continue;}
+            if(sc==0x50&&ocbs[focus_win].sel_item<ocbs[focus_win].n_items-1){ocbs[focus_win].sel_item++; compositor_tick(); continue;}
         }
-        if (sc == 0x3C) { /* F2 */
-            modo_grafico = 1;
-            dibujar_grafica();
-            continue;
+        if(focus_win>=0&&is_win(focus_win)){
+            if(sc==0x4B){ocbs[focus_win].x-=12; compositor_tick(); continue;}
+            if(sc==0x4D){ocbs[focus_win].x+=12; compositor_tick(); continue;}
+            if(sc==0x48){ocbs[focus_win].y-=12; compositor_tick(); continue;}
+            if(sc==0x50){ocbs[focus_win].y+=12; compositor_tick(); continue;}
         }
-
-        if (modo_grafico) {
-            if (sc == 0x11 || sc == 0x48) { /* W / up */
-                if (actor_i > 0) actor_i--;
-                dibujar_grafica();
-            } else if (sc == 0x1F || sc == 0x50) {
-                if (actor_i < n_ocb - 1) actor_i++;
-                dibujar_grafica();
-            } else if (sc == 0x1C || sc == 0x39) {
-                /* pulso Consola -> seleccionado */
-                int from = buscar("Consola");
-                if (from >= 0) pulso(from, actor_i, 1);
-                dibujar_grafica();
-            } else if (sc == 0x02) {
-                /* 1: crear ORGES demo */
-                int from = buscar("Consola");
-                if (from >= 0 && tiene_cap(from, CAP_ORGES_CREAR)) {
-                    actor_i = from;
-                    ocb_add("Demo", K_ORGES, CAP_PULSO_ENV | CAP_PULSO_REC, 0);
-                }
-                dibujar_grafica();
-            }
-            continue;
-        }
-
-        /* modo consola: línea de comandos */
-        if (sc == 0x0E) {
-            if (lin_len > 0) {
-                lin_len--; linea[lin_len] = 0;
-                if (tx > 0) { tx--; vput(tx, ty, ' ', ATR_NORM); }
-            }
-            continue;
-        }
-        char ch = sc_ascii(sc);
-        if (!ch) continue;
-        if (ch == '\n') {
-            tprint("\n");
-            linea[lin_len] = 0;
-            if (lin_len > 0) ejecutar(linea);
-            lin_len = 0;
-            if (!modo_grafico) {
-                barra_estado(ocbs[actor_i].nombre, "CONSOLA");
-                prompt();
-            }
-            continue;
-        }
-        if (lin_len < MAX_LINE - 1 && ch >= 32) {
-            linea[lin_len++] = ch;
-            char t[2] = { ch, 0 };
-            twrite(t, ATR_NORM);
-        }
+        char ch=sc_ascii(sc);
+        if(ch&&focus_win>=0&&ocbs[focus_win].kind==K_TEXT){text_append(focus_win,ch); compositor_tick();}
     }
 }
