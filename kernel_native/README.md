@@ -1,4 +1,4 @@
-# AlsetOS Kernel nativo (x86_64)
+# AlsetOS Kernel nativo
 
 Todo es organismo. Sin SO anfitrión.
 
@@ -6,41 +6,44 @@ Todo es organismo. Sin SO anfitrión.
 Maestro → Framebuffer → Compositor → Desktop → Ventana / Texto / Lista
 ```
 
-## Requisitos
+## Importante (QEMU)
+
+`qemu -kernel` **solo carga ELF multiboot de 32 bit**.  
+Por eso `make run` usa **ARCH=32** (con fuente legible y ratón estable).
+
+El kernel **x86_64 real** se arranca con ISO/GRUB:
 
 ```bash
-sudo apt install -y gcc qemu-system-x86
-# si /tmp es solo lectura:
-mkdir -p "$HOME/tmp" && export TMPDIR="$HOME/tmp"
+make run64   # genera ISO y arranca qemu-system-x86_64 -cdrom
 ```
 
-## Compilar y ejecutar
+## Uso diario (pantalla gráfica)
 
 ```bash
+mkdir -p "$HOME/tmp" && export TMPDIR="$HOME/tmp"
 cd kernel_native
-make clean && make
 make run
 ```
 
-Usa `qemu-system-x86_64` con `-vga std`.
+## Kernel 64-bit
+
+```bash
+sudo apt install -y grub-pc-bin grub-common xorriso
+make run64
+```
 
 ## Controles
 
 | Entrada | Acción |
 |---------|--------|
-| Ratón | Foco / arrastre (barra de título) |
-| **M** | Menú Desktop |
-| **1** | Nueva ventana ORGES |
-| **2** | Texto editable |
-| **3** | Lista |
-| **Enter** | Pulso Desktop → ventana |
+| Ratón | Foco / arrastre (suavizado) |
+| **M** | Menú |
+| **1 / 2 / 3** | Ventana / Texto / Lista |
+| **Enter** | Pulso |
 | **Tab** | Siguiente ventana |
-| Teclado | Escribir en texto |
-| ↑↓ | Selección en lista |
 
-## Arquitectura
+## Nota sobre “64 bit”
 
-- Entrada Multiboot 32-bit → long mode 64-bit
-- Identity map 1 GiB (páginas 2 MiB)
-- Fuente bitmap 8×8 legible
-- Ratón PS/2 con suavizado y resync
+- **HOST**: se recomienda `qemu-system-x86_64`.
+- **Kernel por defecto (`make run`)**: código en modo protegido 32-bit (exigencia de multiboot `-kernel`).
+- **Kernel long mode 64-bit**: `make run64` / `make iso`.
