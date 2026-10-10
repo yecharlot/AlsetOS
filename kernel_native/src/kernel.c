@@ -1,6 +1,6 @@
 /*
- * AlsetOS Kernel Native — integración Desktop + organismos (fase integrada)
- * Sin Linux / TinyCore. Unidad = Organismo (OCB). Descentralizado-first.
+ * AlsetOS Kernel Native — Desktop + organismos (teclado PS/2 fiable en QEMU)
+ * Sin Linux. Unidad = OCB. Descentralizado-first.
  */
 typedef unsigned char u8;
 typedef unsigned short u16;
@@ -12,15 +12,11 @@ typedef unsigned int u32;
 #define MAX_OCB 16
 #define MAX_PULSE 32
 
-/* Colores VGA: atributo = (bg<<4)|fg */
 #define ATR_NORM  0x0F
 #define ATR_DIM   0x08
 #define ATR_ACC   0x0A
 #define ATR_TITLE 0x0B
-#define ATR_WARN  0x0E
 #define ATR_INV   0x1F
-
-static u8 cx, cy;
 
 static void vgaput(int x, int y, char c, u8 atr) {
     if (x < 0 || x >= COLS || y < 0 || y >= ROWS) return;
@@ -30,40 +26,20 @@ static void vgaput(int x, int y, char c, u8 atr) {
 static void clear_atr(u8 atr) {
     for (int i = 0; i < COLS * ROWS; i++)
         VGA[i] = (u16)(atr << 8) | ' ';
-    cx = cy = 0;
 }
 
-static void putc_atr(char c, u8 atr) {
-    if (c == '\n') {
-        cx = 0;
-        if (++cy >= ROWS) cy = ROWS - 1;
-        return;
-    }
-    vgaput(cx, cy, c, atr);
-    if (++cx >= COLS) {
-        cx = 0;
-        if (++cy >= ROWS) cy = ROWS - 1;
-    }
-}
-
-static void print_atr(const char *s, u8 atr) {
-    while (*s) putc_atr(*s++, atr);
-}
-
-static void print(const char *s) { print_atr(s, ATR_NORM); }
-
-static void put_hex(u32 v) {
+static void put_hex_at(int x, int y, u32 v, u8 atr) {
     const char *h = "0123456789ABCDEF";
-    print("0x");
-    for (int i = 7; i >= 0; i--)
-        putc_atr(h[(v >> (i * 4)) & 0xF], ATR_ACC);
+    vgaput(x, y, '0', atr);
+    vgaput(x + 1, y, 'x', atr);
+    for (int i = 0; i < 8; i++)
+        vgaput(x + 2 + i, y, h[(v >> (28 - i * 4)) & 0xF], atr);
 }
 
-/* ——— Organism Control Block ——— */
 struct OCB {
-    u32 magic;       /* 'OCB\0' */
+    u32 magic;
     u32 oid_hash;
-    u32 kind;        /* 1 master 2 desktop 3 studio 4 orges 5 peer */
+    u32 kind; /* 1 master 2 desktop 3 studio 4 orges 5 peer */
     u32 phase;
     u32 caps;
     u32 pulse_in;
@@ -73,10 +49,7 @@ struct OCB {
 };
 
 struct Pulse {
-    u32 from;
-    u32 to;
-    u32 type;
-    u32 nonce;
+    u32 from, to, type, nonce;
 };
 
 static struct OCB ocbs[MAX_OCB];
@@ -85,7 +58,8 @@ static struct Pulse pulses[MAX_PULSE];
 static int n_pulse;
 static u32 node_id;
 static u32 nonce_ctr;
-static int selected; /* index in menu */
+static int selected;
+static u32 key_events; /* debug counter on screen */
 
 static u32 fnv(const char *s) {
     u32 h = 2166136261u;
@@ -118,7 +92,7 @@ static int ocb_add(const char *name, u32 kind, u32 caps) {
 
 static void pulse_send(u32 from_i, u32 to_i, u32 type) {
     if (from_i >= (u32)n_ocb || to_i >= (u32)n_ocb) return;
-    if (n_pulse >= MAX_PULSE) n_pulse = 0; /* ring */
+    if (n_pulse >= MAX_PULSE) n_pulse = 0;
     pulses[n_pulse].from = ocbs[from_i].oid_hash;
     pulses[n_pulse].to = ocbs[to_i].oid_hash;
     pulses[n_pulse].type = type;
@@ -128,104 +102,119 @@ static void pulse_send(u32 from_i, u32 to_i, u32 type) {
     n_pulse++;
 }
 
-/* ——— PS/2 keyboard (QEMU) ——— */
+/* ——— I/O ——— */
 static inline u8 inb(u16 port) {
     u8 v;
     __asm__ __volatile__("inb %1, %0" : "=a"(v) : "Nd"(port));
     return v;
 }
 
-static int kbd_hit(void) {
-    return inb(0x64) & 1;
+static inline void outb(u16 port, u8 val) {
+    __asm__ __volatile__("outb %0, %1" : : "a"(val), "Nd"(port));
 }
 
-/* scancode set 1 → ascii (muy reducido) */
-static char scancode_to_ascii(u8 sc) {
-    static const char map[128] = {
-        0,0,'1','2','3','4','5','6','7','8','9','0','-','=',0,'\t',
-        'q','w','e','r','t','y','u','i','o','p','[',']','\n',0,
-        'a','s','d','f','g','h','j','k','l',';','\'','`',0,'\\',
-        'z','x','c','v','b','n','m',',','.','/',0,'*',0,' ',
-    };
-    if (sc >= 128) return 0;
-    return map[sc];
+/* Inicializar controlador 8042 / PS/2 (QEMU) */
+static void kbd_init(void) {
+    /* vaciar buffer de salida */
+    for (int i = 0; i < 256; i++) {
+        if (!(inb(0x64) & 1)) break;
+        (void)inb(0x60);
+    }
+    /* habilitar teclado: command byte */
+    outb(0x64, 0xAE); /* enable keyboard interface */
 }
 
-#define KEY_UP    0x48
-#define KEY_DOWN  0x50
-#define KEY_ENTER 0x1C
-#define KEY_ESC   0x01
-#define KEY_1     0x02
-#define KEY_2     0x03
-#define KEY_3     0x04
-#define KEY_4     0x05
-#define KEY_5     0x06
+/* Espera activa breve (sin hlt: hlt sin IRQ deja el teclado muerto) */
+static void pause_poll(void) {
+    for (volatile int i = 0; i < 5000; i++)
+        __asm__ __volatile__("pause");
+}
 
-/* ——— Desktop UI (VGA) ——— */
+static int kbd_read_scancode(u8 *out) {
+    if (!(inb(0x64) & 1))
+        return 0;
+    *out = inb(0x60);
+    return 1;
+}
+
+#define SC_EXT    0xE0
+#define SC_UP     0x48
+#define SC_DOWN   0x50
+#define SC_ENTER  0x1C
+#define SC_ESC    0x01
+#define SC_1      0x02
+#define SC_2      0x03
+#define SC_3      0x04
+#define SC_4      0x05
+#define SC_5      0x06
+#define SC_W      0x11
+#define SC_S      0x1F
+#define SC_SPACE  0x39
+
 static void draw_bar(int y, const char *title) {
     for (int x = 0; x < COLS; x++) vgaput(x, y, ' ', ATR_INV);
-    int i = 0;
-    for (int x = 2; title[i] && x < COLS - 2; x++, i++)
+    for (int i = 0, x = 2; title[i] && x < COLS - 2; x++, i++)
         vgaput(x, y, title[i], ATR_INV);
 }
 
 static void draw_desktop(void) {
     clear_atr(0x00);
-    draw_bar(0, " AlsetOS Kernel  |  Desktop-Organism  |  decentralized-first  |  sin SO anfitrion ");
-    print_atr("\n  NodeID ", ATR_DIM);
-    put_hex(node_id);
-    print_atr("   OCBs ", ATR_DIM);
-    putc_atr('0' + (char)n_ocb, ATR_ACC);
-    print_atr("   Pulses ", ATR_DIM);
-    putc_atr('0' + (char)(n_pulse > 9 ? 9 : n_pulse), ATR_ACC);
-    print_atr("\n\n", ATR_NORM);
+    draw_bar(0, " AlsetOS Kernel | Desktop-Organism | decentralized-first | sin SO anfitrion ");
 
-    print_atr("  Organismos en este nodo (todo es organismo)\n", ATR_TITLE);
-    print_atr("  --------------------------------------------\n", ATR_DIM);
+    const char *l1 = " NodeID ";
+    for (int i = 0; l1[i]; i++) vgaput(2 + i, 2, l1[i], ATR_DIM);
+    put_hex_at(10, 2, node_id, ATR_ACC);
+
+    const char *l2 = " OCBs ";
+    for (int i = 0; l2[i]; i++) vgaput(22 + i, 2, l2[i], ATR_DIM);
+    vgaput(28, 2, (char)('0' + (n_ocb > 9 ? 9 : n_ocb)), ATR_ACC);
+
+    const char *l3 = " Pulses ";
+    for (int i = 0; l3[i]; i++) vgaput(32 + i, 2, l3[i], ATR_DIM);
+    vgaput(40, 2, (char)('0' + (n_pulse > 9 ? 9 : n_pulse)), ATR_ACC);
+
+    const char *l4 = " Keys ";
+    for (int i = 0; l4[i]; i++) vgaput(44 + i, 2, l4[i], ATR_DIM);
+    put_hex_at(50, 2, key_events, ATR_ACC);
+
+    const char *title = " Organismos en este nodo (todo es organismo)";
+    for (int i = 0; title[i] && i < COLS; i++) vgaput(2 + i, 4, title[i], ATR_TITLE);
+    for (int x = 2; x < 50; x++) vgaput(x, 5, '-', ATR_DIM);
 
     for (int i = 0; i < n_ocb; i++) {
         u8 atr = (i == selected) ? ATR_INV : ATR_NORM;
-        char line[80];
-        /* manual format */
-        int p = 0;
-        line[p++] = ' ';
-        line[p++] = (i == selected) ? '>' : ' ';
-        line[p++] = ' ';
+        int y = 6 + i;
+        vgaput(2, y, (i == selected) ? '>' : ' ', atr);
         const char *nm = ocbs[i].name;
-        for (int k = 0; nm[k] && p < 18; k++) line[p++] = nm[k];
-        while (p < 20) line[p++] = ' ';
-        const char *kname = "?";
+        int x = 4;
+        for (int k = 0; nm[k] && x < 18; k++, x++) vgaput(x, y, nm[k], atr);
+        while (x < 20) vgaput(x++, y, ' ', atr);
+
+        const char *kname = "?????";
         if (ocbs[i].kind == 1) kname = "MASTER ";
         else if (ocbs[i].kind == 2) kname = "DESKTOP";
         else if (ocbs[i].kind == 3) kname = "STUDIO ";
         else if (ocbs[i].kind == 4) kname = "ORGES  ";
         else if (ocbs[i].kind == 5) kname = "PEER   ";
-        for (int k = 0; kname[k] && p < 28; k++) line[p++] = kname[k];
-        while (p < 30) line[p++] = ' ';
-        line[p++] = 'P';
-        line[p++] = 'i';
-        line[p++] = 'n';
-        line[p++] = ':';
-        line[p++] = '0' + (ocbs[i].pulse_in > 9 ? 9 : (char)ocbs[i].pulse_in);
-        line[p++] = ' ';
-        line[p++] = 'o';
-        line[p++] = 'u';
-        line[p++] = 't';
-        line[p++] = ':';
-        line[p++] = '0' + (ocbs[i].pulse_out > 9 ? 9 : (char)ocbs[i].pulse_out);
-        line[p] = 0;
-        for (int x = 0; line[x]; x++) vgaput(x, 6 + i, line[x], atr);
+        for (int k = 0; kname[k]; k++) vgaput(20 + k, y, kname[k], atr);
+
+        vgaput(30, y, 'P', atr);
+        vgaput(31, y, 'i', atr);
+        vgaput(32, y, 'n', atr);
+        vgaput(33, y, ':', atr);
+        vgaput(34, y, (char)('0' + (ocbs[i].pulse_in > 9 ? 9 : (int)ocbs[i].pulse_in)), atr);
+        vgaput(36, y, 'o', atr);
+        vgaput(37, y, 'u', atr);
+        vgaput(38, y, 't', atr);
+        vgaput(39, y, ':', atr);
+        vgaput(40, y, (char)('0' + (ocbs[i].pulse_out > 9 ? 9 : (int)ocbs[i].pulse_out)), atr);
     }
 
-    int base = 6 + n_ocb + 1;
     draw_bar(ROWS - 4, " Teclas ");
-    for (int x = 0; x < COLS; x++) vgaput(x, ROWS - 3, ' ', 0x07);
-    for (int x = 0; x < COLS; x++) vgaput(x, ROWS - 2, ' ', 0x07);
-    const char *help1 = " Up/Down seleccionar | Enter Pulse al seleccionado | 1=ORGES 2=PEER 3=tick Studio";
-    const char *help2 = " 4=broadcast Pulse desktop->all | 5=info | ESC=redibujar | QEMU: cerrar para salir";
-    for (int i = 0; help1[i] && i < COLS; i++) vgaput(i, ROWS - 3, help1[i], ATR_DIM);
-    for (int i = 0; help2[i] && i < COLS; i++) vgaput(i, ROWS - 2, help2[i], ATR_DIM);
-    (void)base;
+    const char *h1 = " W/S o flechas: seleccionar | Enter/Espacio: Pulse | 1=ORGES 2=PEER 3=Studio 4=broadcast";
+    const char *h2 = " 5=info ESC=redibujar | clic en ventana QEMU para foco del teclado | cerrar QEMU para salir";
+    for (int i = 0; h1[i] && i < COLS; i++) vgaput(i, ROWS - 3, h1[i], ATR_DIM);
+    for (int i = 0; h2[i] && i < COLS; i++) vgaput(i, ROWS - 2, h2[i], ATR_DIM);
 }
 
 static void boot_organisms(void) {
@@ -234,60 +223,83 @@ static void boot_organisms(void) {
     n_pulse = 0;
     nonce_ctr = 0;
     selected = 0;
-    /* Caps: bit flags locales — soberanía del nodo, sin autoridad central */
+    key_events = 0;
     ocb_add("Master",  1, 0xFFFFFFFFu);
     ocb_add("Desktop", 2, 0x0000FFFFu);
     ocb_add("Studio",  3, 0x0000FF00u);
-    ocb_add("PulseBus",4, 0x000000FFu); /* ORGES infraestructura */
+    ocb_add("PulseBus",4, 0x000000FFu);
+}
+
+static void handle_key(u8 sc, int extended) {
+    key_events++;
+    /* break codes */
+    if (sc & 0x80)
+        return;
+
+    if (sc == SC_UP || (extended && sc == SC_UP) || sc == SC_W) {
+        if (selected > 0) selected--;
+        draw_desktop();
+        return;
+    }
+    if (sc == SC_DOWN || (extended && sc == SC_DOWN) || sc == SC_S) {
+        if (selected < n_ocb - 1) selected++;
+        draw_desktop();
+        return;
+    }
+    if (sc == SC_ENTER || sc == SC_SPACE) {
+        pulse_send(0, (u32)selected, 1);
+        draw_desktop();
+        return;
+    }
+    if (sc == SC_1) {
+        ocb_add("ORGES", 4, 0x00000F00u);
+        draw_desktop();
+        return;
+    }
+    if (sc == SC_2) {
+        ocb_add("Peer", 5, 0x0000000Fu);
+        draw_desktop();
+        return;
+    }
+    if (sc == SC_3) {
+        pulse_send(1, 2, 2);
+        draw_desktop();
+        return;
+    }
+    if (sc == SC_4) {
+        for (int i = 0; i < n_ocb; i++)
+            pulse_send(1, (u32)i, 3);
+        draw_desktop();
+        return;
+    }
+    if (sc == SC_5 || sc == SC_ESC) {
+        draw_desktop();
+        return;
+    }
+    /* tecla desconocida: al menos actualiza contador Keys */
+    draw_desktop();
 }
 
 void kernel_main(u32 magic, u32 mb_info) {
+    (void)magic;
     (void)mb_info;
+
+    kbd_init();
     boot_organisms();
     draw_desktop();
 
-    if (magic != 0x2BADB002) {
-        /* still run — some loaders differ */
-    }
-
+    int ext = 0;
     for (;;) {
-        if (!kbd_hit()) {
-            __asm__ __volatile__("hlt");
+        u8 sc;
+        if (!kbd_read_scancode(&sc)) {
+            pause_poll();
             continue;
         }
-        u8 sc = inb(0x60);
-        if (sc & 0x80) continue; /* break codes */
-
-        if (sc == KEY_UP) {
-            if (selected > 0) selected--;
-            draw_desktop();
-        } else if (sc == KEY_DOWN) {
-            if (selected < n_ocb - 1) selected++;
-            draw_desktop();
-        } else if (sc == KEY_ENTER) {
-            /* Pulse Master -> selected (descentralizado: firmado solo por hashes locales) */
-            pulse_send(0, (u32)selected, 1);
-            draw_desktop();
-        } else if (sc == KEY_1) {
-            ocb_add("ORGES", 4, 0x00000F00u);
-            draw_desktop();
-        } else if (sc == KEY_2) {
-            ocb_add("Peer", 5, 0x0000000Fu);
-            draw_desktop();
-        } else if (sc == KEY_3) {
-            /* Studio tick: pulse Desktop -> Studio */
-            pulse_send(1, 2, 2);
-            draw_desktop();
-        } else if (sc == KEY_4) {
-            for (int i = 0; i < n_ocb; i++)
-                pulse_send(1, (u32)i, 3);
-            draw_desktop();
-        } else if (sc == KEY_5) {
-            /* noop redraw with same state */
-            draw_desktop();
-        } else if (sc == KEY_ESC) {
-            draw_desktop();
+        if (sc == SC_EXT) {
+            ext = 1;
+            continue;
         }
-        (void)scancode_to_ascii;
+        handle_key(sc, ext);
+        ext = 0;
     }
 }
