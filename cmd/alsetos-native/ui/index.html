@@ -485,6 +485,7 @@ function renderStudio(body, ctrl) {
         <span style="flex:1"></span>
         <button class="btn" id="st-run">Ejecutar</button>
         <button class="btn primary" id="st-deploy">Desplegar organismo</button>
+        <button class="btn" id="st-export">Exportar Web/PWA</button>
       </div>
       <div class="studio-side">
         <div class="muted" style="font-size:11px;padding:4px 8px">Plantillas</div>
@@ -591,6 +592,33 @@ function renderStudio(body, ctrl) {
         paint();
       } catch (e) { alert(String(e)); }
     };
+    body.querySelector('#st-export').onclick = async () => {
+      let name = t.name, goals = t.goals, caps = t.caps, k = kind, title = t.ui.title, color = t.ui.color || '#0d9488';
+      if (mode === 'nocode') {
+        name = body.querySelector('#nc-name')?.value || name;
+        k = body.querySelector('#nc-kind')?.value || k;
+        title = body.querySelector('#nc-title')?.value || title;
+        goals = (body.querySelector('#nc-goals')?.value || '').split(',').map(s => s.trim()).filter(Boolean);
+        caps = (body.querySelector('#nc-caps')?.value || '').split(',').map(s => s.trim()).filter(Boolean);
+      }
+      try {
+        const r = await fetch('/api/orges/export', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, kind: k, title, goals, caps, color, oid: lastDeploy || '', target: 'pwa' })
+        });
+        if (!r.ok) throw new Error(await r.text());
+        const blob = await r.blob();
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'orges-' + k + '-pwa.zip';
+        a.click();
+        URL.revokeObjectURL(a.href);
+        lastDeploy = lastDeploy || '(export pwa)';
+        await refresh();
+        paint();
+      } catch (e) { alert(String(e)); }
+    };
+
   };
 
   paint();
