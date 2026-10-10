@@ -1,17 +1,11 @@
-# AlsetOS Genesis — guía de trabajo
+# AlsetOS Genesis — Guía completa (español)
 
-## Qué es
+## Visión
 
-Kernel propio orientado a **ORGES** y al modelo del manifiesto ATS:
-
-- Unidad fundamental: **organismo** (OCB), no proceso Unix.
-- Comunicación: **Pulse** (con capacidades).
-- Seguridad: **default-deny** + capacidades explícitas.
-- Lógica: **Zyrion** (V / F / I; la I no se fuerza a falso).
-- Nodo: **soberano local** (NodeID), sin registro central.
-- Interfaz: **shell declarativa** (comandos legibles).
-
-No imita Linux ni Windows. No hay usuarios POSIX ni “todo es un fichero”.
+AlsetOS Genesis es un kernel orientado a **organismos**, no a procesos Unix.  
+El hardware se modela como **organismos-dispositivo**.  
+La interacción entre todo es **Pulso** sujeto a **capacidades** (default-deny).  
+La lógica ternaria es **Zyrion** (V / F / I).
 
 ## Arranque
 
@@ -20,79 +14,125 @@ cd kernel_native
 make clean && make && make run
 ```
 
-Clic en la ventana QEMU para el teclado. Escribe `help` y Enter.
+Haz clic en la ventana de QEMU para que el teclado/ratón vayan a la VM.
 
-## Organismos al nacer
+## Organismos al iniciar
 
-| Nombre    | Rol |
-|-----------|-----|
-| Master    | Soberano del **nodo** (todas las caps). No es “root Unix”. |
-| Shell     | Actor por defecto de la consola (least privilege). |
-| PulseBus  | Infraestructura de mensajería. |
+| Nombre     | Tipo        | Rol |
+|------------|-------------|-----|
+| Maestro    | MAESTRO     | Soberano del **nodo** (todas las capacidades) |
+| Consola    | CONSOLA     | Actor por defecto de la shell |
+| BusPulso   | BUS         | Infraestructura de mensajería |
+| Teclado    | DISP        | Organismo-dispositivo entrada |
+| Raton      | DISP        | Organismo-dispositivo puntero |
+| Memoria    | DISP        | Organismo-dispositivo memoria |
+| Disco      | DISP        | Ramdisk (sectores en RAM) |
+| Red        | DISP        | Red local (sin enlace externo aún) |
+| Extraible  | DISP        | Unidad extraíble (modelo) |
 
-## Comandos
+## Interfaz
 
-```
-help
-node
-organisms          (o ls)
-actor Shell
-actor Master
-create orges fin seguridad alerta
-create peer nodoB
-pulse PulseBus
-pulse fin ping
-grant fin pulse.send
-caps
-zyrion V and I
-zyrion not I
-goals fin
-clear
-```
+### Consola (por defecto)
 
-### Seguridad en la práctica
+Línea de comandos en español. Escribe `ayuda`.
 
-1. Con actor `Shell` puedes crear ORGES (tiene `orges.create`).
-2. Cambia a un ORGES sin `pulse.send` y `pulse` fallará → **default-deny**.
-3. `actor Master` luego `grant <orges> pulse.send` → otorgas capacidad.
-4. Vuelve al ORGES y el Pulse ya puede enviarse.
-
-Eso es el modelo de capacidades del manifiesto, en miniatura y usable.
-
-### Zyrion
+### Gráfica
 
 ```
-zyrion V and I     → I
-zyrion V or I      → V
-zyrion not I       → I
+interfaz grafica
 ```
 
-La incertidumbre permanece incertidumbre.
+o tecla **F2**. Volver a consola: **F1** o `interfaz consola`.
 
-## Cómo pensar un ORGES
+En gráfica:
 
-1. **Nombre** legible (`fin`, `triaje`, `logistica`).
-2. **Goals** en el create: `create orges fin seguridad cumplimiento`.
-3. **Caps mínimas**: al crear recibe send/recv; el resto se **grant**.
-4. **Pulse** solo entre organismos que pueden enviar/recibir.
-5. Un **Peer** es otro organismo de malla, no una “cuenta de usuario”.
+- Panel izquierdo: organismos-dispositivo  
+- Panel derecho: Maestro, Consola, ORGES, pares  
+- **W/S** o flechas: cambiar selección  
+- **Enter**: Pulso desde Consola al seleccionado  
+- **1**: crear ORGES de demostración  
+- Ratón: mover cursor `X`; clic izquierdo selecciona  
 
-## Relación con el Desktop rico (Go)
+## Comandos (español)
 
-- **Genesis kernel**: dominio del modelo y de la seguridad en metal (QEMU).
-- **alsetos-native**: UI rica y export PWA para diseñar ORGES visualmente.
+| Comando | Abreviatura | Descripción |
+|---------|-------------|-------------|
+| ayuda | aid, ? | Lista de comandos |
+| nodo | | NodeID y actor actual |
+| organismos | lista, ls | Todos los OCB |
+| dispositivos | disp | Solo dispositivos |
+| actor \<nombre\> | | Cambiar organismo activo |
+| capacidades | caps | Caps del actor |
+| crear orges \<nom\> [metas…] | | Nuevo ORGES |
+| crear par \<nombre\> | | Peer descentralizado |
+| pulso \<destino\> | | Enviar Pulso |
+| otorgar \<org\> \<cap\> | | Conceder capacidad |
+| metas \<nombre\> | | Metas de un ORGES |
+| estado \<disp\> | | Estado de dispositivo |
+| leer \<disp\> [sector] | | Leer vía organismo-disp |
+| escribir disco \<sec\> \<texto\> | | Escribir ramdisk |
+| zyrion A y\|o\|no B | | Lógica ternaria |
+| interfaz consola\|grafica | gui, cli | Cambiar UI |
+| limpiar | cls | Limpiar pantalla |
 
-Misma filosofía; dos superficies. El objetivo de producto es que ORGES nacidas aquí o en Studio compartan identidad, caps y Pulse.
+### Capacidades (nombres cortos)
 
-## Límites actuales (honestos)
+| Nombre completo | Abreviatura |
+|-----------------|-------------|
+| pulso.env | env |
+| pulso.rec | rec |
+| orges.crear | crear |
+| orges.destr | destr |
+| caps.otorg | otorg |
+| nodo.admin | admin |
+| zyrion | zyrion |
+| disp.leer | leer |
+| disp.escr | escr |
+| disp.ctrl | ctrl |
+| todo | todo |
 
-- Shell texto, no ventanas compositadas.
-- Pulse local al nodo (aún no red entre dos QEMU).
-- Caps en bits en RAM (sin persistencia tras reinicio).
-- Firmas criptográficas fuertes: en el runtime Go de referencia; aquí la autoridad es el chequeo de caps + nonce.
+## Ejemplos
 
-Aun así ya puedes **dominar** el ciclo: crear ORGES, denegar, otorgar, evaluar Zyrion, listar, cambiar actor.
+```
+ayuda
+dispositivos
+estado Disco
+escribir disco 0 hola
+leer Disco 0
+crear orges fin seguridad
+pulso BusPulso
+actor Maestro
+otorgar fin disp.leer
+actor fin
+leer Memoria
+zyrion V y I
+interfaz grafica
+```
 
-## Frase de diseño
+## Seguridad
 
-Si algo no es un organismo con capacidades y Pulse, no pertenece al núcleo de AlsetOS Genesis.
+- **Default-deny**: sin capacidad, la acción falla con mensaje claro.  
+- **Maestro** del nodo puede todo; la Consola arranca con un conjunto limitado.  
+- Acceso a dispositivos vía caps `disp.leer` / `disp.escr` / `disp.ctrl`.  
+- Todo acceso relevante deja rastro de **Pulso** (contadores pin/pout).
+
+## Filosofía de dispositivos
+
+En Linux “todo es un archivo”.  
+En AlsetOS **todo dispositivo es un organismo** con identidad, capacidades y Pulse.
+
+Así el mismo modelo sirve para ORGES de negocio y para Teclado, Disco o Red.
+
+## Límites actuales
+
+- Disco = ramdisk en memoria (se pierde al apagar QEMU).  
+- Red = organismo local, aún sin paquetes entre dos nodos.  
+- Extraíble = modelo de organismo (sin USB host real).  
+- UI gráfica = panel VGA texto + ratón (no compositor TrueColor).  
+- Un solo idioma de comandos: español (i18n después).
+
+## Archivos
+
+- `kernel_native/src/kernel.c` — núcleo Genesis  
+- `kernel_native/Makefile` — build y `make run`  
+- `docs/GUIA_GENESIS.md` — esta guía  
