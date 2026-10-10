@@ -1,23 +1,23 @@
-# AlsetOS Kernel nativo
+# AlsetOS Kernel nativo — Desktop por organismos
 
 Todo es organismo. Sin SO anfitrión.
 
 ```
-Maestro → Framebuffer → Compositor → Desktop → Ventana / Texto / Lista
+Maestro → Framebuffer → Compositor → Desktop → Orges (ventana / texto / lista / inspector)
 ```
 
-## Importante (QEMU)
+## Salto de esta versión
 
-`qemu -kernel` **solo carga ELF multiboot de 32 bit**.  
-Por eso `make run` usa **ARCH=32** (con fuente legible y ratón estable).
+| Antes | Ahora |
+|-------|--------|
+| Redibujado crudo al FB | **Doble buffer** + present |
+| Fuente 8×8 ilegible | Fuente **2× (16 px)** legible |
+| Ratón limitado / errático | **Pantalla completa**, resync PS/2, aceleración leve |
+| Sin z-order | **Pila z-order** y foco |
+| UI mínima | **Top bar + dock + menú + sombras + gradiente** |
+| Sin inspector | **Inspector OCB** de la red de organismos |
 
-El kernel **x86_64 real** se arranca con ISO/GRUB:
-
-```bash
-make run64   # genera ISO y arranca qemu-system-x86_64 -cdrom
-```
-
-## Uso diario (pantalla gráfica)
+## Arranque (QEMU)
 
 ```bash
 mkdir -p "$HOME/tmp" && export TMPDIR="$HOME/tmp"
@@ -25,7 +25,9 @@ cd kernel_native
 make run
 ```
 
-## Kernel 64-bit
+`make run` usa **ARCH=32** porque `qemu -kernel` solo carga ELF multiboot 32-bit.
+
+Kernel **x86_64** long mode:
 
 ```bash
 sudo apt install -y grub-pc-bin grub-common xorriso
@@ -36,14 +38,15 @@ make run64
 
 | Entrada | Acción |
 |---------|--------|
-| Ratón | Foco / arrastre (suavizado) |
-| **M** | Menú |
-| **1 / 2 / 3** | Ventana / Texto / Lista |
-| **Enter** | Pulso |
+| Ratón | Foco, arrastre por barra de título, cerrar (rojo), minimizar (ámbar) |
+| Dock | Menu / Win / Text / List / Insp |
+| **M** | Menú crear organismo |
+| **1–4** | Ventana / Texto / Lista / Inspector |
+| **Enter** | Pulso Desktop → ventana en foco |
 | **Tab** | Siguiente ventana |
+| Flechas | Mover ventana o navegar lista |
+| Texto | Escribir en editor con cursor |
 
-## Nota sobre “64 bit”
+## Filosofía
 
-- **HOST**: se recomienda `qemu-system-x86_64`.
-- **Kernel por defecto (`make run`)**: código en modo protegido 32-bit (exigencia de multiboot `-kernel`).
-- **Kernel long mode 64-bit**: `make run64` / `make iso`.
+No hay “procesos de Windows”. Cada ventana, el compositor, el framebuffer y el desktop son **organismos (OCB)** con capacidades y pulsos. El salto visual no rompe ese contrato.
