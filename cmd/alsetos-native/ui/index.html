@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>AlsetOS Native · ATS-001</title>
+<style>
+:root{
+  --bg:#0a0e14;--panel:#121820;--border:#1e2a38;--text:#e6edf3;--muted:#8b9cb3;
+  --accent:#3dffa8;--accent2:#5b8cff;--warn:#ffb020;--danger:#ff5c7a;--radius:12px;
+  --font:ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif;
+}
+*{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh}
+header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border);background:linear-gradient(180deg,#0f1520,#0a0e14)}
+.brand{display:flex;gap:12px;align-items:center}
+.logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:grid;place-items:center;font-weight:800;color:#061018;font-size:14px}
+.brand h1{margin:0;font-size:16px;letter-spacing:.04em}
+.brand span{color:var(--muted);font-size:12px}
+.badge{font-size:11px;padding:4px 10px;border-radius:999px;border:1px solid var(--border);color:var(--accent);background:#0d1a16}
+main{display:grid;grid-template-columns:220px 1fr 320px;gap:0;min-height:calc(100vh - 64px)}
+nav{border-right:1px solid var(--border);padding:16px 12px;background:var(--panel)}
+nav button{width:100%;text-align:left;background:transparent;border:0;color:var(--text);padding:10px 12px;border-radius:8px;cursor:pointer;font-size:13px;margin-bottom:4px}
+nav button:hover,nav button.active{background:#1a2433;color:var(--accent)}
+section{padding:20px;overflow:auto}
+aside{border-left:1px solid var(--border);padding:16px;background:var(--panel);font-size:12px}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:14px}
+.card h2{margin:0 0 10px;font-size:14px;color:var(--accent)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+.org{border:1px solid var(--border);border-radius:10px;padding:12px;background:#0d121a}
+.org .oid{font-family:ui-monospace,monospace;font-size:11px;color:var(--accent2);word-break:break-all}
+.muted{color:var(--muted)}
+label{display:block;font-size:12px;color:var(--muted);margin:8px 0 4px}
+input,select,textarea{width:100%;background:#0a0e14;border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 10px;font-size:13px}
+button.primary{background:linear-gradient(135deg,#2ae89a,#4f7dff);color:#061018;border:0;font-weight:700;padding:10px 16px;border-radius:8px;cursor:pointer;margin-top:12px}
+button.ghost{background:transparent;border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:8px;cursor:pointer}
+pre{background:#0a0e14;border:1px solid var(--border);border-radius:8px;padding:10px;overflow:auto;font-size:11px;max-height:280px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.tag{font-size:10px;padding:2px 8px;border-radius:999px;background:#15202e;color:var(--muted)}
+.tag.m{color:var(--warn)}
+footer{padding:8px 20px;border-top:1px solid var(--border);font-size:11px;color:var(--muted);display:flex;justify-content:space-between}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="logo">A</div>
+    <div>
+      <h1>AlsetOS Native</h1>
+      <span>ATS-001 · organismo · Pulse · Zyrion · ORGES</span>
+    </div>
+  </div>
+  <div class="badge" id="spec">ATS-001</div>
+</header>
+<main>
+  <nav>
+    <button class="active" data-v="desk">Escritorio</button>
+    <button data-v="orges">Crear ORGES</button>
+    <button data-v="pulse">Pulse</button>
+    <button data-v="orgs">Organismos</button>
+    <button data-v="audit">Auditoría</button>
+    <button data-v="about">Filosofía</button>
+  </nav>
+  <section id="view"></section>
+  <aside>
+    <div class="card">
+      <h2>Nodo</h2>
+      <div class="muted">Master</div>
+      <div class="oid" id="master">—</div>
+      <div class="row" style="margin-top:8px"><span class="tag" id="ticks">tick 0</span><span class="tag" id="norgs">0 orgs</span></div>
+      <button class="ghost" style="margin-top:10px;width:100%" onclick="tick()">Scheduler tick</button>
+    </div>
+    <div class="card">
+      <h2>Estado vivo</h2>
+      <pre id="live">cargando…</pre>
+    </div>
+  </aside>
+</main>
+<footer>
+  <span>Soberano · Go · sin TinyCore · sin Node</span>
+  <span>Un organismo es cognitivo, criptográfico, persistente, descentralizado, reactivo y evolutivo</span>
+</footer>
+<script>
+const $ = s => document.querySelector(s);
+let status = null;
+async function api(path, opts){
+  const r = await fetch(path, opts);
+  if(!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+async function refresh(){
+  status = await api('/api/status');
+  $('#master').textContent = status.master_oid || '—';
+  $('#ticks').textContent = 'tick ' + status.ticks;
+  $('#norgs').textContent = (status.organisms||[]).length + ' orgs';
+  $('#live').textContent = JSON.stringify(status, null, 2);
+  render();
+}
+function tick(){ api('/api/tick',{method:'POST'}).then(refresh); }
+const views = {
+  desk(){
+    return `<div class="card"><h2>Escritorio soberano</h2>
+      <p class="muted">Entorno AlsetOS Native alineado a ATS-001. No es un Linux con otra piel: el núcleo planifica <b>organismos</b>, no procesos.</p>
+      <div class="grid" style="margin-top:12px">
+        <div class="org"><b>Identidad</b><p class="muted">OID + RootCID por organismo</p></div>
+        <div class="org"><b>Pulse</b><p class="muted">Única vía de interacción firmada</p></div>
+        <div class="org"><b>Zyrion</b><p class="muted">Lógica ternaria V / F / I</p></div>
+        <div class="org"><b>ORGES</b><p class="muted">Organismos especializados composables</p></div>
+      </div></div>`;
+  },
+  orges(){
+    return `<div class="card"><h2>Crear ORGES</h2>
+      <p class="muted">Organismo Especializado (Parte IX). Caps + goals + dominio.</p>
+      <label>Nombre</label><input id="o-name" value="financiero"/>
+      <label>Dominio</label>
+      <select id="o-kind">
+        <option value="financiero">Financiero</option>
+        <option value="juridico">Jurídico</option>
+        <option value="medico">Médico</option>
+        <option value="educativo">Educativo</option>
+        <option value="ia">IA</option>
+        <option value="logistico">Logístico</option>
+        <option value="cientifico">Científico</option>
+        <option value="custom">Custom</option>
+      </select>
+      <label>Goals (coma)</label><input id="o-goals" value="seguridad,cumplimiento"/>
+      <label>Caps (coma)</label><input id="o-caps" value="pulse.send,pulse.receive,ejecutar"/>
+      <button class="primary" onclick="createOrges()">Desplegar ORGES</button>
+      <pre id="o-out" style="margin-top:12px"></pre></div>`;
+  },
+  pulse(){
+    const opts = (status.organisms||[]).map(o=>`<option value="${o.oid}">${o.kind||'org'} · ${o.oid.slice(0,28)}…</option>`).join('');
+    return `<div class="card"><h2>Pulse seguro</h2>
+      <label>Origen</label><select id="p-src">${opts}</select>
+      <label>Destino</label><select id="p-dst">${opts}</select>
+      <label>Payload JSON</label><textarea id="p-body" rows="4">{"tipo":"ping","msg":"hola"}</textarea>
+      <button class="primary" onclick="sendPulse()">Enviar Pulse</button>
+      <pre id="p-out" style="margin-top:12px"></pre></div>`;
+  },
+  orgs(){
+    const cards = (status.organisms||[]).map(o=>`<div class="org">
+      <div class="row"><b>${o.kind||'org'}</b>${o.master?'<span class="tag m">MASTER</span>':''}</div>
+      <div class="oid">${o.oid}</div>
+      <div class="muted" style="margin-top:6px">RootCID ${o.root_cid}</div>
+      <div class="row" style="margin-top:6px">${(o.capabilities||[]).slice(0,6).map(c=>`<span class="tag">${c}</span>`).join('')}</div>
+    </div>`).join('');
+    return `<div class="card"><h2>Organismos del nodo</h2><div class="grid">${cards||'<p class="muted">vacío</p>'}</div></div>`;
+  },
+  audit(){
+    return `<div class="card"><h2>Auditoría</h2><pre>${JSON.stringify(status.audit||[],null,2)}</pre></div>`;
+  },
+  about(){
+    return `<div class="card"><h2>Filosofía ATS-001</h2>
+      <p>La unidad fundamental no es el proceso: es el <b>organismo</b>.</p>
+      <ul class="muted">
+        <li>AF-001 Todo es un organismo</li>
+        <li>AF-002 Primero descentralizado</li>
+        <li>AF-005 Todo acceso mediante Pulse</li>
+        <li>AF-006 Incorruptible desde el exterior</li>
+        <li>Zyrion: la incertidumbre (I) no se fuerza a falso</li>
+      </ul>
+      <p class="muted">Este binario Go es el núcleo lógico + entorno de desarrollo ORGES. No monta TinyCore ni requiere Node.</p></div>`;
+  }
+};
+let view = 'desk';
+function render(){ $('#view').innerHTML = views[view](); }
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active'); view = b.dataset.v; render();
+});
+async function createOrges(){
+  const body = {
+    name: $('#o-name').value.trim(),
+    kind: $('#o-kind').value,
+    goals: $('#o-goals').value.split(',').map(s=>s.trim()).filter(Boolean),
+    caps: $('#o-caps').value.split(',').map(s=>s.trim()).filter(Boolean)
+  };
+  try{
+    const r = await api('/api/orges',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    $('#o-out').textContent = JSON.stringify(r,null,2);
+    await refresh();
+  }catch(e){ $('#o-out').textContent = String(e); }
+}
+async function sendPulse(){
+  try{
+    const payload = JSON.parse($('#p-body').value);
+    const r = await api('/api/pulse',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      source: $('#p-src').value, dest: $('#p-dst').value, payload
+    })});
+    $('#p-out').textContent = JSON.stringify(r,null,2);
+    await refresh();
+  }catch(e){ $('#p-out').textContent = String(e); }
+}
+refresh(); setInterval(refresh, 4000);
+</script>
+</body>
+</html>
