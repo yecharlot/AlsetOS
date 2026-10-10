@@ -1,9 +1,6 @@
-# AlsetOS Kernel Native — requiere gcc -m32, ld, grub-mkrescue (opcional)
 CC = gcc
-AS = gcc
 CFLAGS = -m32 -ffreestanding -fno-stack-protector -fno-pic -O2 -Wall -Wextra
 LDFLAGS = -m32 -ffreestanding -nostdlib -static -Wl,-T,boot/linker.ld
-
 OBJS = boot/boot.o src/kernel.o
 
 .PHONY: all clean run iso
@@ -14,7 +11,7 @@ build:
 	mkdir -p build
 
 boot/boot.o: boot/boot.S | build
-	$(AS) -m32 -c $< -o $@
+	gcc -m32 -c $< -o $@
 
 src/kernel.o: src/kernel.c | build
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -23,13 +20,12 @@ build/alsetos-kernel.bin: $(OBJS)
 	$(CC) $(LDFLAGS) -o $@ $(OBJS)
 	@echo "OK $@"
 
-# QEMU directo del kernel multiboot (sin ISO)
 run: build/alsetos-kernel.bin
-	qemu-system-i386 -kernel build/alsetos-kernel.bin -display curses || \
-	qemu-system-i386 -kernel build/alsetos-kernel.bin -nographic || \
+	@echo "Controles: flechas, Enter, 1=ORGES 2=Peer 3=Studio tick 4=broadcast"
+	qemu-system-i386 -kernel build/alsetos-kernel.bin -display curses 2>/dev/null || \
+	qemu-system-i386 -kernel build/alsetos-kernel.bin 2>/dev/null || \
 	qemu-system-x86_64 -kernel build/alsetos-kernel.bin
 
-# ISO opcional si hay grub-mkrescue
 iso: build/alsetos-kernel.bin
 	mkdir -p build/isodir/boot/grub
 	cp build/alsetos-kernel.bin build/isodir/boot/alsetos-kernel.bin

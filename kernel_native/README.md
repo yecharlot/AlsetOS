@@ -1,33 +1,13 @@
-# AlsetOS Kernel Native
+# AlsetOS Kernel Native (integrado)
 
-Kernel **propio** (multiboot), sin Linux ni TinyCore como anfitrión del núcleo.
+Kernel multiboot **sin SO anfitrión**. Al arrancar instancia organismos:
 
-## Fase 1 (actual)
+- Master, Desktop, Studio, PulseBus (ORGES de infraestructura)
 
-- Arranque Multiboot en QEMU
-- Consola VGA texto
-- **Organism Control Block (OCB)** Master en memoria
-- Sin procesos Unix: la unidad es el organismo
-
-## Compilar y probar
+UI VGA interactiva (teclado en QEMU). Modelo descentralizado-first (NodeID local, Pulse, Peers).
 
 ```bash
-cd kernel_native
-make
-make run          # requiere qemu-system-i386 o qemu-system-x86_64
-# opcional:
-make iso          # requiere grub-mkrescue
+make && make run
 ```
 
-## Relación con AlsetOS Native (Go)
-
-| Capa | Qué es | Dónde corre |
-|------|--------|-------------|
-| `kernel_native` | Kernel metal / QEMU | Sin SO anfitrión |
-| `cmd/alsetos-native` | Runtime ATS-001 + escritorio + ORGES Studio | Hoy sobre host (Ubuntu/Windows) como puente de desarrollo |
-
-El runtime Go **no es el kernel**. El camino es portar primitivas (OCB, Pulse, scheduler) del modelo ATS al kernel C/ensamblador. El escritorio y ORGES Studio siguen siendo el entorno de desarrollo hasta que el kernel tenga framebuffer/red suficientes.
-
-## Honestidad
-
-Fase 1 **no** incluye GUI, red, ni ORGES Studio dentro del kernel. Demuestra arranque soberano y OCB. Las fases siguientes: scheduler de OCBs, Pulse interno, persistencia, drivers.
+Guía completa: [docs/GUIA_ALSETOS.md](../docs/GUIA_ALSETOS.md)
