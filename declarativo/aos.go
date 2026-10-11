@@ -20,6 +20,30 @@ type UINode struct {
 	Meta   map[string]string `json:"meta,omitempty"`
 }
 
+
+// TestCase aserción sobre estado tras ensamblar (ATS-001 verificación).
+type TestCase struct {
+	Name string
+	Path string
+	Op   string
+	Want interface{}
+}
+
+// DeployTarget empaquetado multiplataforma desde el flow.
+type DeployTarget struct {
+	Name    string
+	Devices []string
+	OutDir  string
+}
+
+// ContractBind une consumer → provider por contrato (LEGO explícito).
+type ContractBind struct {
+	Consumer string `json:"consumer"`
+	Provider string `json:"provider"`
+	Contract string `json:"contract"`
+	Version  string `json:"version"`
+}
+
 // FlowAOS resultado de compilar un programa LISPAI-AOS.
 type FlowAOS struct {
 	Name        string
@@ -29,6 +53,9 @@ type FlowAOS struct {
 	Surfaces    map[string]UINode // oid UI → árbol
 	SurfaceOID  string            // superficie activa
 	Assemble    []string          // oids a ensamblar
+	Tests       []TestCase
+	Deploy      *DeployTarget
+	Binds       []ContractBind // uniones LEGO explícitas
 }
 
 // CargarAOS lee un archivo .aos / .lispai y lo compila a FlowAOS.
@@ -123,6 +150,64 @@ func compileFlow(flow *FlowAOS, list []lispai.AOSNode) error {
 			if len(l) > 1 {
 				flow.SurfaceOID = oidFor(fmt.Sprint(l[1]))
 			}
+		case "bind":
+			// (bind consumer provider contract [version])
+			if len(l) >= 4 {
+				b := ContractBind{
+					Consumer: oidFor(fmt.Sprint(l[1])),
+					Provider: oidFor(fmt.Sprint(l[2])),
+					Contract: fmt.Sprint(l[3]),
+					Version:  "1.0",
+				}
+				if len(l) > 4 {
+					b.Version = fmt.Sprint(l[4])
+				}
+				flow.Binds = append(flow.Binds, b)
+			}
+		case "test":
+			// (test nombre (eq path value)|...)
+			tc := TestCase{Name: "test"}
+			if len(l) > 1 {
+				tc.Name = fmt.Sprint(l[1])
+			}
+			for _, x := range l[2:] {
+				xl, ok := x.([]lispai.AOSNode)
+				if !ok || len(xl) < 3 {
+					continue
+				}
+				tc.Op = fmt.Sprint(xl[0])
+				tc.Path = fmt.Sprint(xl[1])
+				tc.Want = parseValue(xl[2])
+				flow.Tests = append(flow.Tests, tc)
+			}
+		case "deploy":
+			// (deploy web (devices mobile tablet desktop) (out ./dist))
+			d := &DeployTarget{Name: "web", Devices: []string{"mobile", "tablet", "desktop"}}
+			if len(l) > 1 {
+				d.Name = fmt.Sprint(l[1])
+			}
+			for _, x := range l[2:] {
+				xl, ok := x.([]lispai.AOSNode)
+				if !ok || len(xl) == 0 {
+					continue
+				}
+				switch fmt.Sprint(xl[0]) {
+				case "devices":
+					d.Devices = nil
+					for _, dv := range xl[1:] {
+						d.Devices = append(d.Devices, fmt.Sprint(dv))
+					}
+				case "out":
+					if len(xl) > 1 {
+						d.OutDir = fmt.Sprint(xl[1])
+					}
+				}
+			}
+			flow.Deploy = d
+		case "gene", "mind", "pulse":
+			// registradas en meta para ATS-001 (extensibles por runtime)
+			flow.ensureMeta()
+			flow.Manifiesto.Meta[fmt.Sprint(l[0])] = fmt.Sprint(l[1:])
 		default:
 			return fmt.Errorf("AOS flow: directiva desconocida %s", l[0])
 		}
@@ -375,4 +460,14 @@ func (rt *Runtime) AplicarFlow(flow *FlowAOS) error {
 		rt.audit("ui.surface", flow.SurfaceOID, "activa", "lispai-aos")
 	}
 	return nil
+}
+
+
+func (flow *FlowAOS) ensureMeta() {
+	if flow.Manifiesto == nil {
+		return
+	}
+	if flow.Manifiesto.Meta == nil {
+		flow.Manifiesto.Meta = map[string]string{}
+	}
 }

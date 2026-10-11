@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Alset Studio · LISPAI-AOS</title>
+  <link rel="stylesheet" href="studio.css"/>
+</head>
+<body>
+  <header class="top">
+    <strong>⬡ Alset Studio</strong>
+    <span class="muted">LISPAI-AOS · ORGES como LEGO</span>
+    <div class="top-actions">
+      <button type="button" id="btnApply">Aplicar flow</button>
+      <button type="button" id="btnTest">Probar</button>
+      <button type="button" id="btnDeploy">Desplegar pack</button>
+    </div>
+  </header>
+  <div class="layout">
+    <aside class="palette">
+      <h3>Piezas LEGO</h3>
+      <p class="muted">Arrastra al canvas</p>
+      <div class="brick" draggable="true" data-kind="orge">ORGE dominio</div>
+      <div class="brick" draggable="true" data-kind="ui">ORGE UI</div>
+      <div class="brick" draggable="true" data-kind="bind">BIND contrato</div>
+      <div class="brick" draggable="true" data-kind="test">TEST</div>
+      <div class="brick" draggable="true" data-kind="deploy">DEPLOY</div>
+      <hr/>
+      <h3>Dispositivo</h3>
+      <div class="devs">
+        <button type="button" data-dev="mobile" class="dev on">Mobile</button>
+        <button type="button" data-dev="tablet" class="dev">Tablet</button>
+        <button type="button" data-dev="desktop" class="dev">Desktop</button>
+      </div>
+    </aside>
+    <main class="center">
+      <section class="canvas-wrap">
+        <h3>Canvas · flow</h3>
+        <div id="canvas" class="canvas"></div>
+      </section>
+      <section class="editor-wrap">
+        <h3>Fuente .aos (editable)</h3>
+        <textarea id="aos" spellcheck="false"></textarea>
+      </section>
+    </main>
+    <aside class="preview-pane">
+      <h3>Preview <span id="devLabel">mobile</span></h3>
+      <div id="device" class="device mobile"><div id="previewRoot"></div></div>
+      <pre id="log" class="log"></pre>
+    </aside>
+  </div>
+  <script src="studio.js"></script>
+</body>
+</html>

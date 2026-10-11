@@ -1,10 +1,7 @@
-; Prism@.TEC / AlsetOS — LISPAI-AOS
-; Todo es organismo: dominio + UI. El flow ensambla piezas como LEGO.
-; Fuente de verdad: este archivo. El código generado es editable pero derivado.
-
+; LISPAI-AOS — ATS-001 flow completo (dominio + UI + test + deploy)
 (flow cafeteria-mostrador
   (version "1.0.0")
-  (desc "Mostrador: stock, venta y superficie UI como ORGES")
+  (desc "Mostrador: stock, venta, UI-orge, tests y deploy multi-dispositivo")
 
   (orge stock
     (kind ORGES)
@@ -31,7 +28,7 @@
 
   (orge ui-mostrador
     (kind UI)
-    (desc "Superficie declarativa — la UI es un organismo")
+    (desc "Superficie declarativa")
     (cap "ui.render")
     (ui
       (column
@@ -43,5 +40,11 @@
           (button "Vender" (emit venta.registrar))))))
 
   (assemble stock venta ui-mostrador)
+  (bind venta stock stock.consulta 1.0)
   (surface ui-mostrador)
+
+  (test stock-inicial (eq stock.unidades 10))
+  (deploy web
+    (devices mobile tablet desktop)
+    (out ./dist/cafeteria-mostrador))
 )
