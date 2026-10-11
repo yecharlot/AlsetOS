@@ -29,6 +29,8 @@ El kernel **no puede ejecutar** HTML/CSS. Lo que hacemos es **clonar la identida
 | Start menu | `#start-menu` | `draw_start_menu()`, `menu_open` | Crear organismos |
 | Splash | `#splash` | `phase==0`, `draw_splash()` | Arranque |
 | Cursor rápido | (GPU/navegador) | `scene[]` + `cursor_move_fast()` | No redibujar todo el FB |
+| Componentes / estado | Alset-JS-Runtime / Studio | **UiRuntime** + IR (`UiNode`, `K_APP`) | Apps como orges de UI |
+| Contador / catálogo | apps de ejemplo Studio | `crear_app(0..2)`, iconos C/A/D | IR embebido en kernel |
 
 ---
 

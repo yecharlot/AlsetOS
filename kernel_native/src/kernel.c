@@ -14,6 +14,7 @@ typedef unsigned short u16;
 typedef unsigned int u32;
 typedef unsigned long u64;
 typedef signed char i8;
+typedef short i16;
 
 #define MAX_OCB 64
 #define MAX_NAME 20
@@ -53,6 +54,50 @@ typedef signed char i8;
 #define K_LIST 12
 #define K_INSPECT 13
 #define K_ICON 14
+#define K_APP 15        /* ventana cuyo cuerpo es un IR de orges UI */
+#define K_UIRUNTIME 16  /* intérprete de IR (organismo) */
+
+#define CAP_UI 0x2000u  /* interpretar / servir orges de UI */
+
+/* —— IR de orges UI (compatible conceptualmente con Alset-JS-Runtime) ——
+ * No es HTML: es un árbol de nodos que el UiRuntime dibuja y enlaza a estado.
+ * Studio/Editor exportarán este IR; aquí va embebido para demos nativas.
+ */
+#define UI_END     0
+#define UI_PANEL   1
+#define UI_LABEL   2
+#define UI_BUTTON  3
+#define UI_LIST    4
+#define UI_FIELD   5
+#define UI_BADGE   6
+
+#define UI_ACT_NONE  0
+#define UI_ACT_INC   1
+#define UI_ACT_DEC   2
+#define UI_ACT_CLR   3
+#define UI_ACT_PULSE 4
+#define UI_ACT_NEXT  5
+
+#define UI_MAX_NODES 20
+#define UI_MAX_APPS  4
+#define UI_STATE_SLOTS 4
+
+struct UiNode {
+  u8 type;       /* UI_* */
+  u8 action;     /* UI_ACT_* para botones */
+  i16 x, y, w, h; /* relativo al body de la ventana */
+  u8 text_id;    /* índice en ui_str[] */
+  u8 state_slot; /* slot de estado de la app (0..3) */
+  u8 list_id;    /* catálogo de ítems embebido */
+};
+
+struct UiAppDef {
+  const char *key;
+  const char *title;
+  int def_w, def_h;
+  const struct UiNode *nodes;
+  int n_nodes;
+};
 
 /* Paleta = desktop/shell/shell.css :root */
 #define C_BG      0xFF070A10u
@@ -92,6 +137,8 @@ struct OCB {
   char items[MAX_LIST][MAX_ITEM];
   int n_items, sel_item;
   char glyph; /* icono escritorio */
+  int app_id; /* índice en ui_apps[], -1 si no es K_APP */
+  int state[UI_STATE_SLOTS]; /* estado reactivo de la orge UI */
 };
 
 static struct OCB ocbs[MAX_OCB];
@@ -109,6 +156,70 @@ static int drag_win=-1, drag_ox, drag_oy, menu_open, orges_seq, phase;
 /* phase 0=splash 1=desktop */
 static int splash_ticks;
 static volatile u16 *const VGA=(volatile u16*)0xB8000UL;
+
+/* —— Tablas del UiRuntime (IR embebido) —— */
+static const char *const ui_str[]={
+  /* 0 */ "",
+  /* 1 */ "Contador",
+  /* 2 */ "+",
+  /* 3 */ "-",
+  /* 4 */ "Limpiar",
+  /* 5 */ "Valor",
+  /* 6 */ "Catalogo local",
+  /* 7 */ "Productos",
+  /* 8 */ "Pedir",
+  /* 9 */ "Demo UI IR",
+  /*10 */ "Orge de interfaz",
+  /*11 */ "Abrir lista",
+  /*12 */ "Pulse Desktop",
+  /*13 */ "Estado OCB",
+  /*14 */ "Siguiente",
+  /*15 */ "Bienvenido a AlsetOS",
+  /*16 */ "Apps como organismos",
+  /*17 */ "UiRuntime activo",
+  /*18 */ "Sin anfitrion",
+  /*19 */ "IR nativo"
+};
+#define UI_NSTR 20
+
+static const char *const ui_list0[]={"Arroz 1kg","Aceite","Jabon","Cafe","Pan"};
+static const char *const ui_list1[]={"Studio IR","Editor IR","Mind slot","Gene slot"};
+static const char *const *const ui_lists[]={ui_list0,ui_list1};
+static const int ui_list_len[]={5,4};
+
+/* App 0: Contador reactivo (estado en slot 0) */
+static const struct UiNode app_counter_nodes[]={
+  {UI_LABEL,0, 12, 8, 200,20, 1,0,0},
+  {UI_BADGE,0, 12, 36, 120,28, 5,0,0},
+  {UI_BUTTON,UI_ACT_INC, 12, 80, 72,36, 2,0,0},
+  {UI_BUTTON,UI_ACT_DEC, 96, 80, 72,36, 3,0,0},
+  {UI_BUTTON,UI_ACT_CLR, 180,80, 100,36, 4,0,0},
+  {UI_LABEL,0, 12, 132, 280,20, 17,0,0},
+};
+/* App 1: Catálogo con lista */
+static const struct UiNode app_catalog_nodes[]={
+  {UI_LABEL,0, 12, 8, 240,20, 6,0,0},
+  {UI_LIST,0, 12, 36, 260,140, 7,0,0},
+  {UI_BUTTON,UI_ACT_PULSE, 12, 190, 120,36, 8,0,0},
+  {UI_LABEL,0, 140, 198, 160,20, 16,0,0},
+};
+/* App 2: Demo shell IR */
+static const struct UiNode app_demo_nodes[]={
+  {UI_PANEL,0, 8, 8, 300,70, 0,0,0},
+  {UI_LABEL,0, 20, 20, 260,20, 15,0,0},
+  {UI_LABEL,0, 20, 44, 260,20, 18,0,0},
+  {UI_BUTTON,UI_ACT_NEXT, 12, 96, 140,36, 14,0,0},
+  {UI_BUTTON,UI_ACT_PULSE, 164,96, 140,36, 12,0,0},
+  {UI_LIST,0, 12, 148, 292,100, 7,1,1},
+  {UI_LABEL,0, 12, 260, 280,20, 19,0,0},
+};
+
+static const struct UiAppDef ui_apps[UI_MAX_APPS]={
+  {"contador","App · Contador",320,200, app_counter_nodes, 6},
+  {"catalogo","App · Catalogo",320,260, app_catalog_nodes, 4},
+  {"demo","App · Demo IR",340,300, app_demo_nodes, 7},
+  {0,0,0,0,0,0}
+};
 
 static const u8 FONT8[96][8]={
   {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00},{0x18,0x3C,0x3C,0x18,0x18,0x00,0x18,0x00},
@@ -267,6 +378,7 @@ static int ocb_add(const char *n,u32 kind,u32 caps){
   o->pin=o->pout=0;o->alive=1;o->x=80;o->y=48;o->w=360;o->h=240;o->z=0;
   o->visible=1;o->focused=0;o->minimized=0;o->color=C_PANEL;
   o->text[0]=0;o->text_len=0;o->n_items=0;o->sel_item=0;o->titulo[0]=0;o->glyph='?';
+  o->app_id=-1;o->state[0]=o->state[1]=o->state[2]=o->state[3]=0;
   cpy(o->nombre,n,MAX_NAME);return n_ocb++;
 }
 static int pulso(int from,int to){
@@ -276,7 +388,131 @@ static int pulso(int from,int to){
 }
 static int is_win(int i){
   if(i<0||i>=n_ocb||!ocbs[i].alive)return 0;
-  u32 k=ocbs[i].kind;return k==K_WINDOW||k==K_TEXT||k==K_LIST||k==K_INSPECT;
+  u32 k=ocbs[i].kind;
+  return k==K_WINDOW||k==K_TEXT||k==K_LIST||k==K_INSPECT||k==K_APP;
+}
+
+/* —— UiRuntime: interpreta IR y pinta orges de UI dentro de una K_APP —— */
+static void z_add(int i);
+static void focus_set(int i);
+static const char *ui_get_str(u8 id){
+  if(id>=UI_NSTR)return "";return ui_str[id]?ui_str[id]:"";
+}
+static void ui_fmt_int(char *buf,int v){
+  /* entero simple a texto (positivo/negativo) */
+  int i=0,neg=0;
+  if(v<0){neg=1;v=-v;}
+  if(v==0){buf[0]='0';buf[1]=0;return;}
+  char tmp[12];int n=0;
+  while(v&&n<11){tmp[n++]=(char)('0'+(v%10));v/=10;}
+  if(neg)buf[i++]='-';
+  while(n--)buf[i++]=tmp[n];
+  buf[i]=0;
+}
+static int crear_app(int app_id){
+  if(app_id<0||app_id>=UI_MAX_APPS||!ui_apps[app_id].key)return -1;
+  const struct UiAppDef *a=&ui_apps[app_id];
+  char name[MAX_NAME];
+  int n=0;const char *k=a->key;
+  while(*k&&n<12)name[n++]=*k++;
+  name[n++]='0'+(orges_seq%10);name[n]=0;orges_seq++;
+  int i=ocb_add(name,K_APP,CAP_PULSO_ENV|CAP_PULSO_REC|CAP_DESKTOP|CAP_UI);
+  if(i<0)return i;
+  ocbs[i].app_id=app_id;
+  cpy(ocbs[i].titulo,a->title,MAX_TITLE);
+  ocbs[i].w=a->def_w;ocbs[i].h=a->def_h;
+  ocbs[i].x=60+(orges_seq%4)*30;ocbs[i].y=36+(orges_seq%3)*28;
+  /* precargar lista embebida si el IR tiene UI_LIST */
+  for(int j=0;j<a->n_nodes;j++){
+    if(a->nodes[j].type==UI_LIST){
+      int lid=a->nodes[j].list_id;
+      if(lid>1)lid=0;
+      ocbs[i].n_items=ui_list_len[lid];
+      if(ocbs[i].n_items>MAX_LIST)ocbs[i].n_items=MAX_LIST;
+      for(int t=0;t<ocbs[i].n_items;t++)
+        cpy(ocbs[i].items[t],ui_lists[lid][t],MAX_ITEM);
+      break;
+    }
+  }
+  z_add(i);focus_set(i);
+  /* pulso: Desktop → UiRuntime → App */
+  int desk=buscar("Desktop"), rt=buscar("UiRuntime");
+  if(desk>=0&&rt>=0)pulso(desk,rt);
+  if(rt>=0)pulso(rt,i);
+  return i;
+}
+static void ui_apply_action(int wi,u8 act){
+  if(wi<0||ocbs[wi].kind!=K_APP)return;
+  struct OCB *o=&ocbs[wi];
+  if(act==UI_ACT_INC)o->state[0]++;
+  else if(act==UI_ACT_DEC)o->state[0]--;
+  else if(act==UI_ACT_CLR)o->state[0]=0;
+  else if(act==UI_ACT_PULSE){
+    int desk=buscar("Desktop");
+    if(desk>=0)pulso(desk,wi);
+    o->state[1]++;
+  }else if(act==UI_ACT_NEXT){
+    o->state[2]++;
+    if(o->n_items>0)o->sel_item=(o->sel_item+1)%o->n_items;
+  }
+}
+static void ui_draw_nodes(int wi,int bx,int by,int bw,int bh){
+  if(wi<0||ocbs[wi].app_id<0)return;
+  const struct UiAppDef *a=&ui_apps[ocbs[wi].app_id];
+  if(!a->nodes)return;
+  struct OCB *o=&ocbs[wi];
+  for(int n=0;n<a->n_nodes;n++){
+    const struct UiNode *nd=&a->nodes[n];
+    int x=bx+nd->x,y=by+nd->y,w=nd->w,h=nd->h;
+    if(x+w>bx+bw)w=bx+bw-x;if(y+h>by+bh)h=by+bh-y;
+    if(w<=0||h<=0)continue;
+    if(nd->type==UI_PANEL){
+      panel_r(x,y,w,h,0xFF101820u,C_LINE);
+    }else if(nd->type==UI_LABEL){
+      draw_text_clip(x,y,ui_get_str(nd->text_id),C_TEXT,w);
+    }else if(nd->type==UI_BADGE){
+      char num[16];ui_fmt_int(num,o->state[nd->state_slot]);
+      panel_r(x,y,w,h,0xFF1A2840u,C_GOLD);
+      draw_text(x+10,y+(h-CH)/2,num,C_GOLD);
+    }else if(nd->type==UI_BUTTON){
+      panel_r(x,y,w,h,0xFF1A2030u,C_LINE2);
+      fill_bb(x+2,y+2,w-4,h/2-1,0xFF222A3Au);
+      const char *lab=ui_get_str(nd->text_id);
+      int tw=0;const char *p=lab;while(*p){tw+=CW;p++;}
+      draw_text(x+(w-tw)/2,y+(h-CH)/2,lab,C_TEXT);
+    }else if(nd->type==UI_LIST){
+      panel_r(x,y,w,h,0xFF080B12u,C_LINE);
+      int row_h=CH+8;
+      for(int k=0;k<o->n_items;k++){
+        int iy=y+6+k*row_h;
+        if(iy+row_h>y+h-4)break;
+        u32 bg=(k==o->sel_item)?0xFF1A2840u:0xFF101620u;
+        panel_r(x+4,iy,w-8,row_h-2,bg,k==o->sel_item?C_GOLD:C_LINE);
+        draw_text_clip(x+12,iy+4,o->items[k],C_TEXT,w-24);
+      }
+    }else if(nd->type==UI_FIELD){
+      panel_r(x,y,w,h,0xFF080B12u,C_LINE);
+      draw_text_clip(x+8,y+(h-CH)/2,o->text,C_TEXT,w-16);
+    }
+  }
+}
+/* hit-test de botones/lista dentro del body de una K_APP; devuelve 1 si consumió el click */
+static int ui_hit(int wi,int mx,int my){
+  if(wi<0||ocbs[wi].kind!=K_APP||ocbs[wi].app_id<0)return 0;
+  const struct UiAppDef *a=&ui_apps[ocbs[wi].app_id];
+  int bx=ocbs[wi].x+14,by=ocbs[wi].y+TITLE_H+8;
+  for(int n=0;n<a->n_nodes;n++){
+    const struct UiNode *nd=&a->nodes[n];
+    int x=bx+nd->x,y=by+nd->y,w=nd->w,h=nd->h;
+    if(mx<x||my<y||mx>=x+w||my>=y+h)continue;
+    if(nd->type==UI_BUTTON){ui_apply_action(wi,nd->action);return 1;}
+    if(nd->type==UI_LIST){
+      int row_h=CH+8;
+      int idx=(my-(y+6))/row_h;
+      if(idx>=0&&idx<ocbs[wi].n_items){ocbs[wi].sel_item=idx;return 1;}
+    }
+  }
+  return 0;
 }
 static void z_raise(int i){
   if(!is_win(i)||ocbs[i].minimized)return;
@@ -336,6 +572,9 @@ static void launch_from_icon(int ii){
   else if(g=='T'||g=='t') crear_orges(K_TEXT,"Term");
   else if(g=='M'||g=='m') crear_orges(K_INSPECT,"Mind");
   else if(g=='O'||g=='o') crear_orges(K_INSPECT,"Orges");
+  else if(g=='C'||g=='c') crear_app(0); /* Contador IR */
+  else if(g=='A'||g=='a') crear_app(1); /* Catalogo IR */
+  else if(g=='D'||g=='d') crear_app(2); /* Demo IR */
   else crear_orges(K_WINDOW,"App");
 }
 
@@ -416,6 +655,9 @@ static void draw_window(int i){
       panel_r(cx,iy-4,cw,CH+8,bg,k==o->sel_item?C_GOLD:C_LINE);
       draw_text_clip(cx+12,iy,o->items[k],C_TEXT,cw-24);
     }
+  }else if(o->kind==K_APP){
+    draw_text(cx,cy,"UiRuntime · orge IR",C_MUTED);
+    ui_draw_nodes(i,cx,cy+CH+6,cw,h-TITLE_H-CH-28);
   }else if(o->kind==K_INSPECT){
     draw_text(cx,cy,"Inspector · OCB vivos",C_MUTED);
     int row=0;
@@ -470,19 +712,20 @@ static void draw_taskbar(void){
 }
 static void draw_start_menu(void){
   if(!menu_open)return;
-  int mw=240,mh=280,mx=8,my=(int)fb_h-TASK_H-mh-8;
+  int mw=240,mh=320,mx=8,my=(int)fb_h-TASK_H-mh-8;
   blend_bb(mx+6,my+8,mw,mh,C_SHADOW);
   panel_r(mx,my,mw,mh,C_PANEL,C_LINE2);
   fill_bb(mx+1,my+1,mw-2,36,C_TITLE);
   draw_text(mx+14,my+10,"ALSET OS",C_GOLD);
   draw_text(mx+14+8*CW,my+10,"Desktop",C_MUTED);
-  const char *items[]={"Studio","Editor","Archivos","Terminal","Mind","Organismo","Estado",0};
+  const char *items[]={"Studio","Editor","Archivos","Terminal","Mind","Contador IR","Catalogo IR","Demo IR",0};
   for(int i=0;items[i];i++){
-    int iy=my+44+i*(CH+12);
+    int iy=my+44+i*(CH+10);
+    if(iy+CH>my+mh-40)break;
     draw_text(mx+16,iy,items[i],C_TEXT);
   }
   fill_bb(mx+12,my+mh-48,mw-24,1,C_LINE);
-  draw_text(mx+16,my+mh-36,"1-4 crear · M menu",C_MUTED);
+  draw_text(mx+16,my+mh-36,"IR apps · UiRuntime",C_MUTED);
 }
 static void draw_splash(void){
   fill_bb(0,0,(int)fb_w,(int)fb_h,C_BG);
@@ -591,15 +834,17 @@ static void mouse_feed(u8 sc){
         }
       }
     }else if(menu_open){
-      int mw=240,mh=280,mx=8,my=ty-mh-8;
+      int mw=240,mh=320,mx=8,my=ty-mh-8;
       if(mouse_x>=mx&&mouse_x<mx+mw&&mouse_y>=my&&mouse_y<my+mh){
-        int idx=(mouse_y-(my+44))/(CH+12);
+        int idx=(mouse_y-(my+44))/(CH+10);
         if(idx==0)crear_orges(K_WINDOW,"Studio");
         else if(idx==1)crear_orges(K_TEXT,"Editor");
         else if(idx==2)crear_orges(K_LIST,"Files");
         else if(idx==3)crear_orges(K_TEXT,"Term");
-        else if(idx==4||idx==5)crear_orges(K_INSPECT,"Mind");
-        else if(idx==6)crear_orges(K_INSPECT,"Stat");
+        else if(idx==4)crear_orges(K_INSPECT,"Mind");
+        else if(idx==5)crear_app(0);
+        else if(idx==6)crear_app(1);
+        else if(idx==7)crear_app(2);
         menu_open=0;need_scene=1;
       }else{menu_open=0;need_scene=1;}
     }else{
@@ -614,6 +859,9 @@ static void mouse_feed(u8 sc){
           }else if(mouse_x>=ocbs[hi].x+ocbs[hi].w-64){
             ocbs[hi].minimized=1;focus_win=-1;
           }else{drag_win=hi;drag_ox=mouse_x-ocbs[hi].x;drag_oy=mouse_y-ocbs[hi].y;}
+        }else if(ocbs[hi].kind==K_APP){
+          /* click en cuerpo: UiRuntime consume botones / lista */
+          ui_hit(hi,mouse_x,mouse_y);
         }
         need_scene=1;
       }else{
@@ -657,16 +905,20 @@ static void bootstrap_organisms(void){
   ocb_add("Framebuffer",K_FB,CAP_FB|CAP_DISP_LEER);
   ocb_add("Compositor",K_COMPOSE,CAP_COMPOSE|CAP_PULSO_ENV|CAP_PULSO_REC);
   ocb_add("Desktop",K_DESKTOP,CAP_DESKTOP|CAP_PULSO_ENV|CAP_PULSO_REC|CAP_ORGES_CREAR);
+  ocb_add("UiRuntime",K_UIRUNTIME,CAP_UI|CAP_PULSO_ENV|CAP_PULSO_REC|CAP_ORGES_CREAR);
   ocb_add("Bus",K_BUS,CAP_PULSO_ENV|CAP_PULSO_REC);
   ocb_add("Teclado",K_DISP,CAP_DISP_LEER|CAP_DISP_CTRL);
   ocb_add("Raton",K_DISP,CAP_DISP_LEER|CAP_DISP_CTRL);
-  /* iconos como en shell.js DEFAULT_ICONS */
+  /* iconos: shell + apps IR (orges UI) */
   add_icon("icStudio","Studio",'S',24,24);
   add_icon("icEditor","Editor",'E',24,120);
   add_icon("icFiles","Archivos",'F',24,216);
   add_icon("icTerm","Terminal",'T',24,312);
   add_icon("icMind","Mind",'M',120,24);
   add_icon("icOrges","Organismo",'O',120,120);
+  add_icon("icCount","Contador",'C',120,216);
+  add_icon("icCat","Catalogo",'A',216,24);
+  add_icon("icDemo","Demo IR",'D',216,120);
 }
 
 void kernel_main(u32 magic,u32 info){
@@ -700,6 +952,9 @@ void kernel_main(u32 magic,u32 info){
     if(sc==0x03){crear_orges(K_TEXT,"Txt");menu_open=0;compositor_tick();continue;}
     if(sc==0x04){crear_orges(K_LIST,"Lst");menu_open=0;compositor_tick();continue;}
     if(sc==0x05){crear_orges(K_INSPECT,"Ins");menu_open=0;compositor_tick();continue;}
+    if(sc==0x06){crear_app(0);menu_open=0;compositor_tick();continue;} /* 5 Contador */
+    if(sc==0x07){crear_app(1);menu_open=0;compositor_tick();continue;} /* 6 Catalogo */
+    if(sc==0x08){crear_app(2);menu_open=0;compositor_tick();continue;} /* 7 Demo IR */
     if(sc==0x1C){int from=buscar("Desktop");if(from>=0&&focus_win>=0)pulso(from,focus_win);compositor_tick();continue;}
     if(sc==0x0F){
       int start=focus_win+1;
