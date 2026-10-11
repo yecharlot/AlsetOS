@@ -1,0 +1,239 @@
+:root {
+  --bg: #070a10;
+  --bg2: #0c1220;
+  --panel: rgba(18, 24, 38, 0.92);
+  --panel-solid: #121826;
+  --line: rgba(255, 255, 255, 0.08);
+  --line2: rgba(255, 255, 255, 0.14);
+  --gold: #f0c14b;
+  --gold-dim: rgba(240, 193, 75, 0.15);
+  --text: #eef2f8;
+  --muted: #8b93a7;
+  --accent: #5b9fd4;
+  --ok: #3ddc97;
+  --danger: #e85d5d;
+  --shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+  --radius: 14px;
+  --font: "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; height: 100%; overflow: hidden;
+  font-family: var(--font); color: var(--text);
+  background: var(--bg);
+  user-select: none;
+}
+#os {
+  position: fixed; inset: 0;
+  display: flex; flex-direction: column;
+  background:
+    radial-gradient(ellipse 80% 50% at 20% 10%, rgba(91, 159, 212, 0.12), transparent 50%),
+    radial-gradient(ellipse 60% 40% at 90% 80%, rgba(240, 193, 75, 0.08), transparent 45%),
+    linear-gradient(165deg, #0a0e18 0%, #070a10 50%, #0c1018 100%);
+}
+#desktop { flex: 1; position: relative; overflow: hidden; }
+#icon-layer { position: absolute; inset: 0; z-index: 1; }
+#window-layer { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
+#window-layer > * { pointer-events: auto; }
+
+/* —— Gates: splash + login —— */
+.gate {
+  position: fixed; inset: 0; z-index: 9999;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background:
+    radial-gradient(ellipse at 50% 28%, #1a2840 0%, #0a101c 45%, #05070c 100%);
+}
+.gate.hidden { display: none !important; }
+#os.hidden { display: none !important; }
+.splash-mark {
+  font-size: 72px; line-height: 1; color: var(--gold);
+  filter: drop-shadow(0 0 32px rgba(240, 193, 75, 0.4));
+  animation: pulse 2s ease-in-out infinite;
+}
+.splash-mark.small { font-size: 42px; animation: none; margin-bottom: 4px; }
+.splash-title {
+  margin-top: 16px; font-size: 32px; font-weight: 700;
+  letter-spacing: 0.18em; text-transform: uppercase;
+}
+.splash-sub { margin-top: 8px; color: var(--muted); font-size: 14px; letter-spacing: 0.04em; }
+.splash-bar {
+  width: 200px; height: 3px; margin-top: 32px;
+  background: rgba(255,255,255,0.06); border-radius: 99px; overflow: hidden;
+}
+.splash-bar span {
+  display: block; height: 100%; width: 42%;
+  background: linear-gradient(90deg, transparent, var(--gold), transparent);
+  animation: load 1.3s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100%{ transform: scale(1); opacity: 1 } 50%{ transform: scale(1.04); opacity: 0.85 } }
+@keyframes load { 0%{ transform: translateX(-120%) } 100%{ transform: translateX(280%) } }
+
+.login-card {
+  width: min(380px, 92vw);
+  background: var(--panel);
+  border: 1px solid var(--line2);
+  border-radius: 20px;
+  padding: 28px 26px 24px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(16px);
+  display: flex; flex-direction: column; gap: 6px;
+}
+.login-card h2 { margin: 8px 0 0; font-size: 22px; font-weight: 650; }
+.login-card label { font-size: 11px; color: var(--muted); margin-top: 10px; letter-spacing: 0.06em; text-transform: uppercase; }
+.login-card input {
+  background: #080b12; border: 1px solid var(--line);
+  border-radius: 10px; color: var(--text);
+  padding: 12px 14px; font-size: 15px; outline: none;
+}
+.login-card input:focus { border-color: rgba(240,193,75,0.45); box-shadow: 0 0 0 3px var(--gold-dim); }
+.btn-login {
+  margin-top: 16px; border: 0; border-radius: 12px;
+  padding: 13px; font-size: 15px; font-weight: 700; cursor: pointer;
+  background: linear-gradient(180deg, #f5d06a, var(--gold));
+  color: #1a1408;
+}
+.btn-login:hover { filter: brightness(1.06); }
+.login-err { color: var(--danger); font-size: 12px; min-height: 1.2em; margin: 6px 0 0; }
+.muted { color: var(--muted); font-size: 13px; }
+
+/* —— Icons —— */
+.desk-icon {
+  position: absolute; width: 88px; text-align: center;
+  cursor: pointer; border-radius: 12px; padding: 8px 4px;
+}
+.desk-icon:hover { background: rgba(255,255,255,0.06); }
+.desk-icon .glyph {
+  width: 52px; height: 52px; margin: 0 auto 6px;
+  border-radius: 14px;
+  background: linear-gradient(145deg, #1c2436, #121820);
+  border: 1px solid var(--line2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px; box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+}
+.desk-icon .label {
+  font-size: 11px; line-height: 1.25; color: var(--text);
+  text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+  word-break: break-word;
+}
+
+/* —— Windows —— */
+.win {
+  position: absolute; min-width: 280px; min-height: 200px;
+  background: var(--panel-solid);
+  border: 1px solid var(--line2);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  display: flex; flex-direction: column; overflow: hidden;
+  z-index: 10;
+}
+.win.focused { border-color: rgba(240,193,75,0.35); box-shadow: var(--shadow), 0 0 0 1px rgba(240,193,75,0.12); }
+.win-titlebar {
+  height: 38px; display: flex; align-items: center; gap: 8px;
+  padding: 0 10px; background: linear-gradient(180deg, #1a2233, #141a28);
+  border-bottom: 1px solid var(--line); cursor: move;
+}
+.win-title { flex: 1; font-size: 12px; font-weight: 600; letter-spacing: 0.03em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.win-btn {
+  width: 28px; height: 24px; border: 0; border-radius: 6px;
+  background: transparent; color: var(--muted); cursor: pointer; font-size: 12px;
+}
+.win-btn:hover { background: rgba(255,255,255,0.08); color: var(--text); }
+.win-btn.close:hover { background: var(--danger); color: #fff; }
+.win-body { flex: 1; overflow: auto; background: #0c1018; }
+.win-body iframe { width: 100%; height: 100%; border: 0; background: #0c1018; }
+.win-resize {
+  position: absolute; right: 0; bottom: 0; width: 16px; height: 16px;
+  cursor: nwse-resize;
+}
+
+/* —— Taskbar —— */
+#taskbar {
+  height: 48px; z-index: 100;
+  display: flex; align-items: center; gap: 8px;
+  padding: 0 10px;
+  background: rgba(10, 14, 22, 0.88);
+  border-top: 1px solid var(--line);
+  backdrop-filter: blur(18px);
+}
+.start-btn {
+  width: 40px; height: 36px; border: 0; border-radius: 10px;
+  background: var(--gold-dim); color: var(--gold);
+  font-size: 18px; cursor: pointer;
+}
+.start-btn:hover { background: rgba(240,193,75,0.25); }
+.task-buttons { flex: 1; display: flex; gap: 6px; overflow-x: auto; }
+.task-btn {
+  border: 1px solid var(--line); background: rgba(255,255,255,0.04);
+  color: var(--text); border-radius: 8px; padding: 6px 12px;
+  font-size: 12px; cursor: pointer; white-space: nowrap;
+}
+.task-btn.active { border-color: rgba(240,193,75,0.4); background: var(--gold-dim); }
+.tray { display: flex; align-items: center; gap: 8px; }
+.tray-chip {
+  font-size: 11px; color: var(--muted);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--line); border-radius: 999px;
+  padding: 4px 10px;
+}
+.tray-btn { cursor: pointer; font: inherit; color: var(--muted); }
+.tray-btn:hover { color: var(--text); border-color: var(--line2); }
+.tray-clock { font-size: 12px; color: var(--text); font-variant-numeric: tabular-nums; min-width: 120px; text-align: right; }
+
+/* —— Start menu —— */
+.start-menu {
+  position: fixed; left: 10px; bottom: 56px; z-index: 200;
+  width: min(300px, 92vw); max-height: min(70vh, 520px); overflow: auto;
+  background: var(--panel); border: 1px solid var(--line2);
+  border-radius: 16px; padding: 10px; box-shadow: var(--shadow);
+  backdrop-filter: blur(20px);
+}
+.start-menu.hidden { display: none; }
+.start-brand {
+  font-size: 11px; letter-spacing: 0.12em; color: var(--gold);
+  font-weight: 700; padding: 8px 10px 6px;
+}
+.start-brand small { color: var(--muted); font-weight: 500; letter-spacing: 0.04em; }
+.start-menu button {
+  display: block; width: 100%; text-align: left;
+  background: transparent; border: 0; color: var(--text);
+  padding: 10px 12px; border-radius: 10px; cursor: pointer; font-size: 13px;
+}
+.start-menu button:hover { background: rgba(255,255,255,0.06); }
+.start-menu hr { border: 0; border-top: 1px solid var(--line); margin: 6px 4px; }
+
+/* —— In-window content helpers —— */
+.card {
+  margin: 12px; padding: 14px; border-radius: 12px;
+  background: var(--panel-solid); border: 1px solid var(--line);
+}
+.card h3 { margin: 0 0 8px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.btn, .btn-gold {
+  border: 0; border-radius: 8px; padding: 8px 12px; cursor: pointer;
+  font-size: 12px; font-weight: 600;
+  background: var(--gold); color: #1a1408;
+}
+.btn-ghost {
+  background: transparent; color: var(--muted);
+  border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; cursor: pointer;
+}
+.status-pre {
+  margin: 0; font-size: 11px; color: var(--muted);
+  white-space: pre-wrap; max-height: 220px; overflow: auto;
+}
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.ctx-menu {
+  position: fixed; z-index: 300; min-width: 150px; padding: 6px;
+  background: var(--panel-solid); border: 1px solid var(--line2);
+  border-radius: 10px; box-shadow: var(--shadow);
+}
+.ctx-menu button {
+  display: block; width: 100%; text-align: left;
+  background: transparent; border: 0; color: var(--text);
+  padding: 8px 10px; border-radius: 8px; cursor: pointer; font-size: 12px;
+}
+.ctx-menu button:hover { background: rgba(255,255,255,0.07); }
+.item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; border-radius: 8px; cursor: pointer;
+}
+.item:hover { background: rgba(255,255,255,0.05); }

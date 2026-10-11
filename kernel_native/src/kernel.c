@@ -491,8 +491,8 @@ static void draw_splash(void){
   /* marca oro */
   panel_r(cx-36,cy-90,72,72,0xFF1A2030u,C_GOLD);
   draw_text(cx-8,cy-66,"A",C_GOLD);
-  draw_text(cx-7*CW,cy, "ALSETOS",C_TEXT);
-  draw_text(cx-11*CW,cy+CH+12,"Desktop · organismos",C_MUTED);
+  draw_text(cx-9*CW,cy, "ALSETOS 2026",C_TEXT);
+  draw_text(cx-11*CW,cy+CH+12,"Shell·Surface·Orges",C_MUTED);
   /* barra carga */
   int bw=200,bx=cx-bw/2,by=cy+CH*3;
   fill_bb(bx,by,bw,3,0xFF1A2030u);

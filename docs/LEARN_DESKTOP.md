@@ -103,3 +103,32 @@ make run          # QEMU, ELF32 multiboot
 ```
 
 Cuando cambies algo, anota en un comentario `/* LEARN: ... */` encima de la función. Ese hábito te convierte en co-autor del SO, no en espectador.
+
+---
+
+## 7. Dos caminos de arranque (por qué a veces “no ves” los cambios)
+
+### A) Desktop moderno (recomendado para uso diario)
+
+```bash
+cd AlsetOS
+git pull origin main
+make desktop
+# abre http://127.0.0.1:7420/
+```
+
+Aquí el **Desktop**, **Surface** y **Compositor** son organismos (`sys:desktop`, `sys:surface`, `sys:compositor`).
+Surface es el “framebuffer a la Alset”: no es VGA bare-metal; es la superficie de presentación soberana del shell.
+
+### B) Bare-metal (`kernel_native`)
+
+```bash
+cd AlsetOS
+git pull origin main
+cd kernel_native
+make clean && make run
+```
+
+Si **no** haces `git pull` + `make clean`, QEMU seguirá el binario viejo → “sigues viendo Super Mario”.
+
+En el splash del kernel actual debe leerse **ALSETOS 2026**. Si no aparece, no estás ejecutando el commit nuevo.

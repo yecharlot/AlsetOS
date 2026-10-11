@@ -73,6 +73,37 @@ func (r *orgRegistry) upsert(o *sysOrganism) {
 }
 
 func (b *bridge) refreshSystemOrganisms() {
+	// —— Organismos del campo de escritorio (siempre presentes) ——
+	b.orgs.upsert(&sysOrganism{
+		ID: "sys:master", Kind: "system", Name: "Maestro", State: "alive",
+		Meta: map[string]any{"role": "sovereign", "ats": "001"},
+	})
+	b.orgs.upsert(&sysOrganism{
+		ID: "sys:desktop", Kind: "desktop", Name: "Desktop", State: "alive",
+		Meta: map[string]any{
+			"role": "shell",
+			"description": "Escritorio Alset: el propio campo de ventanas es un organismo",
+			"surface": "sys:surface",
+			"compositor": "sys:compositor",
+		},
+	})
+	b.orgs.upsert(&sysOrganism{
+		ID: "sys:surface", Kind: "surface", Name: "Surface", State: "alive",
+		Meta: map[string]any{
+			"role": "framebuffer-alset",
+			"description": "Superficie de presentación (alternativa soberana al FB bare-metal)",
+			"backend": "html-compositor",
+			"resolution": "host-window",
+		},
+	})
+	b.orgs.upsert(&sysOrganism{
+		ID: "sys:compositor", Kind: "compositor", Name: "Compositor", State: "alive",
+		Meta: map[string]any{
+			"role": "compose",
+			"description": "Compone iconos, ventanas y taskbar sobre Surface",
+			"desktop": "sys:desktop",
+		},
+	})
 	// volumes
 	for _, root := range []string{"/media", "/mnt", b.dataDir} {
 		if st, err := os.Stat(root); err == nil && st.IsDir() {
