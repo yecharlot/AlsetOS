@@ -1,23 +1,29 @@
-# AlsetOS Kernel nativo — Desktop por organismos
+# AlsetOS Kernel nativo — campo vivo
 
-Todo es organismo. Sin SO anfitrión.
+Todo es organismo. Sin SO anfitrión. Sin imitar Windows ni Linux.
 
 ```
-Maestro → Framebuffer → Compositor → Desktop → Orges (ventana / texto / lista / inspector)
+Maestro → Framebuffer → Compositor → Desktop → Orges
 ```
 
-## Salto de esta versión
+## Identidad visual (soberana)
 
-| Antes | Ahora |
-|-------|--------|
-| Redibujado crudo al FB | **Doble buffer** + present |
-| Fuente 8×8 ilegible | Fuente **2× (16 px)** legible |
-| Ratón limitado / errático | **Pantalla completa**, resync PS/2, aceleración leve |
-| Sin z-order | **Pila z-order** y foco |
-| UI mínima | **Top bar + dock + menú + sombras + gradiente** |
-| Sin inspector | **Inspector OCB** de la red de organismos |
+- Fondo en degradado profundo + **orbe de presencia** (no rejilla tipo juego).
+- **Dock flotante** centrado (no barra de sistema clásica).
+- Ventanas con borde fino y **línea de acento** solo en foco.
+- Top bar mínima: marca AlsetOS · campo vivo + contadores de organismos/pulsos.
 
-## Arranque (QEMU)
+## Rendimiento del ratón
+
+El movimiento del cursor **ya no redibuja toda la escena**.
+
+1. La escena se guarda en un buffer `scene`.
+2. Al mover el ratón solo se restaura el rectángulo del cursor y se pinta el nuevo.
+3. La escena completa se recalcula solo en click, arrastre o cambio de UI.
+
+Eso es lo que quita la sensación de “emulador de los 80 lento”.
+
+## Arranque
 
 ```bash
 mkdir -p "$HOME/tmp" && export TMPDIR="$HOME/tmp"
@@ -25,28 +31,19 @@ cd kernel_native
 make run
 ```
 
-`make run` usa **ARCH=32** porque `qemu -kernel` solo carga ELF multiboot 32-bit.
-
-Kernel **x86_64** long mode:
-
-```bash
-sudo apt install -y grub-pc-bin grub-common xorriso
-make run64
-```
+`make run` = ELF32 multiboot (QEMU `-kernel`).  
+`make run64` = long mode vía ISO/GRUB.
 
 ## Controles
 
 | Entrada | Acción |
 |---------|--------|
-| Ratón | Foco, arrastre por barra de título, cerrar (rojo), minimizar (ámbar) |
-| Dock | Menu / Win / Text / List / Insp |
-| **M** | Menú crear organismo |
-| **1–4** | Ventana / Texto / Lista / Inspector |
-| **Enter** | Pulso Desktop → ventana en foco |
+| Ratón | Foco, arrastre, cerrar (rojo), minimizar (ámbar) |
+| Dock flotante | `+` menú · W ventana · T texto · L lista · I inspector |
+| **M** / **1–4** | Menú y crear organismos |
+| **Enter** | Pulso Desktop → foco |
 | **Tab** | Siguiente ventana |
-| Flechas | Mover ventana o navegar lista |
-| Texto | Escribir en editor con cursor |
 
-## Filosofía
+## Manifiesto
 
-No hay “procesos de Windows”. Cada ventana, el compositor, el framebuffer y el desktop son **organismos (OCB)** con capacidades y pulsos. El salto visual no rompe ese contrato.
+No hay procesos de escritorio ajenos: cada superficie es un **OCB** con capacidades y pulsos. La belleza y la fluidez se construyen **dentro** de esa regla, no por encima de ella.

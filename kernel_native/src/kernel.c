@@ -98,6 +98,8 @@ static u32 *fb;
 static u32 fb_w, fb_h, fb_pitch;
 static int fb_ok;
 static u32 backbuf[FB_MAX_W * FB_MAX_H];
+static u32 scene[FB_MAX_W * FB_MAX_H];
+static int cur_ox=-1,cur_oy=-1,scene_valid=0;
 static int mouse_x = 100, mouse_y = 100;
 static u8 mouse_btn, mouse_cycle, mouse_pkt[3];
 static int drag_win = -1, drag_ox, drag_oy, menu_open, orges_seq;
@@ -301,46 +303,71 @@ static void crear_from_dock(int kind_idx){
 }
 
 static void draw_wallpaper(void){
+  /* fondo soberano: degradado vertical suave + orbe de presencia (sin rejilla tipo juego) */
   for(u32 y=0;y<fb_h;y++){
     u32 t=(y*255)/(fb_h?fb_h:1);
-    u32 r=7+(t*8)/255,g=11+(t*18)/255,b=20+(t*30)/255;
+    /* de medianoche a azul profundo Prism */
+    u32 r=6+(t*10)/255;
+    u32 g=10+(t*22)/255;
+    u32 b=18+(t*42)/255;
     u32 c=0xFF000000u|(r<<16)|(g<<8)|b;
     u32 *row=bb()+y*fb_w;
-    for(u32 x=0;x<fb_w;x++){
-      if((x%64)==0||(y%64)==0)row[x]=0xFF000000u|((r+4)<<16)|((g+6)<<8)|(b+8);
-      else row[x]=c;
-    }
+    for(u32 x=0;x<fb_w;x++) row[x]=c;
   }
-  int cx=(int)fb_w-120,cy=100,rad=70;
-  for(int dy=-rad;dy<=rad;dy++)for(int dx=-rad;dx<=rad;dx++){
-    int d2=dx*dx+dy*dy;if(d2>rad*rad)continue;
-    u32 a=(u32)(rad*rad-d2)*40/(u32)(rad*rad);
-    int px=cx+dx,py=cy+dy;if(px<0||py<0||(u32)px>=fb_w||(u32)py>=fb_h)continue;
-    u32 *p=bb()+(u32)py*fb_w+(u32)px;u32 d=*p;
-    u32 r=((d>>16)&0xFF)+a,g=((d>>8)&0xFF)+a*2,b=(d&0xFF)+a;
-    if(r>255)r=255;if(g>255)g=255;if(b>255)b=255;
-    *p=0xFF000000u|(r<<16)|(g<<8)|b;
+  /* orbe de identidad (presencia del organismo Desktop) */
+  int cx=(int)fb_w*2/3, cy=(int)fb_h/3, rad=(int)(fb_h/4);
+  if(rad<40) rad=40;
+  for(int dy=-rad;dy<=rad;dy++){
+    for(int dx=-rad;dx<=rad;dx++){
+      int d2=dx*dx+dy*dy; if(d2>rad*rad) continue;
+      u32 a=(u32)(rad*rad-d2)*28/(u32)(rad*rad+1);
+      int px=cx+dx, py=cy+dy;
+      if(px<0||py<0||(u32)px>=fb_w||(u32)py>=fb_h) continue;
+      u32 *p=bb()+(u32)py*fb_w+(u32)px; u32 d=*p;
+      u32 r=((d>>16)&0xFF)+a/2;
+      u32 g=((d>>8)&0xFF)+a;
+      u32 b=(d&0xFF)+a+8;
+      if(r>40)r=40; if(g>60)g=60; if(b>90)b=90;
+      /* tono esmeralda Alset */
+      g+=a/3; if(g>80)g=80;
+      *p=0xFF000000u|(r<<16)|(g<<8)|b;
+    }
   }
 }
 static void draw_topbar(void){
-  fill_bb(0,0,(int)fb_w,TOP_H,C_TOP);fill_bb(0,TOP_H-1,(int)fb_w,1,C_BORDER);
-  fill_bb(12,8,16,16,C_ACCENT);fill_bb(14,10,12,12,C_TOP);put_bb(18,14,C_ACCENT);
-  draw_text(36,8,"AlsetOS",C_TEXT);draw_text(36+8*CW,8,"Desktop",C_DIM);
-  char buf[48];int n=0;buf[n++]='O';buf[n++]=':';
-  int alive=0;for(int i=0;i<n_ocb;i++)if(ocbs[i].alive)alive++;
-  if(alive>=10){buf[n++]=(char)('0'+alive/10);buf[n++]=(char)('0'+alive%10);}else buf[n++]=(char)('0'+alive);
-  buf[n++]=' ';buf[n++]='P';buf[n++]=':';
-  if(n_pulso>=10){buf[n++]=(char)('0'+(n_pulso/10)%10);buf[n++]=(char)('0'+n_pulso%10);}else buf[n++]=(char)('0'+n_pulso);
-  buf[n]=0;draw_text((int)fb_w-12-n*CW,8,buf,C_DIM);
+  fill_bb(0,0,(int)fb_w,TOP_H,C_TOP);
+  fill_bb(0,TOP_H-1,(int)fb_w,1,0xFF1E2A40u);
+  /* marca organismo */
+  fill_bb(14,9,14,14,C_ACCENT);
+  fill_bb(16,11,10,10,0xFF0C1828u);
+  put_bb(19,14,C_ACCENT); put_bb(20,14,C_ACCENT);
+  draw_text(36,8,"AlsetOS",C_TEXT);
+  draw_text(36+7*CW+4,8,"· campo vivo",C_MUTED);
+  char buf[48]; int n=0;
+  int alive=0; for(int i=0;i<n_ocb;i++) if(ocbs[i].alive) alive++;
+  buf[n++]='o'; buf[n++]='r'; buf[n++]='g'; buf[n++]=':';
+  if(alive>=10){buf[n++]=(char)('0'+alive/10);buf[n++]=(char)('0'+alive%10);} else buf[n++]=(char)('0'+alive);
+  buf[n++]=' '; buf[n++]='p'; buf[n++]=':';
+  if(n_pulso>=10){buf[n++]=(char)('0'+(n_pulso/10)%10);buf[n++]=(char)('0'+n_pulso%10);} else buf[n++]=(char)('0'+n_pulso);
+  buf[n]=0;
+  draw_text((int)fb_w-12-n*CW,8,buf,C_DIM);
 }
 static void draw_dock(void){
-  int y=(int)fb_h-DOCK_H;fill_bb(0,y,(int)fb_w,DOCK_H,C_DOCK);fill_bb(0,y,(int)fb_w,1,C_BORDER);
-  const char *labels[]={"Menu","Win","Text","List","Insp"};
-  int nlab=5,slot=72,start=((int)fb_w-nlab*slot)/2;if(start<8)start=8;
+  /* dock flotante centrado — no barra de SO clásico */
+  const char *labels[]={"+","W","T","L","I"};
+  int nlab=5, slot=56, dw=nlab*slot+24, dh=48;
+  int dx=((int)fb_w-dw)/2, dy=(int)fb_h-dh-14;
+  if(dx<8) dx=8;
+  blend_bb(dx+3,dy+4,dw,dh,C_SHADOW);
+  round_panel(dx,dy,dw,dh,C_DOCK,C_BORDER);
+  /* linea de acento superior del dock */
+  fill_bb(dx+16,dy+1,dw-32,2,C_ACCENT);
   for(int i=0;i<nlab;i++){
-    int bx=start+i*slot,by=y+8;
-    round_panel(bx,by,56,36,C_ICON_BG,menu_open&&i==0?C_ACCENT:C_BORDER);
-    draw_text(bx+6,by+10,labels[i],i==0&&menu_open?C_ACCENT:C_TEXT);
+    int bx=dx+12+i*slot, by=dy+8;
+    u32 bg=C_ICON_BG, bd=C_BORDER;
+    if(menu_open && i==0){ bg=0xFF1A3A32u; bd=C_ACCENT; }
+    round_panel(bx,by,44,32,bg,bd);
+    draw_text(bx+14,by+8,labels[i], (menu_open&&i==0)?C_ACCENT:C_TEXT);
   }
 }
 static void draw_menu(void){
@@ -359,7 +386,7 @@ static void draw_window_body(int i){
   struct OCB *o=&ocbs[i];int x=o->x,y=o->y,w=o->w,h=o->h;
   blend_bb(x+6,y+8,w,h,C_SHADOW);
   u32 tb=o->focused?C_TITLE_F:C_TITLE;u32 bd=o->focused?C_ACCENT:C_BORDER;
-  round_panel(x,y,w,h,C_WIN,bd);fill_bb(x+1,y+1,w-2,TITLE_H,tb);fill_bb(x+1,y+TITLE_H,w-2,1,bd);
+  round_panel(x,y,w,h,C_WIN,bd);fill_bb(x+1,y+1,w-2,TITLE_H,tb);fill_bb(x+1,y+TITLE_H,w-2,1,o->focused?C_ACCENT:0xFF243044u);
   fill_bb(x+w-22,y+8,12,12,C_DANGER);fill_bb(x+w-40,y+8,12,12,C_WARN);fill_bb(x+w-58,y+8,12,12,C_ACCENT);
   draw_text_clip(x+10,y+6,o->titulo[0]?o->titulo:o->nombre,C_TEXT,w-70);
   int cy=y+TITLE_H+8,cx=x+12,cw=w-24;
@@ -395,19 +422,63 @@ static void draw_window_body(int i){
     fill_bb(ox+50,oy+14,30,4,C_ACCENT2);fill_bb(ox+90,oy,40,40,C_PANEL2);rect_bb(ox+90,oy,40,40,C_ACCENT2);
   }
 }
-static void draw_cursor(void){
-  int x=mouse_x,y=mouse_y;
-  for(int i=0;i<16;i++){put_bb(x,y+i,C_CURSOR);if(i<10)put_bb(x+i,y+i,C_CURSOR);}
-  for(int i=0;i<8;i++)put_bb(x+1,y+1+i,C_ACCENT);
-  rect_bb(x-2,y-2,6,6,C_ACCENT2);
+static void scene_store(void){
+  u32 n=fb_w*fb_h;
+  for(u32 i=0;i<n;i++) scene[i]=backbuf[i];
+  scene_valid=1;
+}
+static void scene_restore_rect(int x,int y,int w,int h){
+  if(!scene_valid||!fb_ok) return;
+  if(x<0){w+=x;x=0;} if(y<0){h+=y;y=0;}
+  if((u32)(x+w)>fb_w) w=(int)fb_w-x;
+  if((u32)(y+h)>fb_h) h=(int)fb_h-y;
+  for(int yy=0;yy<h;yy++){
+    u32 *s=scene+(u32)(y+yy)*fb_w+(u32)x;
+    u32 *d=(u32*)((u8*)fb+(u32)(y+yy)*fb_pitch)+x;
+    for(int xx=0;xx<w;xx++) d[xx]=s[xx];
+  }
+}
+static void cursor_draw_on_fb(int x,int y){
+  /* puntero fino soberano (no flecha de juego arcade) */
+  for(int i=0;i<14;i++){
+    if(x>=0&&y+i>=0&&(u32)x<fb_w&&(u32)(y+i)<fb_h)
+      ((u32*)((u8*)fb+(u32)(y+i)*fb_pitch))[x]=C_CURSOR;
+  }
+  for(int i=0;i<10;i++){
+    int px=x+i, py=y+i;
+    if(px>=0&&py>=0&&(u32)px<fb_w&&(u32)py<fb_h)
+      ((u32*)((u8*)fb+(u32)py*fb_pitch))[px]=C_CURSOR;
+  }
+  for(int i=1;i<8;i++){
+    int px=x+1, py=y+i;
+    if(px>=0&&py>=0&&(u32)px<fb_w&&(u32)py<fb_h)
+      ((u32*)((u8*)fb+(u32)py*fb_pitch))[px]=C_ACCENT;
+  }
+}
+static void cursor_move_fast(int nx,int ny){
+  /* solo restaura y repinta cursor: el raton deja de forzar escena completa */
+  if(scene_valid && cur_ox>=0)
+    scene_restore_rect(cur_ox-2,cur_oy-2,20,20);
+  cursor_draw_on_fb(nx,ny);
+  cur_ox=nx; cur_oy=ny;
 }
 static void compositor_tick(void){
-  if(!fb_ok)return;frame_tick++;
-  draw_wallpaper();draw_topbar();
-  for(int zi=0;zi<n_z;zi++){int i=z_order[zi];if(ocbs[i].alive&&ocbs[i].visible&&!ocbs[i].minimized)draw_window_body(i);}
-  draw_dock();draw_menu();draw_cursor();present();
+  if(!fb_ok) return;
+  frame_tick++;
+  draw_wallpaper();
+  draw_topbar();
+  for(int zi=0;zi<n_z;zi++){
+    int i=z_order[zi];
+    if(ocbs[i].alive&&ocbs[i].visible&&!ocbs[i].minimized)
+      draw_window_body(i);
+  }
+  draw_dock();
+  draw_menu();
+  scene_store();
+  present();
+  cursor_draw_on_fb(mouse_x,mouse_y);
+  cur_ox=mouse_x; cur_oy=mouse_y;
 }
-
 static void mouse_wait(u8 type){
   for(int i=0;i<100000;i++){
     if(type==1&&(inb(0x64)&1))return;
@@ -434,12 +505,13 @@ static void mouse_feed(u8 sc){
   if((u32)mouse_x>=fb_w)mouse_x=(int)fb_w-1;if((u32)mouse_y>=fb_h)mouse_y=(int)fb_h-1;
   u8 prev=mouse_btn;mouse_btn=b0&0x07;
   if((mouse_btn&1)&&!(prev&1)){
-    int dock_y=(int)fb_h-DOCK_H;
-    if(mouse_y>=dock_y){
-      int slot=72,nlab=5,start=((int)fb_w-nlab*slot)/2;if(start<8)start=8;
-      int idx=(mouse_x-start)/slot;
-      if(idx==0)menu_open=!menu_open;
-      else if(idx>=1&&idx<=4)crear_from_dock(idx-1);
+    int slot=56,nlab=5,dw=nlab*slot+24,dh=48;
+    int ddx=((int)fb_w-dw)/2, ddy=(int)fb_h-dh-14;
+    if(ddx<8) ddx=8;
+    if(mouse_y>=ddy&&mouse_y<ddy+dh&&mouse_x>=ddx&&mouse_x<ddx+dw){
+      int idx=(mouse_x-(ddx+12))/slot;
+      if(idx==0) menu_open=!menu_open;
+      else if(idx>=1&&idx<=4) crear_from_dock(idx-1);
     }else{
       int hi=hit_win(mouse_x,mouse_y);
       if(hi>=0){
@@ -455,14 +527,18 @@ static void mouse_feed(u8 sc){
     }
   }
   if(!(mouse_btn&1))drag_win=-1;
+  int need_scene=0;
   if(drag_win>=0&&ocbs[drag_win].alive){
     ocbs[drag_win].x=mouse_x-drag_ox;ocbs[drag_win].y=mouse_y-drag_oy;
     if(ocbs[drag_win].y<TOP_H)ocbs[drag_win].y=TOP_H;
     if(ocbs[drag_win].y>(int)fb_h-DOCK_H-40)ocbs[drag_win].y=(int)fb_h-DOCK_H-40;
     if(ocbs[drag_win].x<0)ocbs[drag_win].x=0;
     if(ocbs[drag_win].x>(int)fb_w-40)ocbs[drag_win].x=(int)fb_w-40;
+    need_scene=1;
   }
-  compositor_tick();
+  if((mouse_btn&1)!=(prev&1)) need_scene=1;
+  if(need_scene) compositor_tick();
+  else cursor_move_fast(mouse_x,mouse_y);
 }
 
 static char sc_ascii(u8 sc){
