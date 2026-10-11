@@ -1,8 +1,10 @@
 package main
 
 import (
+	"embed"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -11,6 +13,10 @@ import (
 
 	"github.com/yecharlot/AlsetOS/declarativo"
 )
+
+//go:embed all:web
+var embeddedStudio embed.FS
+
 
 // appInstance — cada app desplegada tiene su propio Runtime (no se pisan).
 type appInstance struct {
@@ -180,7 +186,18 @@ func cmdStudio(args []string) {
 	}
 
 	mux := http.NewServeMux()
-	mux.Handle("/", http.FileServer(http.Dir(studioDir)))
+	// Studio UI: directorio local si existe; si no, embebido (exe Windows portable)
+	if st, err := os.Stat(studioDir); err == nil && st.IsDir() {
+		mux.Handle("/", http.FileServer(http.Dir(studioDir)))
+	} else {
+		sub, err := fs.Sub(embeddedStudio, "web")
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "embed studio:", err)
+			os.Exit(1)
+		}
+		mux.Handle("/", http.FileServer(http.FS(sub)))
+		fmt.Fprintln(os.Stderr, "  UI: embebida en el ejecutable")
+	}
 	mux.Handle("/apps/", http.StripPrefix("/apps/", http.FileServer(http.Dir(appsDir))))
 
 	mux.HandleFunc("/api/help", func(w http.ResponseWriter, r *http.Request) {
@@ -282,6 +299,10 @@ func cmdStudio(args []string) {
 		_ = rt.Persist()
 		// Persist source for cold restart
 		_ = os.WriteFile(filepath.Join(dir, "source.aos"), []byte(body.Source), 0o644)
+		if body.Layouts != nil {
+			lb, _ := json.MarshalIndent(body.Layouts, "", "  ")
+			_ = os.WriteFile(filepath.Join(dir, "layout.json"), lb, 0o644)
+		}
 		writeJSON(w, map[string]interface{}{
 			"ok": true, "app": flow.Name, "out": dir,
 			"url": "/apps/" + flow.Name + "/", "production": true,
@@ -364,10 +385,11 @@ func sanitizeApp(s string) string {
 }
 
 type reqBody struct {
-	Source     string `json:"source"`
-	App        string `json:"app"`
-	Emit       string `json:"emit"`
-	Production bool   `json:"production"`
+	Source     string                 `json:"source"`
+	App        string                 `json:"app"`
+	Emit       string                 `json:"emit"`
+	Production bool                   `json:"production"`
+	Layouts    map[string]interface{} `json:"layouts"`
 }
 
 func readBody(r *http.Request) reqBody {

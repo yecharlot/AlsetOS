@@ -70,7 +70,6 @@ func previewHTML(app, device, uiJSON, surface string) string {
 :root{--bg:#0f1419;--card:#1a2332;--ink:#e8eef8;--accent:#F4B400;--muted:#8b9bb4}
 *{box-sizing:border-box}
 body{margin:0;background:#070b12;color:var(--ink);font-family:system-ui,sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center}
-header{padding:.75rem;color:var(--muted);font-size:.8rem}
 .frame{width:%s;max-width:100%%;min-height:60vh;background:var(--bg);border:1px solid #243044;border-radius:12px;padding:1rem;margin:0 0.5rem 1rem}
 .row{display:flex;gap:.5rem;flex-wrap:wrap}
 .col{display:flex;flex-direction:column;gap:.5rem}
@@ -78,7 +77,6 @@ button{background:var(--accent);border:0;padding:.5rem .75rem;border-radius:8px;
 .badge{display:inline-block;background:var(--card);padding:.35rem .6rem;border-radius:999px;border:1px solid #243044}
 label{color:var(--muted)}
 </style></head><body>
-<header>%s · preview <strong>%s</strong> · surface %s</header>
 <div class="frame" id="root"></div>
 <script>
 const SURFACES = %s;
@@ -96,7 +94,7 @@ function render(n){
 }
 const tree = SURFACES[SURFACE] || Object.values(SURFACES)[0];
 document.getElementById('root').appendChild(render(tree));
-</script></body></html>`, app, device, w, app, device, surface, uiJSON, surface)
+</script></body></html>`, app, device, w, uiJSON, surface)
 }
 
 // RunFlowTests evalúa aserciones simples sobre estado reactivo.

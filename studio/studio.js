@@ -448,5 +448,159 @@ ${body}
     }catch(e){}
   }
   refreshApps();
+  
+
+  // --- Editor visual en preview (adaptar a mobile/tablet/desktop) ---
+  let editMode = false;
+  const layoutStore = JSON.parse(localStorage.getItem('alset.orges.layouts')||'{}');
+  function layoutKey(){ return (sessionApp||appName.value||'app')+'::'+deviceMode; }
+  function saveLayouts(){ localStorage.setItem('alset.orges.layouts', JSON.stringify(layoutStore)); }
+
+  // botón en top si existe, o crear
+  (function(){
+    let b = document.getElementById('btn-edit-layout');
+    if(!b){
+      b = document.createElement('button');
+      b.type='button'; b.id='btn-edit-layout'; b.className='btn btn-ghost';
+      b.textContent='Editar layout';
+      const top = document.getElementById('topbar');
+      if(top) top.appendChild(b);
+    }
+    b.onclick = ()=>{
+      editMode = !editMode;
+      b.classList.toggle('active', editMode);
+      b.textContent = editMode ? 'Layout ON' : 'Editar layout';
+      log(editMode ? 'Modo edición: arrastra y redimensiona elementos en el preview' : 'Modo edición off');
+      paint(surfaces[surfaceOID]||Object.values(surfaces)[0]);
+    };
+  })();
+
+  function applyLayout(el, path){
+    const L = (layoutStore[layoutKey()]||{})[path];
+    if(!L) return;
+    el.style.position = 'absolute';
+    if(L.left!=null) el.style.left = L.left+'px';
+    if(L.top!=null) el.style.top = L.top+'px';
+    if(L.width!=null) el.style.width = L.width+'px';
+    if(L.height!=null) el.style.height = L.height+'px';
+  }
+
+  function makeEditable(el, path){
+    if(!editMode) return;
+    el.dataset.path = path;
+    el.style.outline = '1px dashed rgba(244,180,0,.45)';
+    el.style.cursor = 'move';
+    el.style.position = el.style.position || 'relative';
+    const handle = document.createElement('div');
+    handle.style.cssText = 'position:absolute;right:0;bottom:0;width:12px;height:12px;background:#f4b400;cursor:nwse-resize;z-index:5';
+    el.style.minHeight = '24px';
+    if(getComputedStyle(el).position==='static') el.style.position='relative';
+    el.appendChild(handle);
+    applyLayout(el, path);
+
+    let mode=null, sx, sy, sl, st, sw, sh;
+    el.addEventListener('mousedown', (ev)=>{
+      if(ev.target===handle) mode='resize'; else mode='drag';
+      ev.preventDefault(); ev.stopPropagation();
+      const r = el.getBoundingClientRect();
+      const pr = previewRoot.getBoundingClientRect();
+      sx=ev.clientX; sy=ev.clientY;
+      sl=r.left-pr.left; st=r.top-pr.top; sw=r.width; sh=r.height;
+      el.style.position='absolute';
+      el.style.left=sl+'px'; el.style.top=st+'px';
+      const move=(e)=>{
+        if(mode==='drag'){
+          el.style.left=(sl+e.clientX-sx)+'px';
+          el.style.top=(st+e.clientY-sy)+'px';
+        } else {
+          el.style.width=Math.max(40, sw+e.clientX-sx)+'px';
+          el.style.height=Math.max(24, sh+e.clientY-sy)+'px';
+        }
+      };
+      const up=()=>{
+        window.removeEventListener('mousemove', move);
+        window.removeEventListener('mouseup', up);
+        const key=layoutKey();
+        layoutStore[key]=layoutStore[key]||{};
+        layoutStore[key][path]={
+          left: parseFloat(el.style.left)||0,
+          top: parseFloat(el.style.top)||0,
+          width: parseFloat(el.style.width)||el.offsetWidth,
+          height: parseFloat(el.style.height)||el.offsetHeight
+        };
+        saveLayouts();
+        log('layout '+deviceMode+' · '+path);
+      };
+      window.addEventListener('mousemove', move);
+      window.addEventListener('mouseup', up);
+    });
+  }
+
+  // Patch paint/render to attach paths — replace paint function body usage
+  const _paint = paint;
+  paint = function(tree){
+    previewRoot.innerHTML='';
+    previewRoot.style.position='relative';
+    previewRoot.style.minHeight='200px';
+    if(!tree){ previewRoot.innerHTML='<p class="muted">Sin UI</p>'; return; }
+    const rootEl = renderEditable(tree, '0');
+    previewRoot.appendChild(rootEl);
+  };
+
+  function renderEditable(n, path){
+    if(!n) return document.createTextNode('');
+    const t=(n.type||'').toLowerCase();
+    let el;
+    if(t==='column'||t==='panel'){ el=document.createElement('div'); el.className='col'; (n.kids||[]).forEach((k,i)=>el.appendChild(renderEditable(k, path+'.'+i))); }
+    else if(t==='row'){ el=document.createElement('div'); el.className='row'; (n.kids||[]).forEach((k,i)=>el.appendChild(renderEditable(k, path+'.'+i))); }
+    else if(t==='label'){ el=document.createElement('div'); el.textContent=n.text||''; }
+    else if(t==='badge'){ el=document.createElement('span'); el.className='badge-ui'; el.textContent=val(n.bind); }
+    else if(t==='button'){
+      el=document.createElement('button'); el.textContent=n.text||'OK';
+      el.onclick=async (ev)=>{
+        if(editMode){ ev.preventDefault(); return; }
+        const emit=n.emit||''; log('emit '+emit);
+        const res=await api('/api/flow/action',{emit, app: sessionApp||appName.value});
+        if(res.state){ liveState=res.state; stateView.textContent=JSON.stringify(liveState,null,2); }
+        if(res.ok===false) log(res.error||'fail', true);
+        paint(surfaces[surfaceOID]||Object.values(surfaces)[0]);
+      };
+    }
+    else if(t==='splash'){ el=document.createElement('div'); el.innerHTML='<strong>'+(n.text||'Splash')+'</strong>'; el.style.padding='12px'; }
+    else if(t==='blob'){ el=document.createElement('div'); el.style.cssText='width:64px;height:64px;border-radius:40%;background:linear-gradient(135deg,#f4b400,#5b9cf5)'; }
+    else if(t==='gradient'){ el=document.createElement('div'); el.textContent=n.text||''; el.style.cssText='padding:12px;border-radius:10px;background:linear-gradient(135deg,#1a2332,#3d2a5a)'; }
+    else if(t==='image'){ el=document.createElement('img'); el.src=n.src||''; el.style.maxWidth='100%'; }
+    else if(t==='qr'){ el=document.createElement('code'); el.textContent=val(n.bind)||n.text||'QR'; }
+    else if(t==='file'){ el=document.createElement('input'); el.type='file'; }
+    else if(t==='doclist'){ el=document.createElement('ul'); String(val(n.bind)).split('|').filter(Boolean).forEach(x=>{ const li=document.createElement('li'); li.textContent=x; el.appendChild(li); }); }
+    else if(t==='drawer'||t==='tabs'||t==='top-tabs'||t==='bottom-tabs'||t==='stack'){
+      el=document.createElement('div'); el.className='col';
+      const lab=document.createElement('div'); lab.className='muted'; lab.textContent=t+(n.text?': '+n.text:''); el.appendChild(lab);
+      (n.kids||[]).forEach((k,i)=>el.appendChild(renderEditable(k, path+'.'+i)));
+    }
+    else if(t==='tab'){ el=document.createElement('div'); el.textContent='Tab '+(n.text||''); (n.kids||[]).forEach((k,i)=>el.appendChild(renderEditable(k, path+'.'+i))); }
+    else if(t==='field'){ el=document.createElement('input'); el.className='rt-input'; el.placeholder=n.text||''; }
+    else { el=document.createElement('div'); el.textContent=n.type||''; }
+    if(el && el.nodeType===1) makeEditable(el, path);
+    return el;
+  }
+
+  // include layouts on deploy
+  const _deployBtn = document.getElementById('btn-deploy');
+  if(_deployBtn){
+    const prev = _deployBtn.onclick;
+    _deployBtn.onclick = async ()=>{
+      const name=appName.value.trim()||'mi-app';
+      let src=aos.value.replace(/\(flow\s+[^\s)]+/, '(flow '+name);
+      const layouts = {};
+      Object.keys(layoutStore).forEach(k=>{ if(k.startsWith(name+'::') || k.startsWith(sessionApp+'::')) layouts[k]=layoutStore[k]; });
+      log('Deploy producción instancia '+name+'…');
+      const res=await api('/api/flow/deploy',{source:src, app:name, production:true, layouts});
+      if(res.error){ log(res.error,true); return; }
+      log('Aislada: '+res.app+' → '+res.url);
+      sessionApp=res.app; refreshApps();
+    };
+  }
+
   log('Studio multi-instancia · ' + Object.keys(EXAMPLES).length + ' plantillas · paneles redimensionables');
 })();

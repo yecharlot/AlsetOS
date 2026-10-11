@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+  <title>Alset Studio · ORGES</title>
+  <link rel="stylesheet" href="studio.css"/>
+</head>
+<body class="studio-full">
+  <header class="top" id="topbar">
+    <div class="brand">ALSET STUDIO <small>ORGES · LISPAI-AOS · PWA</small></div>
+    <input id="app-name" class="name-input" value="mi-app" title="Nombre de la app (deploy)"/>
+    <span id="status" class="badge">listo</span>
+    <div class="spacer"></div>
+    <div class="panel-toggles">
+      <button type="button" class="btn btn-ghost panel-tog active" data-panel="left">Toolbox</button>
+      <button type="button" class="btn btn-ghost panel-tog active" data-panel="right">Propiedades</button>
+      <button type="button" class="btn btn-ghost panel-tog active" data-panel="bottom">Consola</button>
+      <button type="button" class="btn btn-ghost panel-tog active" data-panel="preview">Preview</button>
+    </div>
+    <button type="button" class="btn btn-ghost" id="btn-help">Ayuda</button>
+    <button type="button" class="btn btn-ghost" id="btn-examples">Ejemplos</button>
+    <button type="button" class="btn btn-blue" id="btn-apply">Aplicar flow</button>
+    <button type="button" class="btn btn-blue" id="btn-test">Probar</button>
+    <button type="button" class="btn btn-ghost" id="btn-run-preview">Correr preview</button>
+    <button type="button" class="btn btn-gold" id="btn-deploy">Desplegar producción</button>
+  </header>
+
+  <div id="error-box" class="error-box hidden" role="alert"></div>
+
+  <aside id="help-drawer" class="drawer hidden">
+    <div class="drawer-head"><strong>Ayuda · Alset Studio ORGES</strong>
+      <button type="button" class="btn btn-ghost" id="btn-close-help">Cerrar</button></div>
+    <div class="drawer-body">
+      <p><b>Objetivo:</b> definir organismos (ORGES) en LISPAI-AOS, unirlos como LEGO, probarlos y desplegarlos listos para producción.</p>
+      <ol>
+        <li>Arrastra componentes del <b>Toolbox</b> al canvas o edita el <code>.aos</code>.</li>
+        <li><b>Aplicar flow</b> carga el runtime (contratos, estado, reglas).</li>
+        <li><b>Correr preview</b> monta la UI-orge; los botones ejecutan acciones reales (<code>stock.inc</code>, <code>venta.registrar</code>…).</li>
+        <li><b>Probar</b> ejecuta los <code>(test …)</code> del flow.</li>
+        <li><b>Desplegar producción</b> escribe <code>/apps/&lt;nombre&gt;/</code> servida por este Studio (PWA lista).</li>
+      </ol>
+      <h4>Emits con funcionalidad real</h4>
+      <ul>
+        <li><code>stock.inc</code> / <code>stock.dec</code> — suman/restan <code>stock.unidades</code></li>
+        <li><code>venta.registrar</code> — descuenta stock y marca venta</li>
+        <li><code>campo=valor</code> — escribe átomo de estado</li>
+      </ul>
+      <h4>Formas LISPAI-AOS</h4>
+      <p><code>flow orge provides requires bind state rule ui assemble surface test deploy</code></p>
+    </div>
+  </aside>
+
+  <aside id="examples-drawer" class="drawer hidden">
+    <div class="drawer-head"><strong>Ejemplos</strong>
+      <button type="button" class="btn btn-ghost" id="btn-close-examples">Cerrar</button></div>
+    <div class="drawer-body" id="examples-list"></div>
+  </aside>
+
+  <div class="workbench" id="workbench">
+    <aside class="pane pane-left" id="pane-left">
+      <div class="pane-head"><span>Toolbox</span>
+        <button type="button" class="icon-btn" data-close="left">×</button></div>
+      <div class="pane-body">
+        <h3>ORGES / flow</h3>
+        <div class="toolbox" id="toolbox-orges"></div>
+        <h3>UI (arrastrables)</h3>
+        <div class="toolbox" id="toolbox-ui"></div>
+        <h3>Acciones (emit)</h3>
+        <div class="toolbox" id="toolbox-actions"></div>
+        <h3>Plantillas</h3>
+        <div class="toolbox" id="toolbox-templates"></div>
+      </div>
+    </aside>
+    <div class="splitter v" data-split="left"></div>
+
+    <section class="pane pane-center" id="pane-center">
+      <div class="pane-head">
+        <span>Canvas · flow</span>
+        <div class="device-tabs">
+          <button type="button" class="btn btn-ghost dev on" data-dev="mobile">Mobile</button>
+          <button type="button" class="btn btn-ghost dev" data-dev="tablet">Tablet</button>
+          <button type="button" class="btn btn-ghost dev" data-dev="desktop">Desktop</button>
+        </div>
+      </div>
+      <div class="pane-body center-body">
+        <div id="canvas" class="canvas" title="Suelta piezas LEGO aquí"></div>
+        <label class="muted">Fuente LISPAI-AOS</label>
+        <textarea id="aos" spellcheck="false"></textarea>
+      </div>
+    </section>
+    <div class="splitter v" data-split="right"></div>
+
+    <aside class="pane pane-right" id="pane-right">
+      <div class="pane-head"><span>Propiedades · lógica</span>
+        <button type="button" class="icon-btn" data-close="right">×</button></div>
+      <div class="pane-body">
+        <div class="field-row"><label>Seleccionado</label>
+          <input id="prop-sel" class="rt-input" readonly placeholder="—"/></div>
+        <div class="field-row"><label>Emit / acción</label>
+          <input id="prop-emit" class="rt-input" placeholder="stock.inc"/></div>
+        <div class="field-row"><label>Bind estado</label>
+          <input id="prop-bind" class="rt-input" placeholder="stock.unidades"/></div>
+        <button type="button" class="btn btn-blue" id="btn-apply-prop" style="width:100%;margin-top:8px">Aplicar al .aos</button>
+        <h3>Estado vivo</h3>
+        <pre id="state-view" class="state-view">{}</pre>
+        <h3>Apps en producción</h3>
+        <div id="apps-list" class="apps-list"></div>
+      </div>
+    </aside>
+  </div>
+
+  <div class="splitter h" data-split="bottom"></div>
+  <section class="pane pane-bottom" id="pane-bottom">
+    <div class="pane-head"><span>Consola</span>
+      <button type="button" class="icon-btn" data-close="bottom">×</button></div>
+    <pre id="console" class="console"></pre>
+  </section>
+
+  <section class="pane pane-preview" id="pane-preview">
+    <div class="pane-head"><span>Preview · <span id="devLabel">mobile</span></span>
+      <button type="button" class="icon-btn" data-close="preview">×</button></div>
+    <div class="preview-stage">
+      <div id="device" class="device mobile"><div id="previewRoot"></div></div>
+    </div>
+  </section>
+
+  <script src="studio.js"></script>
+</body>
+</html>

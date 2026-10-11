@@ -58,8 +58,8 @@ func productionAppHTML(app, surface, uiJSON string) string {
 <style>
 :root{--bg:#0f1419;--card:#1a2332;--ink:#e8eef8;--accent:#F4B400;--muted:#8b9bb4}
 *{box-sizing:border-box}body{margin:0;font-family:system-ui,sans-serif;background:var(--bg);color:var(--ink);min-height:100vh}
-header{padding:.75rem 1rem;border-bottom:1px solid #243044;display:flex;justify-content:space-between}
-#root{padding:1rem;max-width:560px;margin:0 auto;position:relative}
+#root{padding:1rem;max-width:560px;margin:0 auto;position:relative;min-height:100vh}
+#status{position:fixed;bottom:8px;right:8px;font-size:.7rem;color:var(--muted);opacity:.5;pointer-events:none;z-index:5}
 .col{display:flex;flex-direction:column;gap:.6rem}.row{display:flex;gap:.5rem;flex-wrap:wrap}
 button,.tab{background:var(--accent);border:0;padding:.5rem .8rem;border-radius:10px;font-weight:700;cursor:pointer;color:#111}
 .tab{background:#243044;color:var(--ink)}.tab.on{background:var(--accent);color:#111}
@@ -82,9 +82,9 @@ img.ui-img{max-width:100%%;border-radius:12px;display:block}
 input[type=file]{font-size:.8rem;color:var(--muted)}
 .doclist li{margin:.35rem 0}
 </style></head><body>
-<header><strong>%s</strong><span id="status">listo</span></header>
 <div class="backdrop" id="bd"></div>
 <div id="root"></div>
+<span id="status" aria-hidden="true"></span>
 <script>
 const APP=%q, SURFACE=%q, SURFACES=%s;
 let STATE={}; let tabSel={};
@@ -158,5 +158,5 @@ function paint(){
   root.appendChild(render(tree));
 }
 fetch('/api/apps/'+encodeURIComponent(APP)+'/state').then(r=>r.json()).then(j=>{if(j.state)STATE=j.state;paint();}).catch(paint);
-</script></body></html>`, app, app, app, surface, uiJSON)
+</script></body></html>`, app, app, surface, uiJSON)
 }
