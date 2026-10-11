@@ -1,11 +1,16 @@
 # AlsetOS — Estado
 
-**Toolchain:** Go 1.26 · suite verde  
-**Desktop:** estrategia **Tiny Core first** (ver `docs/ALSET_DESKTOP.es.md`)
+**Toolchain:** Go 1.26 · suite (verificar en entorno con toolchain 1.26)  
+**Desktop host:** estrategia **Tiny Core first** (ver `docs/ALSET_DESKTOP.es.md`)  
+**Génesis metal:** `kernel_native` (ver `docs/FASE0_AUDITORIA.md`)
 
 ## Runtime organismos
 
 Manifiesto → RootCID → Mind → gene → pulso · P2P · embedded multi-arch.
+
+**Ciclo de vida formal (Go):** `organismo.Preparar` / `Iniciar` / `Detener` / `Fallar` — ver `organismo/ciclo.go`.
+
+**Auditoría fundacional:** [docs/FASE0_AUDITORIA.md](FASE0_AUDITORIA.md) (matriz Manifiesto ↔ código, brechas P0).
 
 ## Alset Desktop 0.1 (en curso)
 

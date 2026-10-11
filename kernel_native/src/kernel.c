@@ -59,6 +59,13 @@ typedef short i16;
 
 #define CAP_UI 0x2000u  /* interpretar / servir orges de UI */
 
+/* Ciclo de vida OCB (alineado con organismo.Estado / Contrato) */
+#define PHASE_CREADO     0
+#define PHASE_LISTO      1
+#define PHASE_EJECUTANDO 2
+#define PHASE_DETENIDO   3
+#define PHASE_ERROR      4
+
 /* —— IR de orges UI (compatible conceptualmente con Alset-JS-Runtime) ——
  * No es HTML: es un árbol de nodos que el UiRuntime dibuja y enlaza a estado.
  * Studio/Editor exportarán este IR; aquí va embebido para demos nativas.
@@ -139,6 +146,7 @@ struct OCB {
   char glyph; /* icono escritorio */
   int app_id; /* índice en ui_apps[], -1 si no es K_APP */
   int state[UI_STATE_SLOTS]; /* estado reactivo de la orge UI */
+  u8 phase; /* PHASE_* ciclo de vida del organismo */
 };
 
 static struct OCB ocbs[MAX_OCB];
@@ -379,7 +387,15 @@ static int ocb_add(const char *n,u32 kind,u32 caps){
   o->visible=1;o->focused=0;o->minimized=0;o->color=C_PANEL;
   o->text[0]=0;o->text_len=0;o->n_items=0;o->sel_item=0;o->titulo[0]=0;o->glyph='?';
   o->app_id=-1;o->state[0]=o->state[1]=o->state[2]=o->state[3]=0;
-  cpy(o->nombre,n,MAX_NAME);return n_ocb++;
+  o->phase=PHASE_CREADO;
+  cpy(o->nombre,n,MAX_NAME);
+  /* Sistema fundacional: listo de inmediato (equiv. memoria sistema=1 en Go) */
+  if(kind==K_MASTER||kind==K_FB||kind==K_COMPOSE||kind==K_DESKTOP||
+     kind==K_UIRUNTIME||kind==K_BUS||kind==K_DISP)
+    o->phase=PHASE_EJECUTANDO;
+  else
+    o->phase=PHASE_LISTO;
+  return n_ocb++;
 }
 static int pulso(int from,int to){
   if(from<0||to<0)return -1;if(!tiene_cap(from,CAP_PULSO_ENV))return -2;
