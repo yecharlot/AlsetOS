@@ -95,9 +95,12 @@ func (rt *Runtime) LoadAssembly(decls []OrgDecl) error {
 		}
 		rt.RootCIDs[oid] = cid
 		o := organismo.Nuevo(d.Name)
-		o.RootCID = cid
 		if err := o.Preparar(cid); err != nil {
 			return fmt.Errorf("%s preparar: %w", oid, err)
+		}
+		// Definición canónica = DefinitionCID de la declaración de reglas (fuente de verdad).
+		if err := o.VerificarDefinicion(cid, true); err != nil {
+			return fmt.Errorf("%s verificar definición: %w", oid, err)
 		}
 		caps := map[string]bool{}
 		for _, c := range d.Capabilities {

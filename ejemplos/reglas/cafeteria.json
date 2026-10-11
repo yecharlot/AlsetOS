@@ -1,0 +1,56 @@
+{
+  "plataforma": "AlsetOS",
+  "app": "cafeteria-ruta",
+  "version": "1.0.0",
+  "descripcion": "ORGES de mostrador y stock — definido por reglas, no por código a mano",
+  "organismos": [
+    {
+      "oid": "alset:org:stock:1",
+      "name": "Stock",
+      "version": "1.0.0",
+      "kind": "ORGES",
+      "description": "Disponibilidad de insumos",
+      "capabilities": ["stock.consultar", "stock.actualizar"],
+      "goals": ["disponibilidad"],
+      "contracts": [
+        { "name": "stock.consulta", "version": "1.0", "role": "provides" }
+      ],
+      "initial_state": {
+        "stock.unidades": 10,
+        "stock.umbral": 3
+      },
+      "rules": [
+        {
+          "id": "alerta_bajo",
+          "when": [{ "path": "stock.unidades", "op": "lte", "value": 3 }],
+          "then_path": "stock.alerta",
+          "then_value": true
+        }
+      ]
+    },
+    {
+      "oid": "alset:org:venta:1",
+      "name": "Venta",
+      "version": "1.0.0",
+      "kind": "ORGES",
+      "description": "Venta de mostrador",
+      "capabilities": ["venta.registrar"],
+      "goals": ["cobro", "no_vender_sin_stock"],
+      "contracts": [
+        { "name": "stock.consulta", "version": "1.0", "role": "requires" }
+      ],
+      "initial_state": {
+        "venta.ultima": null
+      },
+      "rules": [
+        {
+          "id": "listo_si_hay_stock",
+          "when": [{ "path": "stock.unidades", "op": "gt", "value": 0 }],
+          "then_path": "venta.habilitada",
+          "then_value": true,
+          "then_on_indeterminate": false
+        }
+      ]
+    }
+  ]
+}
