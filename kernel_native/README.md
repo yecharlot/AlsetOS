@@ -1,49 +1,31 @@
-# AlsetOS Kernel nativo — campo vivo
+# kernel_native — Desktop Alset (clon del shell)
 
-Todo es organismo. Sin SO anfitrión. Sin imitar Windows ni Linux.
+Identidad tomada de `desktop/shell/shell.css` + comportamiento de `shell.js`,
+implementado como organismos en framebuffer.
 
-```
-Maestro → Framebuffer → Compositor → Desktop → Orges
-```
-
-## Identidad visual (soberana)
-
-- Fondo en degradado profundo + **orbe de presencia** (no rejilla tipo juego).
-- **Dock flotante** centrado (no barra de sistema clásica).
-- Ventanas con borde fino y **línea de acento** solo en foco.
-- Top bar mínima: marca AlsetOS · campo vivo + contadores de organismos/pulsos.
-
-## Rendimiento del ratón
-
-El movimiento del cursor **ya no redibuja toda la escena**.
-
-1. La escena se guarda en un buffer `scene`.
-2. Al mover el ratón solo se restaura el rectángulo del cursor y se pinta el nuevo.
-3. La escena completa se recalcula solo en click, arrastre o cambio de UI.
-
-Eso es lo que quita la sensación de “emulador de los 80 lento”.
-
-## Arranque
+## Probar
 
 ```bash
 mkdir -p "$HOME/tmp" && export TMPDIR="$HOME/tmp"
-cd kernel_native
-make run
+cd kernel_native && make run
 ```
 
-`make run` = ELF32 multiboot (QEMU `-kernel`).  
-`make run64` = long mode vía ISO/GRUB.
+## Guía de aprendizaje
+
+Lee **[docs/LEARN_DESKTOP.md](../docs/LEARN_DESKTOP.md)** — mapa shell→kernel y cómo modificar el SO.
 
 ## Controles
 
-| Entrada | Acción |
-|---------|--------|
-| Ratón | Foco, arrastre, cerrar (rojo), minimizar (ámbar) |
-| Dock flotante | `+` menú · W ventana · T texto · L lista · I inspector |
-| **M** / **1–4** | Menú y crear organismos |
-| **Enter** | Pulso Desktop → foco |
-| **Tab** | Siguiente ventana |
+| Acción | Cómo |
+|--------|------|
+| Splash → escritorio | Espera o click |
+| Abrir app | Doble concepto: click en icono o menú **A** |
+| Menú inicio | Botón **A** en taskbar o tecla **M** |
+| Crear | **1** ventana · **2** texto · **3** lista · **4** inspector |
+| Cerrar / minimizar | Botones en titlebar |
+| Arrastrar | Barra de título |
+| Taskbar | Click en la tarea para enfocar |
 
-## Manifiesto
+## Archivo principal
 
-No hay procesos de escritorio ajenos: cada superficie es un **OCB** con capacidades y pulsos. La belleza y la fluidez se construyen **dentro** de esa regla, no por encima de ella.
+`src/kernel.c` — un solo archivo a propósito, para que puedas leerlo de arriba abajo.
