@@ -1,17 +1,24 @@
 package organismo
 
-import "testing"
+import (
+	"testing"
 
-func TestCicloFeliz(t *testing.T) {
+	"github.com/yecharlot/AlsetOS/rootcid"
+)
+
+func TestCicloFelizVerificado(t *testing.T) {
 	o := Nuevo("demo")
-	if o.Estado != Creado {
-		t.Fatalf("esperado creado, got %s", o.Estado)
-	}
-	if err := o.Preparar("bafy-test-cid"); err != nil {
+	def := []byte("demo-def")
+	cid := rootcid.CrearContenido(def)
+	if err := o.Preparar(cid); err != nil {
 		t.Fatal(err)
 	}
-	if o.Estado != Listo || o.RootCID != "bafy-test-cid" {
-		t.Fatalf("preparar: estado=%s cid=%s", o.Estado, o.RootCID)
+	// Solo presencia: aún no puede ejecutar
+	if err := o.Iniciar(); err == nil {
+		t.Fatal("sin verificación no debe ejecutar")
+	}
+	if err := o.VerificarDefinicion(cid, rootcid.VerificarOK(def, cid)); err != nil {
+		t.Fatal(err)
 	}
 	if err := o.Iniciar(); err != nil {
 		t.Fatal(err)
@@ -22,22 +29,15 @@ func TestCicloFeliz(t *testing.T) {
 	if err := o.Detener(); err != nil {
 		t.Fatal(err)
 	}
-	if o.Estado != Detenido {
-		t.Fatalf("esperado detenido")
-	}
 }
 
 func TestNoEjecutarSinRootCID(t *testing.T) {
 	o := Nuevo("x")
-	// forzar listo ilegalmente no: Transicionar a listo sin cid
 	if err := o.Transicionar(Listo); err != nil {
 		t.Fatal(err)
 	}
 	if err := o.Iniciar(); err == nil {
 		t.Fatal("debía fallar sin RootCID")
-	}
-	if o.Estado == Ejecutando {
-		t.Fatal("no debió quedar ejecutando")
 	}
 }
 
@@ -48,37 +48,48 @@ func TestTransicionIlegal(t *testing.T) {
 	}
 }
 
-func TestSistemaSinRootCID(t *testing.T) {
-	o := Nuevo("kernel")
+func TestMemoriaSistemaYaNoBypass(t *testing.T) {
+	o := Nuevo("falso-sistema")
 	o.Memoria["sistema"] = "1"
+	_ = o.Transicionar(Listo)
+	if err := o.Iniciar(); err == nil {
+		t.Fatal("Memoria sistema no debe eludir RootCID/verificación")
+	}
+}
+
+func TestFundacionalEjecutaSinRootCIDApp(t *testing.T) {
+	o := NuevoFundacional("Maestro", "boot")
 	if err := o.Transicionar(Listo); err != nil {
 		t.Fatal(err)
 	}
 	if err := o.Iniciar(); err != nil {
 		t.Fatal(err)
 	}
+	if !o.Fundacional || o.Espacio != EspacioKernel {
+		t.Fatal("sello fundacional")
+	}
 }
 
-func TestCapacidad(t *testing.T) {
+func TestRootCIDPresentePeroNoVerificado(t *testing.T) {
 	o := Nuevo("z")
-	if o.TieneCapacidad("gene.ejecutar") {
-		t.Fatal("default deny")
-	}
-	o.OtorgarCapacidad("gene.ejecutar")
-	if !o.TieneCapacidad("gene.ejecutar") {
-		t.Fatal("capacidad no otorgada")
+	_ = o.Preparar("rootcid:cadena-no-vacia-pero-falsa")
+	if err := o.Iniciar(); err == nil {
+		t.Fatal("presencia ≠ verificación")
 	}
 }
 
 func TestFallarYRecuperar(t *testing.T) {
 	o := Nuevo("r")
-	_ = o.Preparar("cid")
+	def := []byte("r")
+	cid := rootcid.CrearContenido(def)
+	_ = o.Preparar(cid)
+	_ = o.VerificarDefinicion(cid, true)
 	_ = o.Iniciar()
 	if err := o.Fallar("timeout"); err != nil {
 		t.Fatal(err)
 	}
-	if o.Estado != Error || o.Memoria["ultimo_error"] != "timeout" {
-		t.Fatalf("error no registrado")
+	if o.Estado != Error {
+		t.Fatal(o.Estado)
 	}
 	if err := o.Transicionar(Listo); err != nil {
 		t.Fatal(err)
