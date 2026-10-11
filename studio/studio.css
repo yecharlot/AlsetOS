@@ -68,3 +68,11 @@ textarea#aos{width:100%;flex:1;min-height:200px;background:#0a0e14;color:var(--t
 .apps-list a{display:block;color:var(--blue);font-size:12px;margin:4px 0}
 .muted{color:var(--muted);font-size:12px}
 h3{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:12px 0 6px}
+
+/* Resizable panes */
+.pane-left, .pane-right { flex: 0 0 auto; }
+.splitter.v { width: 6px; cursor: col-resize; background: var(--line); flex: 0 0 6px; }
+.splitter.v:hover { background: var(--gold); }
+.pane-bottom, .pane-preview { flex: 0 0 auto; }
+.pane-preview .pane-head, .pane-bottom .pane-head { user-select: none; }
+.workbench { flex: 1 1 auto; }

@@ -12,12 +12,14 @@ import (
 // UINode IR de interfaz declarativa (la UI también es organismo / orge).
 // Compatible en espíritu con UiRuntime (panel, label, button, badge, …).
 type UINode struct {
-	Type   string      `json:"type"` // column|row|label|button|badge|panel|field
-	Text   string      `json:"text,omitempty"`
-	Bind   string      `json:"bind,omitempty"`   // path de estado
-	Emit   string      `json:"emit,omitempty"`   // evento / pulse
-	Kids   []UINode    `json:"kids,omitempty"`
-	Meta   map[string]string `json:"meta,omitempty"`
+	Type  string            `json:"type"` // column|row|label|button|badge|panel|field|drawer|stack|tabs|splash|blob|image|qr|file|gradient|doclist
+	Text  string            `json:"text,omitempty"`
+	Bind  string            `json:"bind,omitempty"`
+	Emit  string            `json:"emit,omitempty"`
+	Src   string            `json:"src,omitempty"`   // image url / gradient / file accept
+	Style string            `json:"style,omitempty"` // css hints: blur, animated, bottom, top
+	Kids  []UINode          `json:"kids,omitempty"`
+	Meta  map[string]string `json:"meta,omitempty"`
 }
 
 
@@ -374,13 +376,46 @@ func compileUI(items []lispai.AOSNode) ([]UINode, error) {
 		t := strings.ToLower(fmt.Sprint(l[0]))
 		node := UINode{Type: t}
 		switch t {
-		case "column", "row", "panel":
-			kids, err := compileUI(l[1:])
+		case "column", "row", "panel", "drawer", "stack", "tabs", "top-tabs", "bottom-tabs", "splash", "blob", "gradient":
+			// optional first string attrs: (drawer "left" ...) (splash "Bienvenido" ...)
+			start := 1
+			if len(l) > 1 {
+				if _, isList := l[1].([]lispai.AOSNode); !isList {
+					node.Text = fmt.Sprint(l[1])
+					start = 2
+				}
+			}
+			for _, extra := range l[start:] {
+				el, ok := extra.([]lispai.AOSNode)
+				if ok && len(el) >= 1 {
+					h := strings.ToLower(fmt.Sprint(el[0]))
+					if h == "style" && len(el) > 1 {
+						node.Style = fmt.Sprint(el[1])
+						continue
+					}
+					if h == "src" && len(el) > 1 {
+						node.Src = fmt.Sprint(el[1])
+						continue
+					}
+				}
+			}
+			// children = list nodes among remaining
+			var childItems []lispai.AOSNode
+			for _, extra := range l[start:] {
+				if el, ok := extra.([]lispai.AOSNode); ok {
+					h := strings.ToLower(fmt.Sprint(el[0]))
+					if h == "style" || h == "src" || h == "emit" || h == "bind" {
+						continue
+					}
+					childItems = append(childItems, extra)
+				}
+			}
+			kids, err := compileUI(childItems)
 			if err != nil {
 				return nil, err
 			}
 			node.Kids = kids
-		case "label", "button", "field":
+		case "label", "button", "field", "tab":
 			if len(l) > 1 {
 				node.Text = fmt.Sprint(l[1])
 			}
@@ -394,9 +429,71 @@ func compileUI(items []lispai.AOSNode) ([]UINode, error) {
 					node.Emit = fmt.Sprint(el[1])
 				case "bind":
 					node.Bind = fmt.Sprint(el[1])
+				case "style":
+					node.Style = fmt.Sprint(el[1])
+				case "src":
+					node.Src = fmt.Sprint(el[1])
 				}
 			}
-		case "badge":
+		case "badge", "qr":
+			for _, extra := range l[1:] {
+				el, ok := extra.([]lispai.AOSNode)
+				if !ok || len(el) < 2 {
+					if !ok {
+						node.Text = fmt.Sprint(extra)
+					}
+					continue
+				}
+				switch fmt.Sprint(el[0]) {
+				case "bind":
+					node.Bind = fmt.Sprint(el[1])
+				case "src":
+					node.Src = fmt.Sprint(el[1])
+				case "text":
+					node.Text = fmt.Sprint(el[1])
+				}
+			}
+		case "image":
+			if len(l) > 1 {
+				if el, ok := l[1].([]lispai.AOSNode); ok && len(el) >= 2 && fmt.Sprint(el[0]) == "src" {
+					node.Src = fmt.Sprint(el[1])
+				} else {
+					node.Src = fmt.Sprint(l[1])
+				}
+			}
+			for _, extra := range l[1:] {
+				el, ok := extra.([]lispai.AOSNode)
+				if !ok || len(el) < 2 {
+					continue
+				}
+				if fmt.Sprint(el[0]) == "style" {
+					node.Style = fmt.Sprint(el[1])
+				}
+				if fmt.Sprint(el[0]) == "src" {
+					node.Src = fmt.Sprint(el[1])
+				}
+			}
+		case "file", "file-picker":
+			node.Type = "file"
+			if len(l) > 1 {
+				node.Text = fmt.Sprint(l[1])
+			}
+			node.Src = "image/*,.pdf,.txt"
+			for _, extra := range l[1:] {
+				el, ok := extra.([]lispai.AOSNode)
+				if !ok || len(el) < 2 {
+					continue
+				}
+				switch fmt.Sprint(el[0]) {
+				case "accept":
+					node.Src = fmt.Sprint(el[1])
+				case "emit":
+					node.Emit = fmt.Sprint(el[1])
+				case "bind":
+					node.Bind = fmt.Sprint(el[1])
+				}
+			}
+		case "doclist":
 			for _, extra := range l[1:] {
 				el, ok := extra.([]lispai.AOSNode)
 				if !ok || len(el) < 2 {
