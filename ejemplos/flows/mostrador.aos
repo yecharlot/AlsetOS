@@ -1,0 +1,47 @@
+; Prism@.TEC / AlsetOS — LISPAI-AOS
+; Todo es organismo: dominio + UI. El flow ensambla piezas como LEGO.
+; Fuente de verdad: este archivo. El código generado es editable pero derivado.
+
+(flow cafeteria-mostrador
+  (version "1.0.0")
+  (desc "Mostrador: stock, venta y superficie UI como ORGES")
+
+  (orge stock
+    (kind ORGES)
+    (desc "Disponibilidad de insumos")
+    (cap "stock.consultar" "stock.actualizar")
+    (provides "stock.consulta" "1.0")
+    (goal "disponibilidad")
+    (state (stock.unidades 10) (stock.umbral 3) (stock.alerta false))
+    (rule alerta_bajo
+      (when (lte stock.unidades 3))
+      (then stock.alerta true)))
+
+  (orge venta
+    (kind ORGES)
+    (desc "Venta de mostrador")
+    (cap "venta.registrar")
+    (requires "stock.consulta" "1.0")
+    (goal "cobro")
+    (state (venta.habilitada false) (venta.ultima null))
+    (rule listo
+      (when (gt stock.unidades 0))
+      (then venta.habilitada true)
+      (indeterminate false)))
+
+  (orge ui-mostrador
+    (kind UI)
+    (desc "Superficie declarativa — la UI es un organismo")
+    (cap "ui.render")
+    (ui
+      (column
+        (label "Cafeteria · mostrador")
+        (badge (bind stock.unidades))
+        (row
+          (button "+" (emit stock.inc))
+          (button "-" (emit stock.dec))
+          (button "Vender" (emit venta.registrar))))))
+
+  (assemble stock venta ui-mostrador)
+  (surface ui-mostrador)
+)

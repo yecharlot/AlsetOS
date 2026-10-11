@@ -2,9 +2,8 @@
 // declaración de organismos → validación → resolución de contratos →
 // ensamblaje ORGES → estado reactivo → ARL/Zyrion → capacidades → auditoría.
 //
-// LISPAI-AOS completo (parser de texto libre) NO está implementado en el repo.
-// Esta extensión usa declaraciones estructuradas (JSON) equivalentes a los
-// campos del manifiesto ATS-001, más ARL estructurado (AST), no un segundo runtime.
+// LISPAI-AOS (subconjunto): ver lispai/aos_parse.go + declarativo/aos.go.
+// JSON estructurado y .aos textual comparten OrgDecl / Runtime.
 package declarativo
 
 import (

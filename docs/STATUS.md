@@ -4,6 +4,12 @@
 **Desktop host:** estrategia **Tiny Core first** (ver `docs/ALSET_DESKTOP.es.md`)  
 **Génesis metal:** `kernel_native` (ver `docs/FASE0_AUDITORIA.md`)
 
+## LISPAI-AOS (flows)
+
+Programa ORGES en texto: `(flow … (orge …) (ui …) (assemble …))`.  
+`alset-plataforma flow ejemplos/flows/mostrador.aos` — la UI es organismo; genera JSON/Go editables.  
+Ver [LISPAI_AOS.md](LISPAI_AOS.md).
+
 ## Runtime organismos
 
 Manifiesto → RootCID → Mind → gene → pulso · P2P · embedded multi-arch.

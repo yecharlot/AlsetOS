@@ -1,5 +1,5 @@
-// alset-plataforma: entrada orientada a REGLAS (fuente de verdad).
-// El código Go es un resultado opcional de la plataforma, no el origen.
+// alset-plataforma: reglas JSON o flows LISPAI-AOS.
+// El código Go es resultado opcional; la fuente es reglas/.aos.
 package main
 
 import (
@@ -18,6 +18,8 @@ func main() {
 	switch os.Args[1] {
 	case "aplicar":
 		cmdAplicar(os.Args[2:])
+	case "flow":
+		cmdFlow(os.Args[2:])
 	case "ayuda", "help", "-h", "--help":
 		uso()
 	default:
@@ -28,20 +30,87 @@ func main() {
 }
 
 func uso() {
-	fmt.Fprintf(os.Stderr, `AlsetOS plataforma — las apps nacen de reglas
+	fmt.Fprintf(os.Stderr, `AlsetOS plataforma — ORGES desde reglas o LISPAI-AOS
 
   alset-plataforma aplicar [--data DIR] [--generar DIR] <manifiesto.json>
+  alset-plataforma flow    [--data DIR] [--generar DIR] <programa.aos>
 
-El JSON de reglas es la fuente de verdad.
---generar emite código Go editable (artefacto), no el origen.
+LISPAI-AOS: defines orges, las unes como LEGO, la UI también es organismo.
+El runtime ensambla, evalúa ARL/Zyrion y puede generar código editable.
 
-Ejemplo:
+Ejemplos:
   alset-plataforma aplicar --generar /tmp/gen ejemplos/reglas/cafeteria.json
+  alset-plataforma flow    --generar /tmp/gen ejemplos/flows/mostrador.aos
 `)
 }
 
 func cmdAplicar(args []string) {
-	var data, gen, ruta string
+	data, gen, ruta := parseFlags(args)
+	if ruta == "" {
+		fmt.Fprintln(os.Stderr, "falta ruta al manifiesto JSON")
+		os.Exit(2)
+	}
+	m, err := declarativo.CargarReglas(ruta)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "error:", err)
+		os.Exit(1)
+	}
+	rt, err := declarativo.NewRuntime(data)
+	must(err)
+	must(rt.AplicarReglas(m))
+	for _, o := range m.Organismos {
+		if _, err := rt.EvalOrgRules(o.OID); err != nil {
+			fmt.Fprintln(os.Stderr, "eval", o.OID, err)
+			os.Exit(1)
+		}
+	}
+	if gen != "" {
+		must(declarativo.GenerarCodigo(m, gen))
+		fmt.Println("código generado en", gen)
+	}
+	if data != "" {
+		must(rt.Persist())
+	}
+	printResumen(m.App, m.Version, len(m.Organismos), rt.AuditLen(), gen, "reglas-json")
+}
+
+func cmdFlow(args []string) {
+	data, gen, ruta := parseFlags(args)
+	if ruta == "" {
+		fmt.Fprintln(os.Stderr, "falta ruta al programa .aos")
+		os.Exit(2)
+	}
+	flow, err := declarativo.CargarAOS(ruta)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "AOS:", err)
+		os.Exit(1)
+	}
+	rt, err := declarativo.NewRuntime(data)
+	must(err)
+	must(rt.AplicarFlow(flow))
+	for _, o := range flow.Manifiesto.Organismos {
+		if o.Kind == "UI" {
+			continue
+		}
+		if _, err := rt.EvalOrgRules(o.OID); err != nil {
+			fmt.Fprintln(os.Stderr, "eval", o.OID, err)
+			os.Exit(1)
+		}
+	}
+	if gen != "" {
+		must(declarativo.GenerarArtefactosFlow(flow, gen))
+		fmt.Println("artefactos (JSON+UI+Go) en", gen)
+	}
+	if data != "" {
+		must(rt.Persist())
+	}
+	printResumen(flow.Name, flow.Version, len(flow.Manifiesto.Organismos), rt.AuditLen(), gen, "lispai-aos")
+	if flow.SurfaceOID != "" {
+		fmt.Fprintf(os.Stderr, "surface activa: %s\n", flow.SurfaceOID)
+	}
+}
+
+func parseFlags(args []string) (data, gen, ruta string) {
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		switch {
@@ -59,58 +128,28 @@ func cmdAplicar(args []string) {
 			ruta = a
 		}
 	}
-	if ruta == "" {
-		fmt.Fprintln(os.Stderr, "falta ruta al manifiesto JSON")
-		os.Exit(2)
-	}
+	return
+}
 
-	m, err := declarativo.CargarReglas(ruta)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "error:", err)
-		os.Exit(1)
-	}
-
-	rt, err := declarativo.NewRuntime(data)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "runtime:", err)
-		os.Exit(1)
-	}
-	if err := rt.AplicarReglas(m); err != nil {
-		fmt.Fprintln(os.Stderr, "aplicar reglas:", err)
-		os.Exit(1)
-	}
-
-	for _, o := range m.Organismos {
-		if _, err := rt.EvalOrgRules(o.OID); err != nil {
-			fmt.Fprintln(os.Stderr, "eval", o.OID, err)
-			os.Exit(1)
-		}
-	}
-
-	if gen != "" {
-		if err := declarativo.GenerarCodigo(m, gen); err != nil {
-			fmt.Fprintln(os.Stderr, "generar código:", err)
-			os.Exit(1)
-		}
-		fmt.Println("código generado en", gen)
-	}
-
-	if data != "" {
-		if err := rt.Persist(); err != nil {
-			fmt.Fprintln(os.Stderr, "persistir:", err)
-			os.Exit(1)
-		}
-	}
-
+func printResumen(app, ver string, nOrg, audit int, gen, src string) {
 	resumen := map[string]interface{}{
-		"app":        m.App,
-		"version":    m.Version,
-		"organismos": len(m.Organismos),
-		"audit_len":  rt.AuditLen(),
+		"app":        app,
+		"version":    ver,
+		"organismos": nOrg,
+		"audit_len":  audit,
 		"generado":   gen,
-		"mensaje":    "ensamblaje desde reglas OK — el código no fue la fuente",
+		"fuente":     src,
+		"mensaje":    "ensamblaje OK — fuente " + src + "; código es artefacto editable",
 	}
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
 	_ = enc.Encode(resumen)
 }
+
+func must(err error) {
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
