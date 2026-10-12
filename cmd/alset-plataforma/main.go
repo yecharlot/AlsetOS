@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	"github.com/yecharlot/AlsetOS/declarativo"
+	"github.com/yecharlot/AlsetOS/mind"
 )
 
 //go:embed all:web
@@ -205,6 +206,33 @@ func cmdStudio(args []string) {
 			"product": "Alset Studio ORGES multi-instancia",
 			"note":    "Cada app en /apps/{nombre}/ tiene Runtime y estado propios",
 		})
+	})
+
+	mindAgent := mind.NewAgent()
+	mux.HandleFunc("/api/mind/analyze", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeErr(w, fmt.Errorf("POST required"))
+			return
+		}
+		var req mind.AnalyzeRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeErr(w, err)
+			return
+		}
+		writeJSON(w, mindAgent.Handle(req))
+	})
+	mux.HandleFunc("/api/mind/chat", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeErr(w, fmt.Errorf("POST required"))
+			return
+		}
+		var req mind.AnalyzeRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeErr(w, err)
+			return
+		}
+		req.Mode = "chat"
+		writeJSON(w, mindAgent.Handle(req))
 	})
 
 	mux.HandleFunc("/api/apps", func(w http.ResponseWriter, r *http.Request) {

@@ -105,16 +105,27 @@
           </div>
           <ul id="aos-suggest" class="aos-suggest hidden"></ul>
         </div>
-        <div id="mind-panel" class="mind-panel hidden">
-          <div class="mind-head">Mind · agente de código ORGES / UI</div>
-          <div id="mind-out" class="mind-out muted">Mind analiza el .aos y sugiere reglas, emits y vistas.</div>
+                <div id="mind-panel" class="mind-panel hidden">
+          <div class="mind-head">Mind · agente de código (tiempo real)</div>
+          <p class="muted">Analiza el flow, diagnostica contratos/ARL/UI y propone snippets. Chat de dominio → ORGES.</p>
           <div class="mind-actions">
-            <button type="button" class="btn btn-blue" id="btn-mind-analyze">Analizar reglas</button>
+            <button type="button" class="btn btn-blue" id="btn-mind-analyze">Analizar flow</button>
             <button type="button" class="btn btn-ghost" id="btn-mind-suggest-ui">Sugerir UI animada</button>
-            <button type="button" class="btn btn-ghost" id="btn-mind-pulse">Plantilla Pulse</button>
+            <button type="button" class="btn btn-ghost" id="btn-mind-pulse">Pulse seguro</button>
           </div>
+          <div id="mind-out" class="mind-out muted">Mind espera tu flow o un mensaje de dominio.</div>
+          <div id="mind-diags" class="mind-diags"></div>
+          <div id="mind-sugs" class="mind-sugs"></div>
           <pre id="mind-code" class="mind-code"></pre>
-          <button type="button" class="btn btn-primary" id="btn-mind-insert" style="width:100%;margin-top:8px">Insertar sugerencia en .aos</button>
+          <button type="button" class="btn btn-primary" id="btn-mind-insert" style="width:100%;margin-top:8px">Insertar snippet activo en .aos</button>
+          <div class="mind-chat">
+            <h4>Chat con Mind</h4>
+            <div id="mind-chat-log" class="mind-chat-log"></div>
+            <div class="mind-chat-row">
+              <input id="mind-chat-input" class="rt-input" placeholder="Ej: pedidos a domicilio con stock y ruta"/>
+              <button type="button" class="btn btn-blue" id="btn-mind-chat">Enviar</button>
+            </div>
+          </div>
         </div>
         <div id="declare-panel" class="declare-panel hidden">
           <div class="mind-head">Declarar piezas independientes → ensamblar</div>

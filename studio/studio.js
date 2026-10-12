@@ -212,6 +212,13 @@ ${body}
     ]
   };
 
+  function setStatus(msg, isErr){
+    const el=document.getElementById('status');
+    if(!el) return;
+    el.textContent=msg||'listo';
+    el.classList.toggle('err', !!isErr);
+    el.classList.toggle('ok', !isErr && msg && msg!=='listo');
+  }
   function log(msg, isErr){
     consoleEl.textContent = '['+new Date().toISOString().slice(11,19)+'] '+msg+'\n'+consoleEl.textContent;
     status.textContent = isErr?'error':'ok';
@@ -367,7 +374,9 @@ ${body}
   async function api(path, body){
     const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});
     const t=await r.text();
-    try{return JSON.parse(t);}catch{return {ok:false,error:t};}
+    let j; try{j=JSON.parse(t);}catch{j={ok:false,error:t};}
+    if(!r.ok || j.error){ const err=new Error(j.error||t||r.statusText); throw err; }
+    return j;
   }
 
   function paint(tree){
@@ -749,34 +758,77 @@ ${body}
       else sug.classList.add('hidden');
     });
   }
-  function mindAnalyze(){
-    var src = aos.value||'';
-    var orges=[], rules=[], binds=[], emits=[], m, re;
-    re=/\(orge\s+([^\s)]+)/g; while((m=re.exec(src))) orges.push(m[1]);
-    re=/\(rule\s+([^\s)]+)/g; while((m=re.exec(src))) rules.push(m[1]);
-    re=/\(bind\s+([^\s)]+)/g; while((m=re.exec(src))) binds.push(m[1]);
-    re=/\(emit\s+([^\s)]+)/g; while((m=re.exec(src))) emits.push(m[1]);
-    var hasUI = /\(kind\s+UI\)|\(ui\s/.test(src);
-    var parts = [];
-    parts.push('ORGES: '+(orges.join(', ')||'ninguno'));
-    parts.push('Reglas: '+(rules.join(', ')||'ninguna'));
-    parts.push('Binds: '+(binds.join(', ')||'—'));
-    parts.push('Emits: '+(emits.join(', ')||'—'));
-    parts.push(hasUI ? 'Superficie UI presente (vista = organismo).' : 'Sin UI-orge: añade vista que reaccione al estado.');
-    if(rules.length && !hasUI) parts.push('Mind: reglas sin vista — sugiere UI con bind a los átomos que escriben las reglas.');
-    if(orges.length>=2 && !/\(assemble/.test(src)) parts.push('Mind: falta (assemble …) para acoplar LEGO.');
-    if(!/\(pulse/.test(src) && orges.length>=2) parts.push('Mind: documenta Pulse firmado entre organismos (Ed25519 + nonce).');
-    document.getElementById('mind-out').textContent = parts.join('\n');
-    if(!hasUI && orges[0]){
-      mindSuggestion = '  (orge ui-main (kind UI) (ui (column\n    (splash "'+orges[0]+'")\n    (gradient "Reactivo Alset" (style "animated"))\n    (badge (bind '+(binds[0]||orges[0]+'.estado')+'))\n    (row (button "Acción" (emit '+(emits[0]||orges[0]+'.tick')+')))))\n  (assemble '+orges.join(' ')+' ui-main)\n  (surface ui-main)\n';
-    } else if(rules.length){
-      mindSuggestion = '    (rule mind-check (when (exists '+(binds[0]||'estado.atom')+')) (then mind.visto true))\n';
-    } else {
-      mindSuggestion = SNIPPETS.orge + SNIPPETS.ui + '  (assemble nombre ui-main)\n  (surface ui-main)\n';
+  async function mindAnalyze(){
+    const src = aos.value || '';
+    setStatus('Mind analiza…');
+    try {
+      const res = await api('/api/mind/analyze', { source: src, mode: 'analyze', message: '' });
+      renderMindResponse(res);
+      setStatus('Mind listo');
+    } catch (e) {
+      // fallback local if API down
+      document.getElementById('mind-out').textContent = 'Mind local (API no disponible): ' + (e.message||e);
+      setStatus('Mind offline', true);
     }
-    document.getElementById('mind-code').textContent = mindSuggestion.replace(/\\n/g, '\n');
+  }
+
+  function renderMindResponse(res){
+    if(!res) return;
+    const out = document.getElementById('mind-out');
+    if(out) out.textContent = res.reply || '';
+    const diags = document.getElementById('mind-diags');
+    if(diags){
+      diags.innerHTML = (res.diagnostics||[]).map(d=>'<div class="diag">⚠ '+escapeHtml(d)+'</div>').join('');
+    }
+    const sugs = document.getElementById('mind-sugs');
+    mindSuggestionsList = res.suggestions || [];
+    if(sugs){
+      sugs.innerHTML = mindSuggestionsList.map((s,i)=>
+        '<button type="button" class="sug-btn" data-sug="'+i+'"><b>'+escapeHtml(s.title)+'</b> <span class="muted">'+escapeHtml(s.kind)+'</span><br/><small>'+escapeHtml(s.reason||'')+'</small></button>'
+      ).join('');
+      sugs.querySelectorAll('[data-sug]').forEach(btn=>{
+        btn.onclick = ()=>{
+          const s = mindSuggestionsList[+btn.dataset.sug];
+          if(!s) return;
+          mindSuggestion = s.snippet || '';
+          document.getElementById('mind-code').textContent = mindSuggestion;
+        };
+      });
+    }
+    if(mindSuggestionsList[0]){
+      mindSuggestion = mindSuggestionsList[0].snippet || '';
+      document.getElementById('mind-code').textContent = mindSuggestion;
+    }
+  }
+
+  function escapeHtml(s){
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  let mindSuggestionsList = [];
+
+  async function mindChat(){
+    const input = document.getElementById('mind-chat-input');
+    const msg = (input && input.value || '').trim();
+    if(!msg) return;
+    const log = document.getElementById('mind-chat-log');
+    if(log) log.innerHTML += '<div class="chat-user"><b>Tú:</b> '+escapeHtml(msg)+'</div>';
+    if(input) input.value = '';
+    setStatus('Mind piensa…');
+    try {
+      const res = await api('/api/mind/chat', { source: aos.value||'', message: msg, mode: 'chat' });
+      renderMindResponse(res);
+      if(log) log.innerHTML += '<div class="chat-mind"><b>Mind:</b> '+escapeHtml(res.reply||'').replace(/\n/g,'<br/>')+'</div>';
+      log && (log.scrollTop = log.scrollHeight);
+      setStatus('Mind listo');
+    } catch(e){
+      if(log) log.innerHTML += '<div class="chat-mind"><b>Mind:</b> error '+escapeHtml(e.message||e)+'</div>';
+      setStatus('Mind error', true);
+    }
   }
   if((_b=document.getElementById('btn-mind-analyze'))) _b.onclick=mindAnalyze;
+  if((_b=document.getElementById('btn-mind-chat'))) _b.onclick=mindChat;
+  if((_b=document.getElementById('mind-chat-input'))) _b.addEventListener('keydown',function(e){ if(e.key==='Enter') mindChat(); });
   if((_b=document.getElementById('btn-mind-suggest-ui'))) _b.onclick=function(){
     mindSuggestion = SNIPPETS.ui + '  (assemble stock ui-main)\n  (surface ui-main)\n';
     document.getElementById('mind-code').textContent = mindSuggestion.replace(/\\n/g, '\n');
