@@ -383,13 +383,13 @@ ${body}
     if(t==='row'){ const d=document.createElement('div'); d.className='row'; (n.kids||[]).forEach(k=>d.appendChild(render(k))); return d; }
     if(t==='label'){ const s=document.createElement('div'); s.textContent=n.text||''; return s; }
     if(t==='badge'){ const s=document.createElement('span'); s.className='badge-ui'; s.textContent=val(n.bind); return s; }
-    if(t==='button'){ const b=document.createElement('button'); b.textContent=n.text||'OK';
+    if(t==='button'){ /* beautiful */ const b=document.createElement('button'); b.textContent=n.text||'OK';
       b.onclick=async()=>{ const emit=n.emit||''; log('emit '+emit);
         const res=await api('/api/flow/action',{emit, app: sessionApp||appName.value});
         if(res.state){ liveState=res.state; stateView.textContent=JSON.stringify(liveState,null,2); }
         if(res.ok===false) log(res.error||'fail', true); paint(surfaces[surfaceOID]||Object.values(surfaces)[0]);
       }; return b; }
-    if(t==='splash'){ const d=document.createElement('div'); d.innerHTML='<strong>'+(n.text||'Splash')+'</strong>'; d.style.padding='12px'; return d; }
+    if(t==='splash'){ el=document.createElement('div'); el.textContent=n.text||'Splash'; el.className='rt-splash'; }
     if(t==='blob'){ const d=document.createElement('div'); d.style.cssText='width:64px;height:64px;border-radius:40%;background:linear-gradient(135deg,#f4b400,#5b9cf5)'; return d; }
     if(t==='gradient'){ const d=document.createElement('div'); d.textContent=n.text||''; d.style.cssText='padding:12px;border-radius:10px;background:linear-gradient(135deg,#1a2332,#3d2a5a)'; return d; }
     if(t==='image'){ const i=document.createElement('img'); i.src=n.src||''; i.style.maxWidth='100%'; return i; }
@@ -555,7 +555,7 @@ ${body}
     else if(t==='row'){ el=document.createElement('div'); el.className='row'; (n.kids||[]).forEach((k,i)=>el.appendChild(renderEditable(k, path+'.'+i))); }
     else if(t==='label'){ el=document.createElement('div'); el.textContent=n.text||''; }
     else if(t==='badge'){ el=document.createElement('span'); el.className='badge-ui'; el.textContent=val(n.bind); }
-    else if(t==='button'){
+    else if(t==='button'){ /* beautiful */
       el=document.createElement('button'); el.textContent=n.text||'OK';
       el.onclick=async (ev)=>{
         if(editMode){ ev.preventDefault(); return; }
@@ -566,7 +566,7 @@ ${body}
         paint(surfaces[surfaceOID]||Object.values(surfaces)[0]);
       };
     }
-    else if(t==='splash'){ el=document.createElement('div'); el.innerHTML='<strong>'+(n.text||'Splash')+'</strong>'; el.style.padding='12px'; }
+    else if(t==='splash'){ el=document.createElement('div'); el.textContent=n.text||'Splash'; el.className='rt-splash'; }
     else if(t==='blob'){ el=document.createElement('div'); el.style.cssText='width:64px;height:64px;border-radius:40%;background:linear-gradient(135deg,#f4b400,#5b9cf5)'; }
     else if(t==='gradient'){ el=document.createElement('div'); el.textContent=n.text||''; el.style.cssText='padding:12px;border-radius:10px;background:linear-gradient(135deg,#1a2332,#3d2a5a)'; }
     else if(t==='image'){ el=document.createElement('img'); el.src=n.src||''; el.style.maxWidth='100%'; }
@@ -602,5 +602,190 @@ ${body}
     };
   }
 
-  log('Studio multi-instancia · ' + Object.keys(EXAMPLES).length + ' plantillas · paneles redimensionables');
+
+  /* ——— Panel inteligente de reglas + Mind ——— */
+  const AOS_KEYWORDS = ['flow','orge','version','desc','kind','cap','provides','requires','state','rule','when','then','indeterminate','ui','column','row','splash','gradient','button','badge','label','field','bind','emit','assemble','surface','test','deploy','devices','mobile','tablet','desktop','blob','tabs','tab','stack','drawer','image','qr','file','doclist','bottom-tabs','top-tabs','pulse','secure'];
+  const SNIPPETS = {
+    orge: "  (orge nombre (kind ORGES)\n    (cap \"recurso.consultar\")\n    (provides \"recurso.consulta\" \"1.0\")\n    (state (recurso.valor 0))\n    (rule r1 (when (gt recurso.valor 0)) (then recurso.ok true)))\n",
+    rule: "    (rule id (when (eq atomo valor)) (then destino true) (indeterminate false))\n",
+    ui: "  (orge ui-main (kind UI) (ui (column\n    (splash \"Mi app\")\n    (gradient \"Espacio Alset\" (style \"animated\"))\n    (badge (bind recurso.valor))\n    (row (button \"+\" (emit recurso.inc)) (button \"Acción\" (emit recurso.ok=true)))))\n",
+    pulse: "  ;; Pulse seguro (tipo, origen, destino, contenido) — firma Ed25519 + nonce en runtime\n  (pulse (tipo \"evento\") (origen stock) (destino venta) (contenido \"stock.changed\"))\n"
+  };
+  let liveOn = true, mindSuggestion = '', suggestIdx = 0;
+  const KW_RE = new RegExp('\\b(' + AOS_KEYWORDS.join('|') + ')\\b', 'g');
+  function highlightAos(src){
+    let esc = src.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+    esc = esc.replace(/("(?:\\.|[^"\\])*")/g, '<span class="s">$1</span>');
+    esc = esc.replace(/(\b\d+(?:\.\d+)?\b)/g, '<span class="n">$1</span>');
+    esc = esc.replace(KW_RE, '<span class="k">$1</span>');
+    esc = esc.replace(/([()])/g, '<span class="p">$1</span>');
+    return esc;
+  }
+  function syncHl(){
+    const hl = document.getElementById('aos-hl');
+    if(!hl || !aos) return;
+    hl.innerHTML = highlightAos(aos.value) + '\n';
+    hl.scrollTop = aos.scrollTop; hl.scrollLeft = aos.scrollLeft;
+  }
+  if(aos){
+    aos.addEventListener('scroll', function(){ var hl=document.getElementById('aos-hl'); if(hl){ hl.scrollTop=aos.scrollTop; hl.scrollLeft=aos.scrollLeft; }});
+    aos.addEventListener('input', function(){ syncHl(); scheduleLive(); });
+    syncHl();
+  }
+  var liveTimer = null;
+  function scheduleLive(){
+    if(!liveOn) return;
+    clearTimeout(liveTimer);
+    liveTimer = setTimeout(async function(){
+      try{
+        var name = (appName && appName.value.trim()) || 'mi-app';
+        var src = aos.value.replace(/\(flow\s+[^\s)]+/, '(flow '+name);
+        var res = await api('/api/flow/apply',{source:src, app:name});
+        if(res.error) return;
+        surfaces = res.surfaces||{}; surfaceOID = res.surface||Object.keys(surfaces)[0]||'';
+        if(res.state) liveState = res.state;
+        if(stateView) stateView.textContent = JSON.stringify(liveState,null,2);
+        paint(surfaces[surfaceOID]||Object.values(surfaces)[0]);
+      }catch(e){}
+    }, 700);
+  }
+  document.querySelectorAll('[data-aos-tab]').forEach(function(btn){
+    btn.onclick = function(){
+      document.querySelectorAll('[data-aos-tab]').forEach(function(b){ b.classList.remove('on'); });
+      btn.classList.add('on');
+      var tab = btn.getAttribute('data-aos-tab');
+      document.getElementById('aos-editor-wrap').classList.toggle('hidden', tab!=='editor');
+      document.getElementById('mind-panel').classList.toggle('hidden', tab!=='mind');
+      if(tab==='mind') mindAnalyze();
+    };
+  });
+  function insertAtCursor(text){
+    if(!aos) return;
+    var start = aos.selectionStart, end = aos.selectionEnd;
+    aos.value = aos.value.slice(0,start) + text + aos.value.slice(end);
+    aos.selectionStart = aos.selectionEnd = start + text.length;
+    aos.focus(); syncHl(); scheduleLive();
+  }
+  var _b;
+  if((_b=document.getElementById('btn-snippet-orge'))) _b.onclick=function(){ insertAtCursor(SNIPPETS.orge); };
+  if((_b=document.getElementById('btn-snippet-rule'))) _b.onclick=function(){ insertAtCursor(SNIPPETS.rule); };
+  if((_b=document.getElementById('btn-snippet-ui'))) _b.onclick=function(){ insertAtCursor(SNIPPETS.ui); };
+  if((_b=document.getElementById('btn-indent'))) _b.onclick=function(){
+    aos.value = aos.value.split('\n').map(function(l){ return l.trim()?('  '+l):l; }).join('\n');
+    syncHl();
+  };
+  var liveBtn = document.getElementById('btn-live-toggle');
+  if(liveBtn){
+    liveBtn.classList.add('live-on');
+    liveBtn.onclick = function(){
+      liveOn = !liveOn;
+      liveBtn.classList.toggle('live-on', liveOn);
+      liveBtn.textContent = liveOn ? '\u25cf Live' : '\u25cb Live';
+      if(liveOn) scheduleLive();
+    };
+  }
+  var sug = document.getElementById('aos-suggest');
+  function wordAtCursor(){
+    var pos = aos.selectionStart;
+    var left = aos.value.slice(0, pos);
+    var m = left.match(/[a-zA-Z0-9_.-]*$/);
+    return { word: m?m[0]:'', start: pos-(m?m[0].length:0), end: pos };
+  }
+  function showSuggest(items){
+    if(!items.length){ sug.classList.add('hidden'); return; }
+    sug.innerHTML = items.map(function(x,i){ return '<li data-i="'+i+'" class="'+(i===0?'active':'')+'">'+x+'</li>'; }).join('');
+    sug.classList.remove('hidden');
+    suggestIdx = 0;
+    sug.querySelectorAll('li').forEach(function(li){
+      li.onmousedown = function(e){ e.preventDefault(); applySuggest(li.textContent); };
+    });
+  }
+  function applySuggest(text){
+    var w = wordAtCursor();
+    aos.value = aos.value.slice(0,w.start) + text + aos.value.slice(w.end);
+    aos.selectionStart = aos.selectionEnd = w.start + text.length;
+    sug.classList.add('hidden');
+    syncHl(); scheduleLive();
+  }
+  function updateSugActive(){
+    var lis = [].slice.call(sug.querySelectorAll('li'));
+    if(!lis.length) return;
+    suggestIdx = (suggestIdx + lis.length) % lis.length;
+    lis.forEach(function(li,i){ li.classList.toggle('active', i===suggestIdx); });
+  }
+  if(aos){
+    aos.addEventListener('keydown', function(e){
+      if(e.key==='Tab'){
+        e.preventDefault();
+        if(!sug.classList.contains('hidden')){
+          var active = sug.querySelector('li.active');
+          if(active) applySuggest(active.textContent);
+          return;
+        }
+        insertAtCursor('  ');
+        return;
+      }
+      if(e.ctrlKey && e.key===' '){
+        e.preventDefault();
+        var w = wordAtCursor().word;
+        showSuggest(AOS_KEYWORDS.filter(function(k){ return !w || k.indexOf(w.toLowerCase())===0; }).slice(0,12));
+      }
+      if(!sug.classList.contains('hidden')){
+        if(e.key==='ArrowDown'){ e.preventDefault(); suggestIdx++; updateSugActive(); }
+        if(e.key==='ArrowUp'){ e.preventDefault(); suggestIdx--; updateSugActive(); }
+        if(e.key==='Enter' && sug.querySelector('li.active')){ e.preventDefault(); applySuggest(sug.querySelector('li.active').textContent); }
+        if(e.key==='Escape') sug.classList.add('hidden');
+      }
+    });
+    aos.addEventListener('keyup', function(e){
+      if(['ArrowDown','ArrowUp','Enter','Escape','Tab','Control'].indexOf(e.key)>=0) return;
+      var w = wordAtCursor().word;
+      if(w.length>=2) showSuggest(AOS_KEYWORDS.filter(function(k){ return k.indexOf(w.toLowerCase())===0; }).slice(0,10));
+      else sug.classList.add('hidden');
+    });
+  }
+  function mindAnalyze(){
+    var src = aos.value||'';
+    var orges=[], rules=[], binds=[], emits=[], m, re;
+    re=/\(orge\s+([^\s)]+)/g; while((m=re.exec(src))) orges.push(m[1]);
+    re=/\(rule\s+([^\s)]+)/g; while((m=re.exec(src))) rules.push(m[1]);
+    re=/\(bind\s+([^\s)]+)/g; while((m=re.exec(src))) binds.push(m[1]);
+    re=/\(emit\s+([^\s)]+)/g; while((m=re.exec(src))) emits.push(m[1]);
+    var hasUI = /\(kind\s+UI\)|\(ui\s/.test(src);
+    var parts = [];
+    parts.push('ORGES: '+(orges.join(', ')||'ninguno'));
+    parts.push('Reglas: '+(rules.join(', ')||'ninguna'));
+    parts.push('Binds: '+(binds.join(', ')||'—'));
+    parts.push('Emits: '+(emits.join(', ')||'—'));
+    parts.push(hasUI ? 'Superficie UI presente (vista = organismo).' : 'Sin UI-orge: añade vista que reaccione al estado.');
+    if(rules.length && !hasUI) parts.push('Mind: reglas sin vista — sugiere UI con bind a los átomos que escriben las reglas.');
+    if(orges.length>=2 && !/\(assemble/.test(src)) parts.push('Mind: falta (assemble …) para acoplar LEGO.');
+    if(!/\(pulse/.test(src) && orges.length>=2) parts.push('Mind: documenta Pulse firmado entre organismos (Ed25519 + nonce).');
+    document.getElementById('mind-out').textContent = parts.join('\n');
+    if(!hasUI && orges[0]){
+      mindSuggestion = '  (orge ui-main (kind UI) (ui (column\n    (splash "'+orges[0]+'")\n    (gradient "Reactivo Alset" (style "animated"))\n    (badge (bind '+(binds[0]||orges[0]+'.estado')+'))\n    (row (button "Acción" (emit '+(emits[0]||orges[0]+'.tick')+')))))\n  (assemble '+orges.join(' ')+' ui-main)\n  (surface ui-main)\n';
+    } else if(rules.length){
+      mindSuggestion = '    (rule mind-check (when (exists '+(binds[0]||'estado.atom')+')) (then mind.visto true))\n';
+    } else {
+      mindSuggestion = SNIPPETS.orge + SNIPPETS.ui + '  (assemble nombre ui-main)\n  (surface ui-main)\n';
+    }
+    document.getElementById('mind-code').textContent = mindSuggestion.replace(/\\n/g, '\n');
+  }
+  if((_b=document.getElementById('btn-mind-analyze'))) _b.onclick=mindAnalyze;
+  if((_b=document.getElementById('btn-mind-suggest-ui'))) _b.onclick=function(){
+    mindSuggestion = SNIPPETS.ui + '  (assemble stock ui-main)\n  (surface ui-main)\n';
+    document.getElementById('mind-code').textContent = mindSuggestion.replace(/\\n/g, '\n');
+    document.getElementById('mind-out').textContent = 'Mind propone UI con splash animado, gradient y botones Alset.';
+  };
+  if((_b=document.getElementById('btn-mind-pulse'))) _b.onclick=function(){
+    mindSuggestion = SNIPPETS.pulse;
+    document.getElementById('mind-code').textContent = mindSuggestion.replace(/\\n/g, '\n');
+    document.getElementById('mind-out').textContent = 'Pulse: protocolo entre ORGES. Seguro (firma+nonce), legible y resiliente en el runtime.';
+  };
+  if((_b=document.getElementById('btn-mind-insert'))) _b.onclick=function(){
+    if(mindSuggestion) insertAtCursor('\n'+mindSuggestion.replace(/\\n/g, '\n'));
+  };
+
+  log('Studio · editor inteligente .aos · Mind agente · Live preview · ' + Object.keys(EXAMPLES).length + ' plantillas');
 })();
+

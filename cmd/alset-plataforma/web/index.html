@@ -85,8 +85,36 @@
       </div>
       <div class="pane-body center-body">
         <div id="canvas" class="canvas" title="Suelta piezas LEGO aquí"></div>
-        <label class="muted">Fuente LISPAI-AOS</label>
-        <textarea id="aos" spellcheck="false"></textarea>
+        <div class="aos-tabs">
+          <button type="button" class="btn btn-ghost aos-tab on" data-aos-tab="editor">Reglas · .aos inteligente</button>
+          <button type="button" class="btn btn-ghost aos-tab" data-aos-tab="mind">Mind agente</button>
+        </div>
+        <div id="aos-editor-wrap" class="aos-editor-wrap">
+          <div class="aos-toolbar">
+            <button type="button" class="btn btn-ghost" id="btn-indent" title="Indentar">⇥ Indentar</button>
+            <button type="button" class="btn btn-ghost" id="btn-snippet-orge" title="Insertar ORGE">+ orge</button>
+            <button type="button" class="btn btn-ghost" id="btn-snippet-rule" title="Insertar rule">+ rule</button>
+            <button type="button" class="btn btn-ghost" id="btn-snippet-ui" title="Insertar UI">+ ui</button>
+            <button type="button" class="btn btn-ghost" id="btn-live-toggle" title="Vista en caliente">● Live</button>
+            <span class="muted" id="aos-hint">Ctrl+Space sugerencias · Tab indenta</span>
+          </div>
+          <div class="code-stack">
+            <pre id="aos-hl" class="aos-hl" aria-hidden="true"></pre>
+            <textarea id="aos" spellcheck="false" class="aos-input" placeholder="(flow mi-app ...)"></textarea>
+          </div>
+          <ul id="aos-suggest" class="aos-suggest hidden"></ul>
+        </div>
+        <div id="mind-panel" class="mind-panel hidden">
+          <div class="mind-head">Mind · agente de código ORGES / UI</div>
+          <div id="mind-out" class="mind-out muted">Mind analiza el .aos y sugiere reglas, emits y vistas.</div>
+          <div class="mind-actions">
+            <button type="button" class="btn btn-blue" id="btn-mind-analyze">Analizar reglas</button>
+            <button type="button" class="btn btn-ghost" id="btn-mind-suggest-ui">Sugerir UI animada</button>
+            <button type="button" class="btn btn-ghost" id="btn-mind-pulse">Plantilla Pulse</button>
+          </div>
+          <pre id="mind-code" class="mind-code"></pre>
+          <button type="button" class="btn btn-primary" id="btn-mind-insert" style="width:100%;margin-top:8px">Insertar sugerencia en .aos</button>
+        </div>
       </div>
     </section>
     <div class="splitter v" data-split="right"></div>
