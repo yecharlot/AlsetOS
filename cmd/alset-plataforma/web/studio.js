@@ -654,9 +654,14 @@ ${body}
       document.querySelectorAll('[data-aos-tab]').forEach(function(b){ b.classList.remove('on'); });
       btn.classList.add('on');
       var tab = btn.getAttribute('data-aos-tab');
-      document.getElementById('aos-editor-wrap').classList.toggle('hidden', tab!=='editor');
-      document.getElementById('mind-panel').classList.toggle('hidden', tab!=='mind');
+      var ed = document.getElementById('aos-editor-wrap');
+      var mind = document.getElementById('mind-panel');
+      var decl = document.getElementById('declare-panel');
+      if(ed) ed.classList.toggle('hidden', tab!=='editor');
+      if(mind) mind.classList.toggle('hidden', tab!=='mind');
+      if(decl) decl.classList.toggle('hidden', tab!=='declare');
       if(tab==='mind') mindAnalyze();
+      if(tab==='declare') renderEmitComponents();
     };
   });
   function insertAtCursor(text){
@@ -719,7 +724,7 @@ ${body}
         e.preventDefault();
         if(!sug.classList.contains('hidden')){
           var active = sug.querySelector('li.active');
-          if(active) applySuggest(active.textContent);
+          if(active){ var it=(sug._items&&sug._items[+active.getAttribute('data-i')])||{insert:active.textContent}; applySuggest(it.insert||it.label||active.textContent); }
           return;
         }
         insertAtCursor('  ');
@@ -733,7 +738,7 @@ ${body}
       if(!sug.classList.contains('hidden')){
         if(e.key==='ArrowDown'){ e.preventDefault(); suggestIdx++; updateSugActive(); }
         if(e.key==='ArrowUp'){ e.preventDefault(); suggestIdx--; updateSugActive(); }
-        if(e.key==='Enter' && sug.querySelector('li.active')){ e.preventDefault(); applySuggest(sug.querySelector('li.active').textContent); }
+        if(e.key==='Enter' && sug.querySelector('li.active')){ e.preventDefault(); var ai=sug.querySelector('li.active'); var it=(sug._items&&sug._items[+ai.getAttribute('data-i')])||{insert:ai.textContent}; applySuggest(it.insert||it.label||ai.textContent); }
         if(e.key==='Escape') sug.classList.add('hidden');
       }
     });
@@ -786,6 +791,193 @@ ${body}
     if(mindSuggestion) insertAtCursor('\n'+mindSuggestion.replace(/\\n/g, '\n'));
   };
 
-  log('Studio · editor inteligente .aos · Mind agente · Live preview · ' + Object.keys(EXAMPLES).length + ' plantillas');
+
+  /* Emits como componentes reutilizables */
+  var emitLibrary = [
+    {name:'stock.inc', effect:'stock.unidades +1', snip:'(button "+" (emit stock.inc))'},
+    {name:'stock.dec', effect:'stock.unidades -1', snip:'(button "-" (emit stock.dec))'},
+    {name:'venta.registrar', effect:'descuenta stock', snip:'(button "Vender" (emit venta.registrar))'},
+    {name:'pago.estado=pagado', effect:'marca pagado', snip:'(button "Pagar" (emit pago.estado=pagado))'}
+  ];
+  var declareDraft = { states:[], rules:[], orges:[], emits:[], flow:'' };
+
+  function renderEmitComponents(){
+    var box = document.getElementById('emit-components');
+    if(!box) return;
+    box.innerHTML = '';
+    emitLibrary.forEach(function(e){
+      var c = document.createElement('span');
+      c.className = 'emit-chip';
+      c.draggable = true;
+      c.textContent = e.name;
+      c.title = e.effect;
+      c.ondragstart = function(ev){ ev.dataTransfer.setData('text/plain', e.snip); };
+      c.onclick = function(){ insertAtCursor('\n  '+e.snip+'\n'); };
+      box.appendChild(c);
+    });
+  }
+  function refreshDeclareDraft(){
+    var lines = [];
+    declareDraft.states.forEach(function(s){ lines.push('    ('+s.key+' '+s.val+')'); });
+    var stateBlock = declareDraft.states.length ? '    (state\n'+declareDraft.states.map(function(s){return '      ('+s.key+' '+s.val+')';}).join('\n')+'\n    )' : '';
+    declareDraft.orges.forEach(function(o){
+      lines.push('  (orge '+o.name+' (kind ORGES) (cap "'+o.cap+'")');
+      if(stateBlock) lines.push(stateBlock);
+      declareDraft.rules.forEach(function(r){
+        lines.push('    (rule '+r.id+' (when '+r.when+') (then '+r.then+'))');
+      });
+      lines.push('  )');
+    });
+    declareDraft.emits.forEach(function(e){
+      lines.push('  ;; emit componente: '+e.name+' → '+e.effect);
+    });
+    if(declareDraft.flow){
+      lines.push('(flow '+declareDraft.flow.name);
+      lines.push('  (version "1.0.0")');
+      lines = lines.concat(/* orges already */);
+      lines.push('  (assemble '+declareDraft.flow.assemble+')');
+      lines.push('  (surface '+declareDraft.flow.surface+')');
+      lines.push(')');
+    }
+    var pre = document.getElementById('declare-draft');
+    if(pre) pre.textContent = lines.join('\n') || '(vacío — declara estado, reglas, orges…)';
+  }
+  function wireDeclare(){
+    function val(id){ var el=document.getElementById(id); return el?el.value.trim():''; }
+    var b;
+    if((b=document.getElementById('d-add-state'))) b.onclick=function(){
+      var k=val('d-state-key'), v=val('d-state-val')||'0';
+      if(!k) return; declareDraft.states.push({key:k,val:v}); refreshDeclareDraft();
+    };
+    if((b=document.getElementById('d-add-rule'))) b.onclick=function(){
+      declareDraft.rules.push({id:val('d-rule-id')||'r1', when:val('d-rule-when')||'(true)', then:val('d-rule-then')||'ok true'});
+      refreshDeclareDraft();
+    };
+    if((b=document.getElementById('d-add-emit'))) b.onclick=function(){
+      var name=val('d-emit-name'), effect=val('d-emit-effect');
+      if(!name) return;
+      emitLibrary.push({name:name, effect:effect||name, snip:'(button "'+name+'" (emit '+name+'))'});
+      declareDraft.emits.push({name:name, effect:effect});
+      renderEmitComponents();
+      // también al toolbox acciones
+      var tb=document.getElementById('toolbox-actions');
+      if(tb){
+        var d=document.createElement('div'); d.className='tool'; d.draggable=true;
+        d.textContent=name; d.dataset.snip='(emit '+name+')';
+        d.ondragstart=function(ev){ ev.dataTransfer.setData('text/plain', d.dataset.snip); };
+        tb.appendChild(d);
+      }
+      refreshDeclareDraft();
+      log('Emit componente: '+name);
+    };
+    if((b=document.getElementById('d-add-orge'))) b.onclick=function(){
+      declareDraft.orges.push({name:val('d-orge-name')||'orge1', cap:val('d-orge-cap')||'cap.default'});
+      refreshDeclareDraft();
+    };
+    if((b=document.getElementById('d-build-flow'))) b.onclick=function(){
+      declareDraft.flow = {
+        name: val('d-flow-name')||'mi-app',
+        assemble: val('d-assemble')||declareDraft.orges.map(function(o){return o.name;}).join(' '),
+        surface: val('d-surface')||'ui-main'
+      };
+      var body = [];
+      body.push('(flow '+declareDraft.flow.name);
+      body.push('  (version "1.0.0")');
+      body.push('  (desc "Declarado con Mind")');
+      declareDraft.orges.forEach(function(o){
+        body.push('  (orge '+o.name+' (kind ORGES) (cap "'+o.cap+'")');
+        if(declareDraft.states.length){
+          body.push('    (state');
+          declareDraft.states.forEach(function(s){ body.push('      ('+s.key+' '+s.val+')'); });
+          body.push('    )');
+        }
+        declareDraft.rules.forEach(function(r){
+          body.push('    (rule '+r.id+' (when '+r.when+') (then '+r.then+'))');
+        });
+        body.push('  )');
+      });
+      // UI mínima si no hay ui en assemble
+      if((declareDraft.flow.assemble||'').indexOf('ui-')>=0 || declareDraft.flow.surface){
+        body.push('  (orge '+(declareDraft.flow.surface||'ui-main')+' (kind UI) (ui (column');
+        body.push('    (splash "'+declareDraft.flow.name+'")');
+        if(declareDraft.states[0]) body.push('    (badge (bind '+declareDraft.states[0].key+'))');
+        emitLibrary.slice(-5).forEach(function(e){ body.push('    '+e.snip); });
+        body.push('  )))');
+      }
+      body.push('  (assemble '+declareDraft.flow.assemble+(declareDraft.flow.surface?' '+declareDraft.flow.surface:'')+')');
+      body.push('  (surface '+declareDraft.flow.surface+')');
+      body.push('  (deploy web (devices mobile tablet desktop))');
+      body.push(')');
+      var pre=document.getElementById('declare-draft');
+      if(pre) pre.textContent = body.join('\n');
+      declareDraft._full = body.join('\n');
+    };
+    if((b=document.getElementById('d-to-aos'))) b.onclick=function(){
+      var pre=document.getElementById('declare-draft');
+      var src = (declareDraft._full) || (pre && pre.textContent) || '';
+      if(!src || src.indexOf('vacío')>=0) return;
+      aos.value = src;
+      syncHl(); scheduleLive();
+      // switch to editor tab
+      var tab=document.querySelector('[data-aos-tab="editor"]');
+      if(tab) tab.click();
+      log('Borrador Mind pasado al .aos');
+    };
+  }
+  wireDeclare();
+  renderEmitComponents();
+
+  /* Sugerencias en tiempo real enriquecidas (keywords + emits + snippets) */
+  function richSuggest(word){
+    var items = [];
+    var w = (word||'').toLowerCase();
+    AOS_KEYWORDS.forEach(function(k){
+      if(!w || k.indexOf(w)===0) items.push({label:k, detail:'keyword', insert:k});
+    });
+    emitLibrary.forEach(function(e){
+      if(!w || e.name.indexOf(w)===0 || e.name.indexOf(w)>=0)
+        items.push({label:e.name, detail:'emit · '+e.effect, insert:e.name});
+    });
+    if(!w || 'rule'.indexOf(w)===0) items.push({label:'(rule …)', detail:'snippet', insert:'(rule r1 (when (true)) (then ok true))'});
+    if(!w || 'state'.indexOf(w)===0) items.push({label:'(state …)', detail:'snippet', insert:'(state (campo 0))'});
+    if(!w || 'orge'.indexOf(w)===0) items.push({label:'(orge …)', detail:'snippet', insert:'(orge nombre (kind ORGES) (state (x 0)))'});
+    if(!w || 'assemble'.indexOf(w)===0) items.push({label:'(assemble …)', detail:'snippet', insert:'(assemble a b ui-main)'});
+    if(!w || 'pulse'.indexOf(w)===0) items.push({label:'(pulse …)', detail:'snippet', insert:SNIPPETS.pulse});
+    return items.slice(0, 14);
+  }
+  // Override showSuggest to support objects
+  var _origShow = showSuggest;
+  showSuggest = function(items){
+    if(!items || !items.length){ sug.classList.add('hidden'); return; }
+    // normalize
+    items = items.map(function(x){
+      if(typeof x==='string') return {label:x, detail:'', insert:x};
+      return x;
+    });
+    sug._items = items;
+    sug.innerHTML = items.map(function(x,i){
+      return '<li data-i="'+i+'" class="'+(i===0?'active':'')+'">'+x.label+(x.detail?'<small>'+x.detail+'</small>':'')+'</li>';
+    }).join('');
+    sug.classList.remove('hidden');
+    suggestIdx = 0;
+    sug.querySelectorAll('li').forEach(function(li){
+      li.onmousedown = function(e){
+        e.preventDefault();
+        var it = sug._items[+li.getAttribute('data-i')];
+        applySuggest(it.insert || it.label);
+      };
+    });
+  };
+  // Replace keyup handler by re-binding: patch via capturing on aos
+  if(aos){
+    aos.addEventListener('keyup', function(e){
+      if(['ArrowDown','ArrowUp','Enter','Escape','Tab','Control'].indexOf(e.key)>=0) return;
+      var w = wordAtCursor().word;
+      if(w.length>=1) showSuggest(richSuggest(w));
+      else sug.classList.add('hidden');
+    });
+  }
+
+  log('Studio · .aos live + Mind declarar + emits componentes · ' + Object.keys(EXAMPLES).length + ' plantillas');
 })();
 

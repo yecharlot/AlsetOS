@@ -39,12 +39,12 @@ func DeployProduction(flow *FlowAOS, appsRoot string) (string, error) {
 	if err := os.WriteFile(filepath.Join(dir, "app.html"), []byte(prod), 0o644); err != nil {
 		return "", err
 	}
-	idx := fmt.Sprintf(`<!DOCTYPE html><html><head><meta charset="utf-8"/>
+	idx := fmt.Sprintf(`<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
 <meta http-equiv="refresh" content="0;url=app.html"/>
-<title>%s</title></head><body>
-<p><a href="app.html">Abrir %s</a></p>
-<p><a href="mobile/">Mobile</a> · <a href="tablet/">Tablet</a> · <a href="desktop/">Desktop</a></p>
-</body></html>`, flow.Name, flow.Name)
+<title>%s</title>
+<style>body{margin:0;background:#0f1419}</style>
+</head><body></body></html>`, flow.Name)
 	_ = os.WriteFile(filepath.Join(dir, "index.html"), []byte(idx), 0o644)
 	return dir, nil
 }
@@ -59,7 +59,7 @@ func productionAppHTML(app, surface, uiJSON string) string {
 :root{--bg:#0f1419;--card:#1a2332;--ink:#e8eef8;--accent:#F4B400;--muted:#8b9bb4}
 *{box-sizing:border-box}body{margin:0;font-family:system-ui,sans-serif;background:var(--bg);color:var(--ink);min-height:100vh}
 #root{padding:1rem;max-width:560px;margin:0 auto;position:relative;min-height:100vh}
-#status{position:fixed;bottom:8px;right:8px;font-size:.7rem;color:var(--muted);opacity:.5;pointer-events:none;z-index:5}
+#status{display:none}
 .col{display:flex;flex-direction:column;gap:.6rem}.row{display:flex;gap:.5rem;flex-wrap:wrap}
 button,.tab{background:var(--accent);border:0;padding:.5rem .8rem;border-radius:10px;font-weight:700;cursor:pointer;color:#111}
 .tab{background:#243044;color:var(--ink)}.tab.on{background:var(--accent);color:#111}
@@ -78,7 +78,7 @@ button,.tab{background:var(--accent);border:0;padding:.5rem .8rem;border-radius:
 .stack>*{display:none}.stack>.on{display:block}
 img.ui-img{max-width:100%%;border-radius:12px;display:block}
 .qr-box{font-family:monospace;background:#111;padding:1rem;border-radius:8px;word-break:break-all}
-#status{font-size:.75rem;color:var(--muted)}
+
 input[type=file]{font-size:.8rem;color:var(--muted)}
 .doclist li{margin:.35rem 0}
 </style></head><body>

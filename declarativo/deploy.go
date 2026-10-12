@@ -47,12 +47,11 @@ func DeployFlow(flow *FlowAOS, outDir string) error {
 		}
 	}
 	// index launcher
-	idx := fmt.Sprintf(`<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"/><title>%s · deploy</title>
-<style>body{font-family:system-ui;background:#0f1419;color:#e8eef8;padding:2rem}
-a{color:#F4B400;margin-right:1rem}</style></head><body>
-<h1>%s</h1><p>Pack generado desde flow LISPAI-AOS</p>
-<p><a href="mobile/">Mobile</a><a href="tablet/">Tablet</a><a href="desktop/">Desktop</a>
-<a href="artifacts/">Artefactos</a></p></body></html>`, flow.Name, flow.Name)
+	idx := fmt.Sprintf(`<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta http-equiv="refresh" content="0;url=mobile/"/>
+<title>%s</title>
+<style>body{margin:0;background:#0f1419}</style></head><body></body></html>`, flow.Name)
 	return os.WriteFile(filepath.Join(outDir, "index.html"), []byte(idx), 0o644)
 }
 
