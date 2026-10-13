@@ -200,13 +200,42 @@
     <pre id="console" class="console"></pre>
   </section>
 
-  <section class="pane pane-preview" id="pane-preview">
-    <div class="pane-head"><span>Preview · <span id="devLabel">mobile</span></span>
-      <button type="button" class="icon-btn" data-close="preview">×</button></div>
-    <div class="preview-stage">
-      <div id="device" class="device mobile"><div id="previewRoot"></div></div>
-    </div>
-  </section>
+  <div class="preview-row" id="preview-row">
+    <section class="pane pane-preview" id="pane-preview">
+      <div class="pane-head">
+        <span>Preview · <span id="devLabel">mobile</span></span>
+        <div class="device-tabs" id="device-tabs">
+          <button type="button" class="btn btn-ghost on" data-device="mobile">Móvil</button>
+          <button type="button" class="btn btn-ghost" data-device="tablet">Tablet</button>
+          <button type="button" class="btn btn-ghost" data-device="desktop">Desktop</button>
+        </div>
+        <button type="button" class="icon-btn" data-close="preview">×</button>
+      </div>
+      <div class="preview-stage">
+        <div id="device" class="device mobile"><div id="previewRoot"><p class="muted">Aplica un flow o activa Live para ver la UI</p></div></div>
+      </div>
+    </section>
+    <aside class="pane pane-inspector" id="pane-inspector">
+      <div class="pane-head"><span>AlsetInspector · Mind</span>
+        <span class="badge" id="inspector-badge">activo</span></div>
+      <div class="pane-body inspector-body">
+        <div id="inspector-out" class="mind-out muted">Analizando flow en tiempo real…</div>
+        <div id="inspector-diags" class="mind-diags"></div>
+        <div id="inspector-sugs" class="mind-sugs"></div>
+        <pre id="inspector-code" class="mind-code"></pre>
+        <button type="button" class="btn btn-primary" id="btn-inspector-insert" style="width:100%">Insertar snippet / flow en .aos</button>
+        <button type="button" class="btn btn-blue" id="btn-inspector-apply-build" style="width:100%;margin-top:6px">Reemplazar .aos con flow generado</button>
+        <div class="mind-chat">
+          <h4>Dominio → ORGES</h4>
+          <div id="inspector-chat-log" class="mind-chat-log"></div>
+          <div class="mind-chat-row">
+            <input id="inspector-chat-input" class="rt-input" placeholder="Ej: pedidos a domicilio con stock y estados"/>
+            <button type="button" class="btn btn-blue" id="btn-inspector-chat">Enviar</button>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
 
   <script src="studio.js"></script>
 </body>

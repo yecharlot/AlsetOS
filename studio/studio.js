@@ -371,11 +371,43 @@ ${body}
   };
   $('#btn-close-examples').onclick=()=>$('#examples-drawer').classList.add('hidden');
 
+
+  /** Extrae IR UI mínimo del texto .aos si el API no devuelve surfaces */
+  function clientUIFromAOS(src){
+    if(!src) return null;
+    const hasUI = /\(kind\s+UI\)/.test(src) || /\(ui\s+\(/.test(src);
+    if(!hasUI) return null;
+    const kids = [];
+    const splash = src.match(/\(splash\s+"([^"]*)"/);
+    if(splash) kids.push({type:'splash', text:splash[1]});
+    if(/\(gradient/.test(src)) kids.push({type:'gradient', text:''});
+    const badges = [...src.matchAll(/\(badge\s+\(bind\s+([a-zA-Z0-9_.-]+)\)/g)];
+    badges.forEach(m => kids.push({type:'badge', bind:m[1]}));
+    const labels = [...src.matchAll(/\(label\s+"([^"]*)"/g)];
+    labels.forEach(m => kids.push({type:'label', text:m[1]}));
+    const buttons = [...src.matchAll(/\(button\s+"([^"]*)"\s+\(emit\s+([a-zA-Z0-9_.=-]+)\)/g)];
+    if(buttons.length){
+      const row = {type:'row', kids: buttons.map(m => ({type:'button', text:m[1], emit:m[2]}))};
+      kids.push(row);
+    }
+    if(!kids.length) kids.push({type:'label', text:'UI (sin nodos parseables en cliente)'});
+    return {type:'column', kids};
+  }
+
+  function pickSurface(res){
+    const surfacesMap = res && res.surfaces ? res.surfaces : surfaces;
+    const oid = (res && res.surface) || surfaceOID || Object.keys(surfacesMap||{})[0] || '';
+    let tree = oid ? surfacesMap[oid] : null;
+    if(!tree) tree = Object.values(surfacesMap||{})[0];
+    if(!tree) tree = clientUIFromAOS(aos && aos.value);
+    return { tree, oid, surfacesMap };
+  }
+
   async function api(path, body){
     const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});
     const t=await r.text();
     let j; try{j=JSON.parse(t);}catch{j={ok:false,error:t};}
-    if(!r.ok || j.error){ const err=new Error(j.error||t||r.statusText); throw err; }
+    if(!r.ok){ throw new Error(j.error||t||r.statusText); }
     return j;
   }
 
@@ -425,12 +457,20 @@ ${body}
     surfaces=res.surfaces||{}; surfaceOID=res.surface||Object.keys(surfaces)[0]||'';
     sessionApp=res.app||name; appName.value=sessionApp;
     if(res.state) liveState=res.state;
-    stateView.textContent=JSON.stringify(liveState,null,2);
-    log('OK instancia '+sessionApp+' · orgs '+(res.organismos||0));
-    paint(surfaces[surfaceOID]||Object.values(surfaces)[0]);
+    if(stateView) stateView.textContent=JSON.stringify(liveState,null,2);
+    log('OK instancia '+sessionApp+' · orgs '+(res.organismos||0)+' · surface '+(surfaceOID||'—'));
+    const picked = pickSurface(res);
+    surfaces = picked.surfacesMap || surfaces;
+    surfaceOID = picked.oid || surfaceOID;
+    paint(picked.tree);
+    try{ inspectorAnalyze(); }catch(_){}
     refreshApps();
   };
-  $('#btn-run-preview').onclick=()=>{ paint(surfaces[surfaceOID]||Object.values(surfaces)[0]); log('Preview '+deviceMode); };
+  $('#btn-run-preview').onclick=()=>{
+    const picked = pickSurface({surfaces, surface: surfaceOID});
+    paint(picked.tree);
+    log('Preview '+deviceMode+(picked.tree?' · UI ok':' · sin UI'));
+  };
   $('#btn-test').onclick=async()=>{
     const res=await api('/api/flow/test',{source:aos.value, app:appName.value});
     if(res.ok) log('Tests OK · '+res.app); else log('Tests: '+JSON.stringify(res.errors||res.error), true);
@@ -548,12 +588,23 @@ ${body}
   // Patch paint/render to attach paths — replace paint function body usage
   const _paint = paint;
   paint = function(tree){
+    if(!previewRoot) return;
     previewRoot.innerHTML='';
     previewRoot.style.position='relative';
-    previewRoot.style.minHeight='200px';
-    if(!tree){ previewRoot.innerHTML='<p class="muted">Sin UI</p>'; return; }
-    const rootEl = renderEditable(tree, '0');
-    previewRoot.appendChild(rootEl);
+    previewRoot.style.minHeight='160px';
+    if(!tree || (typeof tree==='object' && !tree.type && !(tree.kids||[]).length)){
+      const fb = clientUIFromAOS(aos && aos.value);
+      tree = fb;
+    }
+    if(!tree){ previewRoot.innerHTML='<p class="muted">Sin UI — añade (orge … (kind UI) (ui …)) y (surface …), luego Aplicar flow</p>'; return; }
+    try {
+      const rootEl = renderEditable(tree, '0');
+      if(rootEl) previewRoot.appendChild(rootEl);
+      else previewRoot.innerHTML='<p class="muted">UI vacía</p>';
+    } catch(err) {
+      console.error(err);
+      previewRoot.innerHTML='<p class="muted">Error render: '+(err.message||err)+'</p>';
+    }
   };
 
   function renderEditable(n, path){
@@ -650,12 +701,19 @@ ${body}
         var name = (appName && appName.value.trim()) || 'mi-app';
         var src = aos.value.replace(/\(flow\s+[^\s)]+/, '(flow '+name);
         var res = await api('/api/flow/apply',{source:src, app:name});
-        if(res.error) return;
-        surfaces = res.surfaces||{}; surfaceOID = res.surface||Object.keys(surfaces)[0]||'';
-        if(res.state) liveState = res.state;
+        if(res && res.error) { try{ inspectorAnalyze(); }catch(_){} return; }
+        surfaces = (res && res.surfaces) || {};
+        surfaceOID = (res && res.surface) || Object.keys(surfaces)[0] || '';
+        if(res && res.state) liveState = res.state;
         if(stateView) stateView.textContent = JSON.stringify(liveState,null,2);
-        paint(surfaces[surfaceOID]||Object.values(surfaces)[0]);
-      }catch(e){}
+        var picked = pickSurface(res || {});
+        paint(picked.tree);
+        try{ inspectorAnalyze(); }catch(_){}
+      }catch(e){
+        // API falló: al menos pintar fallback cliente + inspector local
+        paint(clientUIFromAOS(aos.value));
+        try{ inspectorAnalyze(); }catch(_){}
+      }
     }, 700);
   }
   document.querySelectorAll('[data-aos-tab]').forEach(function(btn){
@@ -1031,5 +1089,124 @@ ${body}
   }
 
   log('Studio · .aos live + Mind declarar + emits componentes · ' + Object.keys(EXAMPLES).length + ' plantillas');
+
+  /* ——— AlsetInspector permanente (derecha del preview) ——— */
+  let inspectorSnippet = '';
+  let inspectorBuilt = '';
+
+  async function inspectorAnalyze(){
+    const src = (aos && aos.value) || '';
+    const badge = document.getElementById('inspector-badge');
+    if(badge){ badge.textContent='analizando…'; badge.classList.remove('ok'); }
+    try {
+      const res = await api('/api/mind/analyze', { source: src, mode: 'analyze', message: '' });
+      renderInspector(res);
+      if(badge){ badge.textContent='activo'; badge.classList.add('ok'); }
+    } catch(e) {
+      const out = document.getElementById('inspector-out');
+      if(out) out.textContent = 'Inspector offline: '+(e.message||e)+'\nRevisa sintaxis localmente (paréntesis, flow, surface).';
+      if(badge) badge.textContent='offline';
+      // local paren check
+      let bal=0; for(const c of src){ if(c==='(')bal++; else if(c===')')bal--; if(bal<0)break; }
+      const diags = document.getElementById('inspector-diags');
+      if(diags && bal!==0) diags.innerHTML = '<div class="diag">⚠ Paréntesis desbalanceados (Δ '+bal+')</div>';
+    }
+  }
+
+  function renderInspector(res){
+    if(!res) return;
+    const out = document.getElementById('inspector-out');
+    if(out) out.textContent = res.reply || '';
+    const diags = document.getElementById('inspector-diags');
+    if(diags) diags.innerHTML = (res.diagnostics||[]).map(d=>'<div class="diag">⚠ '+escapeHtml(d)+'</div>').join('');
+    const sugs = document.getElementById('inspector-sugs');
+    const list = res.suggestions || [];
+    if(sugs){
+      sugs.innerHTML = list.map((s,i)=>
+        '<button type="button" class="sug-btn" data-isug="'+i+'"><b>'+escapeHtml(s.title)+'</b> <span class="muted">'+escapeHtml(s.kind)+'</span><br/><small>'+escapeHtml(s.reason||'')+'</small></button>'
+      ).join('');
+      sugs.querySelectorAll('[data-isug]').forEach(btn=>{
+        btn.onclick = ()=>{
+          const s = list[+btn.dataset.isug];
+          if(!s) return;
+          inspectorSnippet = s.snippet || '';
+          if(s.kind==='build') inspectorBuilt = s.snippet || '';
+          const code = document.getElementById('inspector-code');
+          if(code) code.textContent = inspectorSnippet;
+        };
+      });
+    }
+    if(res.built_aos){ inspectorBuilt = res.built_aos; inspectorSnippet = res.built_aos; }
+    else if(list[0]){ inspectorSnippet = list[0].snippet || ''; }
+    const code = document.getElementById('inspector-code');
+    if(code && inspectorSnippet) code.textContent = inspectorSnippet;
+  }
+
+  async function inspectorChat(){
+    const input = document.getElementById('inspector-chat-input');
+    const msg = (input && input.value || '').trim();
+    if(!msg) return;
+    const logEl = document.getElementById('inspector-chat-log');
+    if(logEl) logEl.innerHTML += '<div class="chat-user"><b>Tú:</b> '+escapeHtml(msg)+'</div>';
+    if(input) input.value = '';
+    try {
+      const res = await api('/api/mind/chat', { source: (aos&&aos.value)||'', message: msg, mode: 'chat' });
+      renderInspector(res);
+      if(res.built_aos){
+        inspectorBuilt = res.built_aos;
+        const code = document.getElementById('inspector-code');
+        if(code) code.textContent = res.built_aos;
+      }
+      if(logEl) logEl.innerHTML += '<div class="chat-mind"><b>Inspector:</b> '+escapeHtml(res.reply||'').replace(/\n/g,'<br/>')+'</div>';
+      if(logEl) logEl.scrollTop = logEl.scrollHeight;
+    } catch(e) {
+      if(logEl) logEl.innerHTML += '<div class="chat-mind">Error: '+escapeHtml(e.message||e)+'</div>';
+    }
+  }
+
+  (function wireInspector(){
+    const ins = document.getElementById('btn-inspector-insert');
+    if(ins) ins.onclick = ()=>{
+      if(!inspectorSnippet || !aos) return;
+      insertAtCursor('\n'+inspectorSnippet+'\n');
+      log('Inspector: snippet insertado');
+      scheduleLive();
+    };
+    const apl = document.getElementById('btn-inspector-apply-build');
+    if(apl) apl.onclick = ()=>{
+      const src = inspectorBuilt || inspectorSnippet;
+      if(!src || !aos) return;
+      aos.value = src;
+      if(typeof syncHl==='function') syncHl();
+      log('Inspector: flow cargado en editor');
+      scheduleLive();
+      $('#btn-apply') && $('#btn-apply').click();
+    };
+    const chat = document.getElementById('btn-inspector-chat');
+    if(chat) chat.onclick = inspectorChat;
+    const cin = document.getElementById('inspector-chat-input');
+    if(cin) cin.addEventListener('keydown', function(e){ if(e.key==='Enter') inspectorChat(); });
+    // continuous
+    setTimeout(inspectorAnalyze, 400);
+    setInterval(function(){ if(document.getElementById('pane-inspector')) inspectorAnalyze(); }, 12000);
+  })();
+
+  // Device tabs if present
+  document.querySelectorAll('#device-tabs [data-device]').forEach(function(btn){
+    btn.onclick = function(){
+      document.querySelectorAll('#device-tabs [data-device]').forEach(b=>b.classList.remove('on'));
+      btn.classList.add('on');
+      deviceMode = btn.getAttribute('data-device')||'mobile';
+      if(device){ device.className = 'device '+deviceMode; }
+      const lab = document.getElementById('devLabel');
+      if(lab) lab.textContent = deviceMode;
+      const picked = pickSurface({surfaces, surface: surfaceOID});
+      paint(picked.tree);
+    };
+  });
+
+  // Initial paint attempt from editor
+  setTimeout(function(){ try{ scheduleLive(); }catch(_){} }, 600);
+
 })();
 
