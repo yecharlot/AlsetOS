@@ -62,9 +62,9 @@ func CatalogModes() []ModeInfo {
 		},
 		{
 			ID: string(ModeIngest), Label: "Ingestión",
-			Summary: "Importa esquema BD, SQL o descripción de API REST y genera un draft de ORGES.",
+			Summary: "Importa esquema BD, SQL, API REST o estados financieros (PDF/XLS/DOCX/JSON) y genera draft ORGES + genes.",
 			RequiresUI: false,
-			Outputs:    []string{"IR intermedio", "draft .aos", "warnings"},
+			Outputs:    []string{"IR intermedio", "draft .aos", "ratios/TIR/VPN", "warnings"},
 			NextSteps:  []string{"Revisar en Modelo", "Firmar manifiesto", "Implementar"},
 		},
 		{
@@ -250,6 +250,11 @@ func (a *Agent) Ingest(req IngestRequest) IngestResponse {
 	kind := strings.ToLower(strings.TrimSpace(req.Kind))
 	if kind == "" {
 		kind = "schema"
+	}
+	// Vertical financiero: PDF/XLS/DOCX/JSON → ORGES + genes
+	switch kind {
+	case "finance-json", "finance", "finance-pdf", "finance-xls", "finance-docx":
+		return a.IngestFinance(req)
 	}
 	var warnings []string
 	var entities []schemaEntity

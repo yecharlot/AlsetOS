@@ -269,3 +269,12 @@ hardware
 ```
 
 La meta no es construir otro Linux. Linux/TinyCore es el sustrato. AlsetOS debe convertirse en la capa que redefine la unidad fundamental de ejecución.
+
+## Vertical financiero (rápido)
+
+```bash
+go run ./cmd/alset-finance -file ejemplos/finance/sample.json
+go test ./gene/ ./mind/ ./ingest/ -count=1
+```
+
+Guía completa: [docs/GUIA_FINANCE.md](docs/GUIA_FINANCE.md) · Windows: `scripts/start-finance-node.bat`

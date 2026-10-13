@@ -1,0 +1,82 @@
+(flow analisis-financiero-ejemplo
+  (version "1.0.0")
+  (desc "Plantilla de análisis financiero — Alset Arquitecto")
+  (policy (mode model) (requires-ui false) (domain finance))
+
+  (orge balance
+    (kind ORGES)
+    (cap "balance.consultar")
+    (provides "balance.entity" "1.0")
+    (state
+      (balance.activo_corriente 150000000)
+      (balance.activo_no_corriente 320000000)
+      (balance.activo_total 470000000)
+      (balance.pasivo_corriente 80000000)
+      (balance.pasivo_no_corriente 120000000)
+      (balance.pasivo_total 200000000)
+      (balance.patrimonio 270000000)
+      (balance.periodo "2025-Q3")))
+
+  (orge dre
+    (kind ORGES)
+    (cap "dre.consultar")
+    (provides "dre.entity" "1.0")
+    (state
+      (dre.ingresos 410000000)
+      (dre.costo_ventas 180000000)
+      (dre.utilidad_bruta 230000000)
+      (dre.gastos_operativos 95000000)
+      (dre.ebitda 135000000)
+      (dre.ebit 120000000)
+      (dre.utilidad_neta 77000000)
+      (dre.periodo "2025-Q3")))
+
+  (orge flujo
+    (kind ORGES)
+    (cap "flujo.consultar")
+    (provides "flujo.entity" "1.0")
+    (state
+      (flujo.operativo 110000000)
+      (flujo.inversion -45000000)
+      (flujo.financiacion -20000000)
+      (flujo.neto 45000000)
+      (flujo.periodo "2025-Q3")))
+
+  (orge analisis-financiero
+    (kind ORGES)
+    (cap "finance.analizar" "finance.alertar")
+    (requires "balance.entity" "1.0" "dre.entity" "1.0" "flujo.entity" "1.0")
+    (provides "analisis.entity" "1.0")
+    (state
+      (analisis.liquidez 0)
+      (analisis.prueba_acida 0)
+      (analisis.endeudamiento 0)
+      (analisis.roe 0)
+      (analisis.roa 0)
+      (analisis.margen 0)
+      (analisis.vpn 0)
+      (analisis.tir 0)
+      (analisis.alerta false)
+      (analisis.periodo "2025-Q3"))
+    (gene gene.ratio.liquidez)
+    (gene gene.ratio.prueba_acida)
+    (gene gene.ratio.endeudamiento)
+    (gene gene.ratio.roe)
+    (gene gene.ratio.roa)
+    (gene gene.ratio.margen_neto)
+    (gene gene.vpn)
+    (gene gene.tir)
+    (rule liquidez-critica
+      (when (lt analisis.liquidez 1.0))
+      (then analisis.alerta true))
+    (rule endeudamiento-alto
+      (when (gt analisis.endeudamiento 0.7))
+      (then analisis.alerta true))
+    (goal analisis.alerta false))
+
+  (assemble balance dre flujo analisis-financiero)
+  (bind analisis-financiero balance balance.entity 1.0)
+  (bind analisis-financiero dre dre.entity 1.0)
+  (bind analisis-financiero flujo flujo.entity 1.0)
+  (test ini (eq analisis.alerta false))
+)
