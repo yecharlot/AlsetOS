@@ -281,6 +281,41 @@ func cmdStudio(args []string) {
 		writeJSON(w, mindAgent.Handle(req))
 	})
 
+	
+	mux.HandleFunc("/api/work/modes", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, map[string]interface{}{"ok": true, "modes": mind.CatalogModes()})
+	})
+	mux.HandleFunc("/api/work/domain", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "POST", 405)
+			return
+		}
+		var req mind.AnalyzeRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeErr(w, err)
+			return
+		}
+		if req.WorkMode == "" {
+			req.WorkMode = req.Mode
+		}
+		if req.WorkMode == "" {
+			req.WorkMode = "analyze"
+		}
+		writeJSON(w, mindAgent.Handle(req))
+	})
+	mux.HandleFunc("/api/ingest", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "POST", 405)
+			return
+		}
+		var req mind.IngestRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeErr(w, err)
+			return
+		}
+		writeJSON(w, mindAgent.Ingest(req))
+	})
+
 	mux.HandleFunc("/api/apps", func(w http.ResponseWriter, r *http.Request) {
 		entries, _ := os.ReadDir(appsDir)
 		var names []string

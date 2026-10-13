@@ -1382,5 +1382,95 @@ ${body}
     }
   })();
 
+
+  /* ——— Modos de trabajo del Arquitecto ——— */
+  var workModeCurrent = 'analyze';
+  var lastDomainDraft = '';
+  var MODE_COPY = {
+    analyze: 'Análisis: describe el negocio; ruta de digitalización. Sin pantallas obligatorias.',
+    model: 'Modelo: solo ORGES (state, cap, rule, bind, test). La UI es opcional.',
+    ingest: 'Ingestión: SQL, schema JSON o API REST → draft .aos para revisar.',
+    implement: 'Implementación: dominio + UI + preview + deploy.',
+    audit: 'Auditoría: política PrismaTEC, Pulse, tokenización del manifiesto.'
+  };
+  function setWorkMode(m) {
+    workModeCurrent = m;
+    document.querySelectorAll('.wm-btn').forEach(function(b) {
+      b.classList.toggle('on', b.getAttribute('data-mode') === m);
+    });
+    var sum = document.getElementById('mode-summary');
+    if (sum) sum.textContent = MODE_COPY[m] || m;
+    var box = document.getElementById('ingest-box');
+    if (box) box.classList.toggle('hidden', m !== 'ingest');
+    // Preview less critical in non-implement modes
+    var pr = document.getElementById('pane-preview');
+    if (pr) pr.style.opacity = (m === 'implement') ? '1' : '0.85';
+    log('Modo: ' + m);
+  }
+  document.querySelectorAll('.wm-btn').forEach(function(b) {
+    b.onclick = function() { setWorkMode(b.getAttribute('data-mode')); };
+  });
+  async function runDomain() {
+    var spec = (document.getElementById('domain-spec') || {}).value || '';
+    var out = document.getElementById('mode-out');
+    if (!spec.trim() && workModeCurrent !== 'audit') {
+      if (out) out.textContent = 'Escribe la descripción del dominio.';
+      return;
+    }
+    try {
+      var res = await api('/api/work/domain', {
+        message: spec,
+        work_mode: workModeCurrent,
+        mode: workModeCurrent,
+        name: (appName && appName.value) || 'modelo-dominio',
+        source: (aos && aos.value) || ''
+      });
+      lastDomainDraft = res.built_aos || '';
+      var text = res.reply || res.roadmap || res.audit_notes || JSON.stringify(res, null, 2);
+      if (out) out.textContent = text;
+      if (res.built_aos && workModeCurrent === 'model') {
+        log('Draft ORGES listo (sin UI)');
+      }
+    } catch (e) {
+      if (out) out.textContent = String(e.message || e);
+    }
+  }
+  async function runIngest() {
+    var kind = (document.getElementById('ingest-kind') || {}).value || 'sql';
+    var text = (document.getElementById('ingest-text') || {}).value || '';
+    var out = document.getElementById('mode-out');
+    try {
+      var res = await api('/api/ingest', {
+        kind: kind,
+        text: text,
+        name: (appName && appName.value) || 'ingest-draft'
+      });
+      lastDomainDraft = res.draft_aos || '';
+      var w = (res.warnings || []).join('\n');
+      if (out) out.textContent = (w ? 'Warnings:\n' + w + '\n\n' : '') + (res.draft_aos || '');
+      log('Ingestión: ' + ((res.entities || []).join(', ') || 'sin entidades'));
+    } catch (e) {
+      if (out) out.textContent = String(e.message || e);
+    }
+  }
+  var bd = document.getElementById('btn-domain-run');
+  if (bd) bd.onclick = function() {
+    if (workModeCurrent === 'ingest') runIngest();
+    else runDomain();
+  };
+  var bi = document.getElementById('btn-ingest-run');
+  if (bi) bi.onclick = runIngest;
+  var be = document.getElementById('btn-domain-to-editor');
+  if (be) be.onclick = function() {
+    if (!lastDomainDraft) { log('No hay draft — ejecuta Traducir o Ingerir primero', true); return; }
+    if (aos) {
+      aos.value = lastDomainDraft;
+      if (typeof syncHl === 'function') syncHl();
+      log('Draft cargado en editor .aos');
+      if (typeof scheduleLive === 'function') scheduleLive();
+    }
+  };
+  setWorkMode('analyze');
+
 })();
 

@@ -16,10 +16,12 @@ func NewAgent() *Agent {
 }
 
 type AnalyzeRequest struct {
-	Source  string `json:"source"`
-	Message string `json:"message"`
-	Cursor  int    `json:"cursor"`
-	Mode    string `json:"mode"` // analyze | suggest | chat | complete | build
+	Source   string `json:"source"`
+	Message  string `json:"message"`
+	Cursor   int    `json:"cursor"`
+	Mode     string `json:"mode"` // analyze | suggest | chat | complete | build | model | ingest | audit
+	WorkMode string `json:"work_mode"` // analyze | model | ingest | implement | audit
+	Name     string `json:"name"`
 }
 
 type Suggestion struct {
@@ -36,8 +38,12 @@ type AnalyzeResponse struct {
 	Diagnostics []string     `json:"diagnostics"`
 	Completions []string     `json:"completions,omitempty"`
 	SurfaceHints []string    `json:"surface_hints,omitempty"`
-	BuiltAOS    string       `json:"built_aos,omitempty"`
-	Agent       string       `json:"agent"`
+	BuiltAOS     string       `json:"built_aos,omitempty"`
+	Roadmap      string       `json:"roadmap,omitempty"`
+	AuditNotes   string       `json:"audit_notes,omitempty"`
+	WorkMode     string       `json:"work_mode,omitempty"`
+	RequiresUI   bool         `json:"requires_ui"`
+	Agent        string       `json:"agent"`
 }
 
 var (
@@ -68,10 +74,53 @@ func (a *Agent) Handle(req AnalyzeRequest) AnalyzeResponse {
 	}
 	diags := a.diagnostics(src)
 	sugs := a.suggestions(src, msg)
+	wmEarly := ParseWorkMode(req.WorkMode)
+	if wmEarly != ModeImplement || strings.Contains(src, "requires-ui false") || strings.Contains(src, "(policy (mode model") || strings.Contains(src, "(policy (mode ingest") || strings.Contains(src, "(policy (mode analyze") {
+		filtered := make([]string, 0, len(diags))
+		for _, d := range diags {
+			dl := strings.ToLower(d)
+			if strings.Contains(dl, "surface") || strings.Contains(dl, "ui ") || strings.Contains(dl, "sin ui") {
+				continue
+			}
+			filtered = append(filtered, d)
+		}
+		diags = filtered
+	}
 	resp := AnalyzeResponse{Ok: true, Agent: a.Name, Diagnostics: diags, Suggestions: sugs}
+
+	wm := ParseWorkMode(req.WorkMode)
+	if req.WorkMode == "" && (mode == "analyze" || mode == "model" || mode == "audit") {
+		wm = ParseWorkMode(mode)
+	}
+	resp.WorkMode = string(wm)
+	resp.RequiresUI = wm == ModeImplement
+
+	if wm == ModeAnalyze && msg != "" {
+		resp.Roadmap = a.RoadmapFromDomain(msg)
+		resp.BuiltAOS = a.BuildDomainOnly(req.Name, msg)
+		resp.Reply = resp.Roadmap + "\n\n---\nDraft .aos de dominio (sin UI) generado. Usa modo **Modelo** o **Implementación** según el cliente."
+		return resp
+	}
+	if wm == ModeModel && msg != "" {
+		resp.BuiltAOS = a.BuildDomainOnly(req.Name, msg)
+		resp.Reply = "Modelo ORGES sin superficie visual. Valida tests y contratos; la UI es opcional."
+		resp.Suggestions = append([]Suggestion{{Title: "Modelo dominio", Kind: "build", Snippet: resp.BuiltAOS, Reason: "Sin UI"}}, resp.Suggestions...)
+		return resp
+	}
+	if wm == ModeAudit {
+		resp.AuditNotes = a.AuditNotes(req.Name, src)
+		resp.Reply = resp.AuditNotes
+		return resp
+	}
 
 	// Domain build from natural language
 	if mode == "build" || looksLikeDomainSpec(msg) {
+		if wm == ModeModel || wm == ModeAnalyze {
+			built := a.BuildDomainOnly(req.Name, msg)
+			resp.BuiltAOS = built
+			resp.Reply = "ORGES de dominio (sin UI obligatoria)."
+			return resp
+		}
 		built := a.buildFromDomain(msg)
 		if built != "" {
 			resp.BuiltAOS = built

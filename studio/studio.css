@@ -353,3 +353,27 @@ h3{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--mute
   background:linear-gradient(135deg,#f4b400,#5b9cf5);
 }
 #previewRoot.alset-ui .ui-selectable { cursor: default; }
+
+/* Work modes — Arquitecto de negocios */
+.work-modes {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  padding: 8px 12px; background: #121820; border-bottom: 1px solid var(--line, #243044);
+}
+.wm-label { font-size: 11px; color: var(--muted, #8b9bb4); text-transform: uppercase; letter-spacing: .06em; margin-right: 6px; }
+.wm-btn {
+  background: #1a2332; border: 1px solid #243044; color: #e8eef8;
+  padding: 5px 10px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.wm-btn.on { background: #F4B400; color: #111; border-color: #F4B400; }
+.mode-panel {
+  padding: 10px 12px; background: #0c1016; border-bottom: 1px solid #243044;
+}
+.mode-summary { font-size: 12px; color: #8b9bb4; margin: 0 0 8px; }
+.domain-spec { width: 100%; min-height: 64px; font-family: inherit; }
+.mode-actions { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.mode-out {
+  margin-top: 8px; max-height: 180px; overflow: auto; font-size: 11px;
+  background: #0a0e14; padding: 8px; border-radius: 8px; white-space: pre-wrap;
+}
+.ingest-box { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.ingest-box.hidden { display: none; }
