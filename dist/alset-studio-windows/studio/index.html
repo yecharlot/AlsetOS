@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+  <title>Alset Studio · ORGES</title>
+  <link rel="stylesheet" href="studio.css"/>
+</head>
+<body class="studio-full">
+  <header class="top" id="topbar">
+    <div class="brand">ALSET STUDIO <small>ORGES · LISPAI-AOS · PWA</small></div>
+    <input id="app-name" class="name-input" value="mi-app" title="Nombre de la app (deploy)"/>
+    <span id="status" class="badge">listo</span>
+    <div class="spacer"></div>
+    <div class="panel-toggles">
+      <button type="button" class="btn btn-ghost panel-tog active" data-panel="left">Toolbox</button>
+      <button type="button" class="btn btn-ghost panel-tog active" data-panel="right">Propiedades</button>
+      <button type="button" class="btn btn-ghost panel-tog active" data-panel="bottom">Consola</button>
+      <button type="button" class="btn btn-ghost panel-tog active" data-panel="preview">Preview</button>
+    </div>
+    <button type="button" class="btn btn-ghost" id="btn-help">Ayuda</button>
+    <button type="button" class="btn btn-ghost" id="btn-examples">Ejemplos</button>
+    <button type="button" class="btn btn-blue" id="btn-apply">Aplicar flow</button>
+    <button type="button" class="btn btn-blue" id="btn-test">Probar</button>
+    <button type="button" class="btn btn-ghost" id="btn-run-preview">Correr preview</button>
+    <button type="button" class="btn btn-gold" id="btn-deploy">Desplegar producción</button>
+  </header>
+
+  <div id="error-box" class="error-box hidden" role="alert"></div>
+
+  <aside id="help-drawer" class="drawer hidden">
+    <div class="drawer-head"><strong>Ayuda · Alset Studio ORGES</strong>
+      <button type="button" class="btn btn-ghost" id="btn-close-help">Cerrar</button></div>
+    <div class="drawer-body">
+      <p><b>Objetivo:</b> definir organismos (ORGES) en LISPAI-AOS, unirlos como LEGO, probarlos y desplegarlos listos para producción.</p>
+      <ol>
+        <li>Arrastra componentes del <b>Toolbox</b> al canvas o edita el <code>.aos</code>.</li>
+        <li><b>Aplicar flow</b> carga el runtime (contratos, estado, reglas).</li>
+        <li><b>Correr preview</b> monta la UI-orge; los botones ejecutan acciones reales (<code>stock.inc</code>, <code>venta.registrar</code>…).</li>
+        <li><b>Probar</b> ejecuta los <code>(test …)</code> del flow.</li>
+        <li><b>Desplegar producción</b> escribe <code>/apps/&lt;nombre&gt;/</code> servida por este Studio (PWA lista).</li>
+      </ol>
+      <h4>Emits con funcionalidad real</h4>
+      <ul>
+        <li><code>stock.inc</code> / <code>stock.dec</code> — suman/restan <code>stock.unidades</code></li>
+        <li><code>venta.registrar</code> — descuenta stock y marca venta</li>
+        <li><code>campo=valor</code> — escribe átomo de estado</li>
+      </ul>
+      <h4>Formas LISPAI-AOS</h4>
+      <p><code>flow orge provides requires bind state rule ui assemble surface test deploy</code></p>
+    </div>
+  </aside>
+
+  <aside id="examples-drawer" class="drawer hidden">
+    <div class="drawer-head"><strong>Ejemplos</strong>
+      <button type="button" class="btn btn-ghost" id="btn-close-examples">Cerrar</button></div>
+    <div class="drawer-body" id="examples-list"></div>
+  </aside>
+
+  <div class="workbench" id="workbench">
+    <aside class="pane pane-left" id="pane-left">
+      <div class="pane-head"><span>Toolbox</span>
+        <button type="button" class="icon-btn" data-close="left">×</button></div>
+      <div class="pane-body">
+        <h3>ORGES / flow</h3>
+        <div class="toolbox" id="toolbox-orges"></div>
+        <h3>UI (arrastrables)</h3>
+        <div class="toolbox" id="toolbox-ui"></div>
+        <h3>Acciones (emit)</h3>
+        <div class="toolbox" id="toolbox-actions"></div>
+        <h3>Plantillas</h3>
+        <div class="toolbox" id="toolbox-templates"></div>
+      </div>
+    </aside>
+    <div class="splitter v" data-split="left"></div>
+
+    <section class="pane pane-center" id="pane-center">
+      <div class="pane-head">
+        <span>Canvas · flow</span>
+        <div class="device-tabs">
+          <button type="button" class="btn btn-ghost dev on" data-dev="mobile">Mobile</button>
+          <button type="button" class="btn btn-ghost dev" data-dev="tablet">Tablet</button>
+          <button type="button" class="btn btn-ghost dev" data-dev="desktop">Desktop</button>
+        </div>
+      </div>
+      <div class="pane-body center-body">
+        <div id="canvas" class="canvas" title="Suelta piezas LEGO aquí"></div>
+        <div class="aos-tabs">
+          <button type="button" class="btn btn-ghost aos-tab on" data-aos-tab="editor">Reglas · .aos inteligente</button>
+          <button type="button" class="btn btn-ghost aos-tab" data-aos-tab="mind">Mind agente</button>
+          <button type="button" class="btn btn-ghost aos-tab" data-aos-tab="declare">Mind · declarar</button>
+        </div>
+        <div id="aos-editor-wrap" class="aos-editor-wrap">
+          <div class="aos-toolbar">
+            <button type="button" class="btn btn-ghost" id="btn-indent" title="Indentar">⇥ Indentar</button>
+            <button type="button" class="btn btn-ghost" id="btn-snippet-orge" title="Insertar ORGE">+ orge</button>
+            <button type="button" class="btn btn-ghost" id="btn-snippet-rule" title="Insertar rule">+ rule</button>
+            <button type="button" class="btn btn-ghost" id="btn-snippet-ui" title="Insertar UI">+ ui</button>
+            <button type="button" class="btn btn-ghost" id="btn-live-toggle" title="Vista en caliente">● Live</button>
+            <span class="muted" id="aos-hint">Ctrl+Space sugerencias · Tab indenta</span>
+          </div>
+          <div class="code-stack">
+            <pre id="aos-hl" class="aos-hl" aria-hidden="true"></pre>
+            <textarea id="aos" spellcheck="false" class="aos-input" placeholder="(flow mi-app ...)"></textarea>
+          </div>
+          <ul id="aos-suggest" class="aos-suggest hidden"></ul>
+        </div>
+                <div id="mind-panel" class="mind-panel hidden">
+          <div class="mind-head">Mind · agente de código (tiempo real)</div>
+          <p class="muted">Analiza el flow, diagnostica contratos/ARL/UI y propone snippets. Chat de dominio → ORGES.</p>
+          <div class="mind-actions">
+            <button type="button" class="btn btn-blue" id="btn-mind-analyze">Analizar flow</button>
+            <button type="button" class="btn btn-ghost" id="btn-mind-suggest-ui">Sugerir UI animada</button>
+            <button type="button" class="btn btn-ghost" id="btn-mind-pulse">Pulse seguro</button>
+          </div>
+          <div id="mind-out" class="mind-out muted">Mind espera tu flow o un mensaje de dominio.</div>
+          <div id="mind-diags" class="mind-diags"></div>
+          <div id="mind-sugs" class="mind-sugs"></div>
+          <pre id="mind-code" class="mind-code"></pre>
+          <button type="button" class="btn btn-primary" id="btn-mind-insert" style="width:100%;margin-top:8px">Insertar snippet activo en .aos</button>
+          <div class="mind-chat">
+            <h4>Chat con Mind</h4>
+            <div id="mind-chat-log" class="mind-chat-log"></div>
+            <div class="mind-chat-row">
+              <input id="mind-chat-input" class="rt-input" placeholder="Ej: pedidos a domicilio con stock y ruta"/>
+              <button type="button" class="btn btn-blue" id="btn-mind-chat">Enviar</button>
+            </div>
+          </div>
+        </div>
+        <div id="declare-panel" class="declare-panel hidden">
+          <div class="mind-head">Declarar piezas independientes → ensamblar</div>
+          <p class="muted">Cada bloque genera su fragmento .aos. Luego «Ensamblar en flow» los une.</p>
+          <div class="declare-grid">
+            <div class="declare-card">
+              <h4>Estado</h4>
+              <input id="d-state-key" class="rt-input" placeholder="stock.unidades"/>
+              <input id="d-state-val" class="rt-input" placeholder="10"/>
+              <button type="button" class="btn btn-ghost" id="d-add-state">+ estado</button>
+            </div>
+            <div class="declare-card">
+              <h4>Regla</h4>
+              <input id="d-rule-id" class="rt-input" placeholder="r-alerta"/>
+              <input id="d-rule-when" class="rt-input" placeholder="(lte stock.unidades 3)"/>
+              <input id="d-rule-then" class="rt-input" placeholder="stock.alerta true"/>
+              <button type="button" class="btn btn-ghost" id="d-add-rule">+ regla</button>
+            </div>
+            <div class="declare-card">
+              <h4>Emit (acción)</h4>
+              <input id="d-emit-name" class="rt-input" placeholder="stock.inc"/>
+              <input id="d-emit-effect" class="rt-input" placeholder="stock.unidades += 1"/>
+              <button type="button" class="btn btn-ghost" id="d-add-emit">+ emit componente</button>
+            </div>
+            <div class="declare-card">
+              <h4>ORGE</h4>
+              <input id="d-orge-name" class="rt-input" placeholder="stock"/>
+              <input id="d-orge-cap" class="rt-input" placeholder="stock.consultar"/>
+              <button type="button" class="btn btn-ghost" id="d-add-orge">+ orge</button>
+            </div>
+            <div class="declare-card">
+              <h4>Flow / assemble</h4>
+              <input id="d-flow-name" class="rt-input" placeholder="mi-app"/>
+              <input id="d-assemble" class="rt-input" placeholder="stock venta ui-main"/>
+              <input id="d-surface" class="rt-input" placeholder="ui-main"/>
+              <button type="button" class="btn btn-blue" id="d-build-flow">Ensamblar en flow</button>
+            </div>
+          </div>
+          <h4>Emits como componentes</h4>
+          <div id="emit-components" class="emit-components"></div>
+          <h4>Borrador declarado</h4>
+          <pre id="declare-draft" class="mind-code"></pre>
+          <button type="button" class="btn btn-primary" id="d-to-aos" style="width:100%">Pasar borrador al .aos</button>
+        </div>
+      </div>
+    </section>
+    <div class="splitter v" data-split="right"></div>
+
+    <aside class="pane pane-right" id="pane-right">
+      <div class="pane-head"><span>Propiedades · lógica</span>
+        <button type="button" class="icon-btn" data-close="right">×</button></div>
+      <div class="pane-body">
+        <div class="field-row"><label>Seleccionado</label>
+          <input id="prop-sel" class="rt-input" readonly placeholder="—"/></div>
+        <div class="field-row"><label>Emit / acción</label>
+          <input id="prop-emit" class="rt-input" placeholder="stock.inc"/></div>
+        <div class="field-row"><label>Bind estado</label>
+          <input id="prop-bind" class="rt-input" placeholder="stock.unidades"/></div>
+        <button type="button" class="btn btn-blue" id="btn-apply-prop" style="width:100%;margin-top:8px">Aplicar al .aos</button>
+        <h3>Estado vivo</h3>
+        <pre id="state-view" class="state-view">{}</pre>
+        <h3>Apps en producción</h3>
+        <div id="apps-list" class="apps-list"></div>
+      </div>
+    </aside>
+  </div>
+
+  <div class="splitter h" data-split="bottom"></div>
+  <section class="pane pane-bottom" id="pane-bottom">
+    <div class="pane-head"><span>Consola</span>
+      <button type="button" class="icon-btn" data-close="bottom">×</button></div>
+    <pre id="console" class="console"></pre>
+  </section>
+
+  <div class="preview-row" id="preview-row">
+    <section class="pane pane-preview" id="pane-preview">
+      <div class="pane-head">
+        <span>Preview · <span id="devLabel">mobile</span></span>
+        <div class="device-tabs" id="device-tabs">
+          <button type="button" class="btn btn-ghost on" data-device="mobile">Móvil</button>
+          <button type="button" class="btn btn-ghost" data-device="tablet">Tablet</button>
+          <button type="button" class="btn btn-ghost" data-device="desktop">Desktop</button>
+        </div>
+        <button type="button" class="icon-btn" data-close="preview">×</button>
+      </div>
+      <div class="preview-stage">
+        <div id="device" class="device mobile"><div id="previewRoot"><p class="muted">Aplica un flow o activa Live para ver la UI</p></div></div>
+      </div>
+    </section>
+    <aside class="pane pane-inspector" id="pane-inspector">
+      <div class="pane-head"><span>AlsetInspector · Mind</span>
+        <span class="badge" id="inspector-badge">activo</span></div>
+      <div class="pane-body inspector-body">
+        <div id="inspector-out" class="mind-out muted">Analizando flow en tiempo real…</div>
+        <div id="inspector-diags" class="mind-diags"></div>
+        <div id="inspector-sugs" class="mind-sugs"></div>
+        <pre id="inspector-code" class="mind-code"></pre>
+        <button type="button" class="btn btn-primary" id="btn-inspector-insert" style="width:100%">Insertar snippet / flow en .aos</button>
+        <button type="button" class="btn btn-blue" id="btn-inspector-apply-build" style="width:100%;margin-top:6px">Reemplazar .aos con flow generado</button>
+        <div class="mind-chat">
+          <h4>Dominio → ORGES</h4>
+          <div id="inspector-chat-log" class="mind-chat-log"></div>
+          <div class="mind-chat-row">
+            <input id="inspector-chat-input" class="rt-input" placeholder="Ej: pedidos a domicilio con stock y estados"/>
+            <button type="button" class="btn btn-blue" id="btn-inspector-chat">Enviar</button>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <script src="studio.js"></script>
+</body>
+</html>
