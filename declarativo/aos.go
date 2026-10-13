@@ -18,6 +18,8 @@ type UINode struct {
 	Emit  string            `json:"emit,omitempty"`
 	Src   string            `json:"src,omitempty"`   // image url / gradient / file accept
 	Style string            `json:"style,omitempty"` // css hints: blur, animated, bottom, top
+	// Props: propiedades visuales del órgano UI (padding, margin, gap, radius, color, bg, width, height, fontSize…)
+	Props map[string]string `json:"props,omitempty"`
 	Kids  []UINode          `json:"kids,omitempty"`
 	Meta  map[string]string `json:"meta,omitempty"`
 }
@@ -366,6 +368,27 @@ func compileCond(n lispai.AOSNode) (Condition, error) {
 	return c, nil
 }
 
+
+// mergeUIProp guarda una propiedad visual en el nodo (órgano UI).
+func mergeUIProp(node *UINode, key, val string) {
+	if node.Props == nil {
+		node.Props = map[string]string{}
+	}
+	node.Props[strings.ToLower(strings.TrimSpace(key))] = strings.TrimSpace(val)
+}
+
+// isUIPropKey reconoce atributos visuales declarativos.
+func isUIPropKey(h string) bool {
+	switch strings.ToLower(h) {
+	case "padding", "margin", "gap", "radius", "color", "bg", "background",
+		"width", "height", "fontsize", "font-size", "weight", "opacity",
+		"border", "shadow", "align", "justify", "props":
+		return true
+	default:
+		return false
+	}
+}
+
 func compileUI(items []lispai.AOSNode) ([]UINode, error) {
 	var out []UINode
 	for _, it := range items {
@@ -397,6 +420,22 @@ func compileUI(items []lispai.AOSNode) ([]UINode, error) {
 						node.Src = fmt.Sprint(el[1])
 						continue
 					}
+					if isUIPropKey(h) && len(el) > 1 {
+						if h == "props" {
+							// (props (padding 8px) (radius 12px))
+							if sub, ok := el[1].([]lispai.AOSNode); ok {
+								for _, p := range sub {
+									pl, ok := p.([]lispai.AOSNode)
+									if ok && len(pl) >= 2 {
+										mergeUIProp(&node, fmt.Sprint(pl[0]), fmt.Sprint(pl[1]))
+									}
+								}
+							}
+						} else {
+							mergeUIProp(&node, h, fmt.Sprint(el[1]))
+						}
+						continue
+					}
 				}
 			}
 			// children = list nodes among remaining
@@ -404,7 +443,7 @@ func compileUI(items []lispai.AOSNode) ([]UINode, error) {
 			for _, extra := range l[start:] {
 				if el, ok := extra.([]lispai.AOSNode); ok {
 					h := strings.ToLower(fmt.Sprint(el[0]))
-					if h == "style" || h == "src" || h == "emit" || h == "bind" {
+					if h == "style" || h == "src" || h == "emit" || h == "bind" || isUIPropKey(h) {
 						continue
 					}
 					childItems = append(childItems, extra)
@@ -431,6 +470,17 @@ func compileUI(items []lispai.AOSNode) ([]UINode, error) {
 					node.Bind = fmt.Sprint(el[1])
 				case "style":
 					node.Style = fmt.Sprint(el[1])
+				case "padding", "margin", "gap", "radius", "color", "bg", "background", "width", "height", "fontsize", "font-size", "weight", "opacity", "border", "shadow", "align", "justify":
+					mergeUIProp(&node, fmt.Sprint(el[0]), fmt.Sprint(el[1]))
+				case "props":
+					if sub, ok := el[1].([]lispai.AOSNode); ok {
+						for _, p := range sub {
+							pl, ok := p.([]lispai.AOSNode)
+							if ok && len(pl) >= 2 {
+								mergeUIProp(&node, fmt.Sprint(pl[0]), fmt.Sprint(pl[1]))
+							}
+						}
+					}
 				case "src":
 					node.Src = fmt.Sprint(el[1])
 				}

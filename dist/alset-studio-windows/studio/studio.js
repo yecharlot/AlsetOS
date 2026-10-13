@@ -394,6 +394,27 @@ ${body}
     return {type:'column', kids};
   }
 
+  function applyAlsetProps(el, n){
+    if(!el || !n || el.nodeType!==1) return el;
+    const p = n.props || {};
+    const st = el.style;
+    if(p.padding) st.padding = p.padding;
+    if(p.margin) st.margin = p.margin;
+    if(p.gap) st.gap = p.gap;
+    if(p.radius) st.borderRadius = p.radius;
+    if(p.color) st.color = p.color;
+    if(p.bg || p.background) st.background = p.bg || p.background;
+    if(p.width) st.width = p.width;
+    if(p.height) st.height = p.height;
+    if(p.fontsize || p['font-size']) st.fontSize = p.fontsize || p['font-size'];
+    if(p.weight) st.fontWeight = p.weight;
+    if(p.opacity) st.opacity = p.opacity;
+    if(p.border) st.border = p.border;
+    if(p.shadow) st.boxShadow = p.shadow;
+    if(p.align) st.alignItems = p.align;
+    if(p.justify) st.justifyContent = p.justify;
+    return el;
+  }
   function pickSurface(res){
     const surfacesMap = res && res.surfaces ? res.surfaces : surfaces;
     const oid = (res && res.surface) || surfaceOID || Object.keys(surfacesMap||{})[0] || '';
@@ -592,6 +613,7 @@ ${body}
     previewRoot.innerHTML='';
     previewRoot.style.position='relative';
     previewRoot.style.minHeight='160px';
+    previewRoot.classList.add('alset-ui');
     if(!tree || (typeof tree==='object' && !tree.type && !(tree.kids||[]).length)){
       const fb = clientUIFromAOS(aos && aos.value);
       tree = fb;
@@ -641,7 +663,12 @@ ${body}
     else if(t==='tab'){ el=document.createElement('div'); el.textContent='Tab '+(n.text||''); (n.kids||[]).forEach((k,i)=>el.appendChild(renderEditable(k, path+'.'+i))); }
     else if(t==='field'){ el=document.createElement('input'); el.className='rt-input'; el.placeholder=n.text||''; }
     else { el=document.createElement('div'); el.textContent=n.type||''; }
-    if(el && el.nodeType===1) makeEditable(el, path);
+    if(el && el.nodeType===1){ applyAlsetProps(el, n); makeEditable(el, path);
+      el.dataset.uiPath = path; el.onclick = (function(node, path){ return function(ev){
+        if(!editMode && ev.target.tagName==='BUTTON') return;
+        if(editMode){ ev.stopPropagation(); selectUINode(node, path); }
+      }; })(n, path);
+    }
     return el;
   }
 

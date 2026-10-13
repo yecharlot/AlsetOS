@@ -184,7 +184,19 @@
           <input id="prop-emit" class="rt-input" placeholder="stock.inc"/></div>
         <div class="field-row"><label>Bind estado</label>
           <input id="prop-bind" class="rt-input" placeholder="stock.unidades"/></div>
-        <button type="button" class="btn btn-blue" id="btn-apply-prop" style="width:100%;margin-top:8px">Aplicar al .aos</button>
+        <p class="organo-hint">Cada componente es un <b>órgano UI</b>. Activa «Editar layout», haz clic en un elemento y ajusta props. Mismo aspecto en preview y deploy.</p>
+        <div class="prop-grid">
+          <label>Padding <input id="prop-padding" class="rt-input" placeholder="8px"/></label>
+          <label>Margin <input id="prop-margin" class="rt-input" placeholder="4px"/></label>
+          <label>Gap <input id="prop-gap" class="rt-input" placeholder="8px"/></label>
+          <label>Radius <input id="prop-radius" class="rt-input" placeholder="10px"/></label>
+          <label>Color <input id="prop-color" class="rt-input" placeholder="#e8eef8"/></label>
+          <label>Fondo <input id="prop-bg" class="rt-input" placeholder="#F4B400"/></label>
+          <label>Width <input id="prop-width" class="rt-input" placeholder="100%"/></label>
+          <label>Height <input id="prop-height" class="rt-input" placeholder="auto"/></label>
+          <label>Font size <input id="prop-fontsize" class="rt-input" placeholder="14px"/></label>
+        </div>
+        <button type="button" class="btn btn-blue" id="btn-apply-prop" style="width:100%;margin-top:8px">Aplicar props al órgano</button>
         <h3>Estado vivo</h3>
         <pre id="state-view" class="state-view">{}</pre>
         <h3>Apps en producción</h3>

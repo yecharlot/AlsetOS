@@ -288,3 +288,39 @@ h3{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--mute
   background: linear-gradient(135deg, #1b4965, #e85d04 80%);
   color: #fff; border-radius: 14px; padding: 16px; font-weight: 800;
 }
+
+/* Shared skin — same tokens as deploy SharedUISkin */
+#previewRoot.alset-ui, .alset-ui {
+  --alset-bg:#0f1419; --alset-card:#1a2332; --alset-ink:#e8eef8;
+  --alset-accent:#F4B400; --alset-muted:#8b9bb4; --alset-line:#243044;
+  --alset-blue:#1b4965; --alset-orange:#e85d04;
+  color: var(--alset-ink);
+}
+#previewRoot.alset-ui .col { display:flex; flex-direction:column; gap:.65rem; }
+#previewRoot.alset-ui .row { display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; }
+#previewRoot.alset-ui button {
+  background:var(--alset-accent); border:0; padding:.55rem .9rem; border-radius:10px;
+  font-weight:700; cursor:pointer; color:#111;
+}
+#previewRoot.alset-ui .badge-ui, #previewRoot.alset-ui .badge {
+  background:var(--alset-card); padding:.35rem .7rem; border-radius:999px;
+  border:1px solid var(--alset-line); display:inline-block;
+}
+#previewRoot.alset-ui .rt-splash, #previewRoot.alset-ui .splash {
+  background:linear-gradient(135deg,var(--alset-blue),var(--alset-orange) 80%);
+  color:#fff; border-radius:14px; padding:1rem 1.15rem; font-weight:800;
+}
+
+/* Inspector close/resize */
+.preview-row { position: relative; }
+.pane-inspector { position: relative; transition: flex-basis .15s, width .15s, max-width .15s; }
+.pane-inspector.collapsed { display: none !important; }
+.splitter-inspector {
+  width: 5px; cursor: col-resize; background: transparent; flex: 0 0 5px;
+  align-self: stretch;
+}
+.splitter-inspector:hover { background: rgba(244,180,0,.25); }
+.prop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
+.prop-grid label { font-size: 11px; color: var(--muted); display: flex; flex-direction: column; gap: 2px; }
+.prop-grid input { font-size: 12px; }
+.organo-hint { font-size: 11px; color: var(--muted); margin: 6px 0; line-height: 1.35; }
