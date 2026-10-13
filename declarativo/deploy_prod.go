@@ -64,41 +64,31 @@ body{margin:0;background:var(--alset-bg);color:var(--alset-ink);min-height:100vh
 <script>
 const SURFACES = %s;
 const SURFACE = %q;
+const APP_NAME = %q;
 %s
-function val(bind, state){ if(!bind) return '·'; const v=(state||{})[bind]; return v==null?bind:v; }
-function render(n, state){
-  if(!n) return document.createTextNode('');
-  const t=(n.type||'').toLowerCase();
-  let el;
-  if(t==='column'||t==='panel'){ el=document.createElement('div'); el.className='col'; (n.kids||[]).forEach(k=>el.appendChild(render(k,state))); }
-  else if(t==='row'){ el=document.createElement('div'); el.className='row'; (n.kids||[]).forEach(k=>el.appendChild(render(k,state))); }
-  else if(t==='label'){ el=document.createElement('div'); el.textContent=n.text||''; }
-  else if(t==='badge'){ el=document.createElement('span'); el.className='badge'; el.textContent=val(n.bind,state); }
-  else if(t==='button'){
-    el=document.createElement('button'); el.textContent=n.text||'OK';
-    el.onclick=async()=>{
-      const emit=n.emit||'';
-      try{
-        const r=await fetch('api/action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({emit:emit})});
-        const j=await r.json();
-        if(j.state){ window.__state=j.state; const root=document.getElementById('root'); root.innerHTML=''; root.appendChild(render(tree,j.state)); }
-      }catch(e){ console.warn(e); }
-    };
+%s
+window.__alsetAction = async function(emit){
+  const urls = [
+    '/api/apps/' + encodeURIComponent(APP_NAME) + '/action',
+    'api/action',
+    './api/action'
+  ];
+  let lastErr = null;
+  for (const u of urls) {
+    try {
+      const r = await fetch(u, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({emit: emit, app: APP_NAME}) });
+      const txt = await r.text();
+      let j; try { j = JSON.parse(txt); } catch(e) { lastErr = e; continue; }
+      if (!r.ok) { lastErr = new Error(j.error||txt); continue; }
+      return j;
+    } catch(e) { lastErr = e; }
   }
-  else if(t==='splash'){ el=document.createElement('div'); el.className='rt-splash splash'; el.textContent=n.text||'Splash'; }
-  else if(t==='gradient'){ el=document.createElement('div'); el.className='gradient'; el.textContent=n.text||''; }
-  else if(t==='field'){ el=document.createElement('input'); el.className='rt-input'; el.placeholder=n.text||''; }
-  else if(t==='blob'){ el=document.createElement('div'); el.style.cssText='width:64px;height:64px;border-radius:40%%;background:linear-gradient(135deg,#f4b400,#5b9cf5)'; }
-  else if(t==='image'){ el=document.createElement('img'); el.src=n.src||''; el.style.maxWidth='100%%'; }
-  else if(t==='drawer'||t==='tabs'||t==='stack'||t==='top-tabs'||t==='bottom-tabs'){
-    el=document.createElement('div'); el.className='col';
-    const lab=document.createElement('div'); lab.className='muted'; lab.textContent=t; el.appendChild(lab);
-    (n.kids||[]).forEach(k=>el.appendChild(render(k,state)));
-  } else { el=document.createElement('div'); el.textContent=n.type||''; }
-  return applyAlsetProps(el, n);
-}
+  console.warn('action failed', lastErr);
+  return { ok:false };
+};
 const tree = SURFACES[SURFACE] || Object.values(SURFACES)[0];
+window.__tree = tree;
 window.__state = {};
 document.getElementById('root').appendChild(render(tree, window.__state));
-</script></body></html>`, app, SharedUISkin, uiJSON, surface, ApplyPropsJS)
+</script></body></html>`, app, SharedUISkin, uiJSON, surface, app, ApplyPropsJS, RenderUIJS)
 }

@@ -199,7 +199,53 @@ func cmdStudio(args []string) {
 		mux.Handle("/", http.FileServer(http.FS(sub)))
 		fmt.Fprintln(os.Stderr, "  UI: embebida en el ejecutable")
 	}
-	mux.Handle("/apps/", http.StripPrefix("/apps/", http.FileServer(http.Dir(appsDir))))
+	// /apps/{name}/api/action|state — mismo contrato que /api/apps/{name}/…
+	// (app.html usa rutas relativas bajo /apps/nombre/)
+	appsFS := http.StripPrefix("/apps/", http.FileServer(http.Dir(appsDir)))
+	mux.HandleFunc("/apps/", func(w http.ResponseWriter, r *http.Request) {
+		path := strings.TrimPrefix(r.URL.Path, "/apps/")
+		parts := strings.Split(path, "/")
+		if len(parts) >= 3 && parts[1] == "api" {
+			name := sanitizeApp(parts[0])
+			action := parts[2]
+			inst := reg.get(name)
+			if inst == nil {
+				srcPath := filepath.Join(appsDir, name, "source.aos")
+				if b, err := os.ReadFile(srcPath); err == nil {
+					if _, _, err := bootApp(name, string(b)); err == nil {
+						inst = reg.get(name)
+					}
+				}
+			}
+			switch action {
+			case "state":
+				st := map[string]interface{}{}
+				if inst != nil && inst.rt != nil && inst.rt.State != nil {
+					st = inst.rt.State.Snapshot()
+				}
+				writeJSON(w, map[string]interface{}{"ok": true, "app": name, "state": st})
+				return
+			case "action":
+				if r.Method != http.MethodPost {
+					http.Error(w, "POST", 405)
+					return
+				}
+				if inst == nil {
+					writeErr(w, fmt.Errorf("app %s no cargada — vuelve a Desplegar", name))
+					return
+				}
+				body := readBody(r)
+				res, err := inst.rt.HandleEmit(body.Emit)
+				if err != nil {
+					writeErr(w, err)
+					return
+				}
+				writeJSON(w, map[string]interface{}{"ok": true, "app": name, "state": res["state"], "changed": res["changed"]})
+				return
+			}
+		}
+		appsFS.ServeHTTP(w, r)
+	})
 
 	mux.HandleFunc("/api/help", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]interface{}{

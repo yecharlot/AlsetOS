@@ -540,7 +540,7 @@ ${body}
       editMode = !editMode;
       b.classList.toggle('active', editMode);
       b.textContent = editMode ? 'Layout ON' : 'Editar layout';
-      log(editMode ? 'Modo edición: arrastra y redimensiona elementos en el preview' : 'Modo edición off');
+      log(editMode ? 'Layout ON: usa el handle dorado para mover. Clic selecciona props.' : 'Clic en un componente del preview para editar props');
       paint(surfaces[surfaceOID]||Object.values(surfaces)[0]);
     };
   })();
@@ -556,21 +556,33 @@ ${body}
   }
 
   function makeEditable(el, path){
-    if(!editMode) return;
+    if(!el || el.nodeType!==1) return;
     el.dataset.path = path;
-    el.style.outline = '1px dashed rgba(244,180,0,.45)';
-    el.style.cursor = 'move';
-    el.style.position = el.style.position || 'relative';
-    const handle = document.createElement('div');
-    handle.style.cssText = 'position:absolute;right:0;bottom:0;width:12px;height:12px;background:#f4b400;cursor:nwse-resize;z-index:5';
-    el.style.minHeight = '24px';
+    el.classList.add('ui-selectable');
+    // Click = seleccionar para props (no mueve el layout)
+    el.addEventListener('click', function(ev){
+      // no interceptar botones funcionales salvo en editMode
+      if(ev.target.closest && ev.target.closest('button') && !editMode) return;
+      if(ev.target.classList && ev.target.classList.contains('ui-drag-handle')) return;
+      ev.stopPropagation();
+      document.querySelectorAll('#previewRoot .ui-selected').forEach(function(x){ x.classList.remove('ui-selected'); });
+      el.classList.add('ui-selected');
+      // Recuperar nodo del IR si está en dataset — selectUINode se llama desde fuera con n
+      if(el.__uiNode && typeof selectUINode==='function') selectUINode(el.__uiNode, path);
+    });
+    if(!editMode) return;
+    el.style.outline = '1px dashed rgba(244,180,0,.35)';
     if(getComputedStyle(el).position==='static') el.style.position='relative';
-    el.appendChild(handle);
     applyLayout(el, path);
-
+    // Solo el handle mueve/redimensiona — evita desajustar al hacer clic
+    const handle = document.createElement('div');
+    handle.className = 'ui-drag-handle';
+    handle.title = 'Arrastrar / redimensionar';
+    handle.style.cssText = 'position:absolute;right:2px;bottom:2px;width:14px;height:14px;background:#f4b400;border-radius:3px;cursor:nwse-resize;z-index:6';
+    el.appendChild(handle);
     let mode=null, sx, sy, sl, st, sw, sh;
-    el.addEventListener('mousedown', (ev)=>{
-      if(ev.target===handle) mode='resize'; else mode='drag';
+    handle.addEventListener('mousedown', function(ev){
+      mode = (ev.shiftKey ? 'resize' : 'drag');
       ev.preventDefault(); ev.stopPropagation();
       const r = el.getBoundingClientRect();
       const pr = previewRoot.getBoundingClientRect();
@@ -578,7 +590,7 @@ ${body}
       sl=r.left-pr.left; st=r.top-pr.top; sw=r.width; sh=r.height;
       el.style.position='absolute';
       el.style.left=sl+'px'; el.style.top=st+'px';
-      const move=(e)=>{
+      const move=function(e){
         if(mode==='drag'){
           el.style.left=(sl+e.clientX-sx)+'px';
           el.style.top=(st+e.clientY-sy)+'px';
@@ -587,7 +599,7 @@ ${body}
           el.style.height=Math.max(24, sh+e.clientY-sy)+'px';
         }
       };
-      const up=()=>{
+      const up=function(){
         window.removeEventListener('mousemove', move);
         window.removeEventListener('mouseup', up);
         const key=layoutKey();
@@ -605,6 +617,7 @@ ${body}
       window.addEventListener('mouseup', up);
     });
   }
+
 
   // Patch paint/render to attach paths — replace paint function body usage
   const _paint = paint;
@@ -655,19 +668,53 @@ ${body}
     else if(t==='qr'){ el=document.createElement('code'); el.textContent=val(n.bind)||n.text||'QR'; }
     else if(t==='file'){ el=document.createElement('input'); el.type='file'; }
     else if(t==='doclist'){ el=document.createElement('ul'); String(val(n.bind)).split('|').filter(Boolean).forEach(x=>{ const li=document.createElement('li'); li.textContent=x; el.appendChild(li); }); }
-    else if(t==='drawer'||t==='tabs'||t==='top-tabs'||t==='bottom-tabs'||t==='stack'){
-      el=document.createElement('div'); el.className='col';
-      const lab=document.createElement('div'); lab.className='muted'; lab.textContent=t+(n.text?': '+n.text:''); el.appendChild(lab);
-      (n.kids||[]).forEach((k,i)=>el.appendChild(renderEditable(k, path+'.'+i)));
+        else if(t==='top-tabs'||t==='tabs'||t==='bottom-tabs'){
+      el=document.createElement('div'); el.className='alset-tabs '+t;
+      const bar=document.createElement('div'); bar.className='alset-tabs-bar';
+      const panels=document.createElement('div'); panels.className='alset-tabs-panels';
+      (n.kids||[]).forEach(function(k,i){
+        const btn=document.createElement('button'); btn.type='button';
+        btn.className='alset-tab-btn'+(i===0?' on':'');
+        btn.textContent=k.text||('Tab '+(i+1));
+        const panel=document.createElement('div'); panel.className='alset-tab-panel';
+        panel.style.display=i===0?'block':'none';
+        (k.kids||[]).forEach(function(c,j){ panel.appendChild(renderEditable(c, path+'.'+i+'.'+j)); });
+        btn.onclick=function(ev){
+          ev.stopPropagation();
+          bar.querySelectorAll('.alset-tab-btn').forEach(function(b){ b.classList.remove('on'); });
+          btn.classList.add('on');
+          panels.querySelectorAll('.alset-tab-panel').forEach(function(p){ p.style.display='none'; });
+          panel.style.display='block';
+        };
+        bar.appendChild(btn); panels.appendChild(panel);
+      });
+      if(t==='bottom-tabs'){ el.appendChild(panels); el.appendChild(bar); }
+      else { el.appendChild(bar); el.appendChild(panels); }
     }
-    else if(t==='tab'){ el=document.createElement('div'); el.textContent='Tab '+(n.text||''); (n.kids||[]).forEach((k,i)=>el.appendChild(renderEditable(k, path+'.'+i))); }
+    else if(t==='drawer'){
+      el=document.createElement('div'); el.className='alset-drawer open';
+      const head=document.createElement('div'); head.className='alset-drawer-head';
+      head.innerHTML='<span>'+(n.text||'Menu')+'</span><span>▾</span>';
+      const body=document.createElement('div'); body.className='alset-drawer-body'; body.style.display='block';
+      (n.kids||[]).forEach(function(k,i){ body.appendChild(renderEditable(k, path+'.'+i)); });
+      head.onclick=function(ev){ ev.stopPropagation(); el.classList.toggle('open'); body.style.display=el.classList.contains('open')?'block':'none'; };
+      el.appendChild(head); el.appendChild(body);
+    }
+    else if(t==='stack'){
+      el=document.createElement('div'); el.className='alset-stack';
+      (n.kids||[]).forEach(function(k,i){ el.appendChild(renderEditable(k, path+'.'+i)); });
+    }
+    else if(t==='tab'){
+      el=document.createElement('div'); el.className='col';
+      (n.kids||[]).forEach(function(k,i){ el.appendChild(renderEditable(k, path+'.'+i)); });
+    }
     else if(t==='field'){ el=document.createElement('input'); el.className='rt-input'; el.placeholder=n.text||''; }
     else { el=document.createElement('div'); el.textContent=n.type||''; }
-    if(el && el.nodeType===1){ applyAlsetProps(el, n); makeEditable(el, path);
-      el.dataset.uiPath = path; el.onclick = (function(node, path){ return function(ev){
-        if(!editMode && ev.target.tagName==='BUTTON') return;
-        if(editMode){ ev.stopPropagation(); selectUINode(node, path); }
-      }; })(n, path);
+    if(el && el.nodeType===1){
+      el.__uiNode = n;
+      applyAlsetProps(el, n);
+      el.dataset.uiPath = path;
+      makeEditable(el, path);
     }
     return el;
   }
@@ -1234,6 +1281,106 @@ ${body}
 
   // Initial paint attempt from editor
   setTimeout(function(){ try{ scheduleLive(); }catch(_){} }, 600);
+
+
+  /* ——— Props de órganos UI + Inspector chrome ——— */
+  var selectedNode = null, selectedPath = '';
+  function selectUINode(n, path){
+    selectedNode = n; selectedPath = path || '';
+    var sel = document.getElementById('prop-sel');
+    if(sel) sel.value = ((n && n.type) || '') + (path ? (' @ ' + path) : '');
+    var emit = document.getElementById('prop-emit');
+    if(emit) emit.value = (n && n.emit) || '';
+    var bind = document.getElementById('prop-bind');
+    if(bind) bind.value = (n && n.bind) || '';
+    var p = (n && n.props) || {};
+    function set(id, k){ var el=document.getElementById(id); if(el) el.value = p[k] || ''; }
+    set('prop-padding','padding'); set('prop-margin','margin'); set('prop-gap','gap');
+    set('prop-radius','radius'); set('prop-color','color'); set('prop-bg','bg');
+    set('prop-width','width'); set('prop-height','height'); set('prop-fontsize','fontsize');
+    log('Seleccionado: ' + ((n && n.type) || '?') + ' ' + selectedPath);
+  }
+
+  function applyPropsToAOS(){
+    if(!selectedNode){ log('Haz clic en un componente del preview para seleccionarlo', true); return; }
+    if(!selectedNode.props) selectedNode.props = {};
+    var map = {
+      padding:'prop-padding', margin:'prop-margin', gap:'prop-gap', radius:'prop-radius',
+      color:'prop-color', bg:'prop-bg', width:'prop-width', height:'prop-height', fontsize:'prop-fontsize'
+    };
+    Object.keys(map).forEach(function(k){
+      var el = document.getElementById(map[k]);
+      if(el && el.value.trim()) selectedNode.props[k] = el.value.trim();
+      else if(selectedNode.props[k]) delete selectedNode.props[k];
+    });
+    var emit = document.getElementById('prop-emit');
+    var bind = document.getElementById('prop-bind');
+    if(emit && emit.value.trim()) selectedNode.emit = emit.value.trim();
+    if(bind && bind.value.trim()) selectedNode.bind = bind.value.trim();
+    // Anotar en .aos si hay texto de botón
+    var propsPairs = Object.keys(selectedNode.props||{}).map(function(k){ return '('+k+' '+selectedNode.props[k]+')'; }).join(' ');
+    if(propsPairs && selectedNode.text && aos){
+      var label = selectedNode.text;
+      var re = new RegExp('(\\(button\\s+"'+label.replace(/[.*+?^${}()|[\\]\\\\]/g,'\\$&')+'"[^\\)]*?)(\\))');
+      if(re.test(aos.value)){
+        aos.value = aos.value.replace(re, function(m,a,b){
+          if(/\bpadding\b|\bradius\b|\bbg\b/.test(a)) return m;
+          return a + ' ' + propsPairs + b;
+        });
+        if(typeof syncHl==='function') syncHl();
+      }
+    }
+    log('Props del órgano aplicadas');
+    paint(pickSurface({surfaces: surfaces, surface: surfaceOID}).tree);
+    if(typeof scheduleLive==='function') scheduleLive();
+  }
+  var _bp = document.getElementById('btn-apply-prop');
+  if(_bp) _bp.onclick = applyPropsToAOS;
+
+  (function wireInspectorChrome(){
+    var insp = document.getElementById('pane-inspector');
+    var row = document.getElementById('preview-row');
+    if(!insp || !row) return;
+    var head = insp.querySelector('.pane-head');
+    if(head && !head.querySelector('[data-close-inspector]')){
+      var x = document.createElement('button');
+      x.type = 'button'; x.className = 'icon-btn'; x.setAttribute('data-close-inspector','1');
+      x.textContent = '×'; x.title = 'Cerrar inspector';
+      head.appendChild(x);
+      x.onclick = function(){ insp.classList.add('collapsed'); };
+    }
+    var top = document.getElementById('topbar');
+    if(top && !document.getElementById('btn-toggle-inspector')){
+      var t = document.createElement('button');
+      t.type = 'button'; t.id = 'btn-toggle-inspector'; t.className = 'btn btn-ghost';
+      t.textContent = 'Inspector';
+      top.appendChild(t);
+      t.onclick = function(){ insp.classList.toggle('collapsed'); };
+    }
+    if(!document.getElementById('splitter-inspector')){
+      var sp = document.createElement('div');
+      sp.id = 'splitter-inspector'; sp.className = 'splitter-inspector';
+      row.insertBefore(sp, insp);
+      var startX=0, startW=0;
+      sp.addEventListener('mousedown', function(ev){
+        ev.preventDefault();
+        startX = ev.clientX;
+        startW = insp.getBoundingClientRect().width;
+        function move(e){
+          var w = Math.max(200, Math.min(window.innerWidth*0.55, startW - (e.clientX - startX)));
+          insp.style.flex = '0 0 ' + w + 'px';
+          insp.style.maxWidth = w + 'px';
+          insp.style.width = w + 'px';
+        }
+        function up(){
+          window.removeEventListener('mousemove', move);
+          window.removeEventListener('mouseup', up);
+        }
+        window.addEventListener('mousemove', move);
+        window.addEventListener('mouseup', up);
+      });
+    }
+  })();
 
 })();
 

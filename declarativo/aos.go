@@ -458,32 +458,59 @@ func compileUI(items []lispai.AOSNode) ([]UINode, error) {
 			if len(l) > 1 {
 				node.Text = fmt.Sprint(l[1])
 			}
+			var childItems []lispai.AOSNode
 			for _, extra := range l[2:] {
 				el, ok := extra.([]lispai.AOSNode)
-				if !ok || len(el) < 2 {
+				if !ok {
 					continue
 				}
-				switch fmt.Sprint(el[0]) {
+				if len(el) == 0 {
+					continue
+				}
+				h := strings.ToLower(fmt.Sprint(el[0]))
+				switch h {
 				case "emit", "pulse":
-					node.Emit = fmt.Sprint(el[1])
+					if len(el) > 1 {
+						node.Emit = fmt.Sprint(el[1])
+					}
 				case "bind":
-					node.Bind = fmt.Sprint(el[1])
+					if len(el) > 1 {
+						node.Bind = fmt.Sprint(el[1])
+					}
 				case "style":
-					node.Style = fmt.Sprint(el[1])
+					if len(el) > 1 {
+						node.Style = fmt.Sprint(el[1])
+					}
+				case "src":
+					if len(el) > 1 {
+						node.Src = fmt.Sprint(el[1])
+					}
 				case "padding", "margin", "gap", "radius", "color", "bg", "background", "width", "height", "fontsize", "font-size", "weight", "opacity", "border", "shadow", "align", "justify":
-					mergeUIProp(&node, fmt.Sprint(el[0]), fmt.Sprint(el[1]))
+					if len(el) > 1 {
+						mergeUIProp(&node, h, fmt.Sprint(el[1]))
+					}
 				case "props":
-					if sub, ok := el[1].([]lispai.AOSNode); ok {
-						for _, p := range sub {
-							pl, ok := p.([]lispai.AOSNode)
-							if ok && len(pl) >= 2 {
-								mergeUIProp(&node, fmt.Sprint(pl[0]), fmt.Sprint(pl[1]))
+					if len(el) > 1 {
+						if sub, ok := el[1].([]lispai.AOSNode); ok {
+							for _, p := range sub {
+								pl, ok := p.([]lispai.AOSNode)
+								if ok && len(pl) >= 2 {
+									mergeUIProp(&node, fmt.Sprint(pl[0]), fmt.Sprint(pl[1]))
+								}
 							}
 						}
 					}
-				case "src":
-					node.Src = fmt.Sprint(el[1])
+				default:
+					// hijos UI: (tab "Uno" (column …))
+					childItems = append(childItems, extra)
 				}
+			}
+			if len(childItems) > 0 {
+				kids, err := compileUI(childItems)
+				if err != nil {
+					return nil, err
+				}
+				node.Kids = kids
 			}
 		case "badge", "qr":
 			for _, extra := range l[1:] {

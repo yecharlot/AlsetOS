@@ -324,3 +324,32 @@ h3{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--mute
 .prop-grid label { font-size: 11px; color: var(--muted); display: flex; flex-direction: column; gap: 2px; }
 .prop-grid input { font-size: 12px; }
 .organo-hint { font-size: 11px; color: var(--muted); margin: 6px 0; line-height: 1.35; }
+
+/* Nav components — mirror deploy */
+#previewRoot.alset-ui .alset-tabs {
+  display:flex; flex-direction:column; border:1px solid var(--line); border-radius:12px;
+  overflow:hidden; background: var(--panel2);
+}
+#previewRoot.alset-ui .alset-tabs-bar { display:flex; gap:4px; padding:6px; background:#121820; flex-wrap:wrap; }
+#previewRoot.alset-ui .alset-tab-btn {
+  background:#243044; color:var(--text); border:0; border-radius:8px 8px 0 0;
+  padding:6px 12px; font-weight:700; cursor:pointer;
+}
+#previewRoot.alset-ui .alset-tab-btn.on { background: var(--gold); color:#111; }
+#previewRoot.alset-ui .alset-tabs.bottom-tabs .alset-tabs-bar { border-top:1px solid var(--line); justify-content:space-around; }
+#previewRoot.alset-ui .alset-tabs.bottom-tabs .alset-tab-btn { border-radius:8px; flex:1; }
+#previewRoot.alset-ui .alset-tabs-panels { padding:10px 12px; min-height:48px; }
+#previewRoot.alset-ui .alset-drawer {
+  border:1px solid var(--line); border-radius:12px; overflow:hidden; background:var(--panel2);
+}
+#previewRoot.alset-ui .alset-drawer-head {
+  display:flex; justify-content:space-between; padding:10px 12px; background:#121820;
+  cursor:pointer; font-weight:700;
+}
+#previewRoot.alset-ui .alset-drawer-body { padding:10px 12px; }
+#previewRoot.alset-ui .ui-selected { outline:2px solid var(--gold)!important; outline-offset:2px; }
+#previewRoot.alset-ui .blob {
+  width:64px; height:64px; border-radius:40%;
+  background:linear-gradient(135deg,#f4b400,#5b9cf5);
+}
+#previewRoot.alset-ui .ui-selectable { cursor: default; }
