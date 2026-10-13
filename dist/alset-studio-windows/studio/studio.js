@@ -212,13 +212,6 @@ ${body}
     ]
   };
 
-  function setStatus(msg, isErr){
-    const el=document.getElementById('status');
-    if(!el) return;
-    el.textContent=msg||'listo';
-    el.classList.toggle('err', !!isErr);
-    el.classList.toggle('ok', !isErr && msg && msg!=='listo');
-  }
   function log(msg, isErr){
     consoleEl.textContent = '['+new Date().toISOString().slice(11,19)+'] '+msg+'\n'+consoleEl.textContent;
     status.textContent = isErr?'error':'ok';
@@ -267,88 +260,112 @@ ${body}
     save(); log('LEGO '+label);
   });
 
-  // --- Resizable panels (real) ---
-  function enableSplit(selector, orient, onMove){
-    const el = document.querySelector(selector);
+  // --- Resizable panels (persistidos) ---
+  const LS_KEY = 'alset-studio-layout-v2';
+  function loadLayout(){
+    try { return JSON.parse(localStorage.getItem(LS_KEY)||'{}'); } catch(e){ return {}; }
+  }
+  function saveLayout(s){
+    try { localStorage.setItem(LS_KEY, JSON.stringify(s)); } catch(e){}
+  }
+  const layout = Object.assign({ left:220, right:260, preview:200, bottom:100 }, loadLayout());
+  const leftPane=$('#pane-left'), rightPane=$('#pane-right'), bottomPane=$('#pane-bottom'), previewPane=$('#pane-preview');
+  const splitLeft=document.querySelector('.splitter.v[data-split="left"]');
+  const splitRight=document.querySelector('.splitter.v[data-split="right"]');
+  const splitPreview=document.querySelector('.splitter.h[data-split="preview"]');
+  const splitBottom=document.querySelector('.splitter.h[data-split="bottom"]');
+
+  function applyLayout(){
+    if(leftPane && !leftPane.classList.contains('collapsed')){
+      leftPane.style.width = layout.left+'px';
+      leftPane.style.flex = '0 0 auto';
+    }
+    if(rightPane && !rightPane.classList.contains('collapsed')){
+      rightPane.style.width = layout.right+'px';
+      rightPane.style.flex = '0 0 auto';
+    }
+    if(previewPane && !previewPane.classList.contains('collapsed')){
+      previewPane.style.height = layout.preview+'px';
+      previewPane.style.flex = '0 0 auto';
+      if(splitPreview) splitPreview.classList.remove('collapsed-hide');
+    } else if(splitPreview) {
+      splitPreview.classList.add('collapsed-hide');
+    }
+    if(bottomPane && !bottomPane.classList.contains('collapsed')){
+      bottomPane.style.height = layout.bottom+'px';
+      bottomPane.style.flex = '0 0 auto';
+      if(splitBottom) splitBottom.classList.remove('collapsed-hide');
+    } else if(splitBottom) {
+      splitBottom.classList.add('collapsed-hide');
+    }
+    if(splitLeft) splitLeft.classList.toggle('collapsed-hide', !!(leftPane&&leftPane.classList.contains('collapsed')));
+    if(splitRight) splitRight.classList.toggle('collapsed-hide', !!(rightPane&&rightPane.classList.contains('collapsed')));
+    saveLayout(layout);
+  }
+  applyLayout();
+
+  function dragSplit(el, orient, onDelta){
     if(!el) return;
     el.addEventListener('mousedown', (ev)=>{
+      if(ev.button!==0) return;
       ev.preventDefault();
-      const startX=ev.clientX, startY=ev.clientY;
+      el.classList.add('dragging');
+      document.body.classList.add(orient==='v'?'resizing-panels':'resizing-panels-h');
+      const sx=ev.clientX, sy=ev.clientY;
+      const base = orient==='v'
+        ? { left: layout.left, right: layout.right }
+        : { preview: layout.preview, bottom: layout.bottom };
       const move=(e)=>{
-        onMove(e.clientX-startX, e.clientY-startY, e);
+        const dx=e.clientX-sx, dy=e.clientY-sy;
+        onDelta(dx, dy, base);
+        applyLayout();
       };
-      const up=()=>{ window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); document.body.style.cursor=''; };
+      const up=()=>{
+        window.removeEventListener('mousemove', move);
+        window.removeEventListener('mouseup', up);
+        el.classList.remove('dragging');
+        document.body.classList.remove('resizing-panels','resizing-panels-h');
+        saveLayout(layout);
+      };
       window.addEventListener('mousemove', move);
       window.addEventListener('mouseup', up);
-      document.body.style.cursor = orient==='v'?'col-resize':'row-resize';
     });
   }
-  const leftPane=$('#pane-left'), rightPane=$('#pane-right'), bottomPane=$('#pane-bottom'), previewPane=$('#pane-preview');
-  let leftW=leftPane.offsetWidth||240, rightW=rightPane.offsetWidth||280, bottomH=140, previewH=280;
-  enableSplit('.splitter.v[data-split="left"]','v',(dx)=>{ leftW=Math.max(160, Math.min(420, leftW+dx)); leftPane.style.width=leftW+'px'; leftPane.style.flex='0 0 auto'; });
-  // right splitter is before right pane - need second splitter handler: use data-split right
-  document.querySelectorAll('.splitter.v').forEach((sp, idx)=>{
-    if(sp.getAttribute('data-split')==='right'){
-      let base=rightW;
-      sp.addEventListener('mousedown', (ev)=>{
-        ev.preventDefault();
-        const sx=ev.clientX; base=rightPane.offsetWidth;
-        const move=(e)=>{ const w=Math.max(180, Math.min(480, base-(e.clientX-sx))); rightPane.style.width=w+'px'; rightPane.style.flex='0 0 auto'; };
-        const up=()=>{ window.removeEventListener('mousemove',move); window.removeEventListener('mouseup',up); };
-        window.addEventListener('mousemove',move); window.addEventListener('mouseup',up);
-      });
-    }
+  dragSplit(splitLeft, 'v', (dx,_,base)=>{
+    layout.left = Math.max(140, Math.min(Math.floor(window.innerWidth*0.45), base.left + dx));
   });
-  enableSplit('.splitter.h[data-split="bottom"]','h',(dx,dy)=>{
-    // This splitter is above bottom - actually structure may need fix
+  dragSplit(splitRight, 'v', (dx,_,base)=>{
+    layout.right = Math.max(140, Math.min(Math.floor(window.innerWidth*0.45), base.right - dx));
   });
-  // Preview height drag: top border of preview
-  previewPane.style.flex='0 0 auto';
-  previewPane.style.height=previewH+'px';
-  bottomPane.style.flex='0 0 auto';
-  bottomPane.style.height=bottomH+'px';
-  const prevHead = previewPane.querySelector('.pane-head');
-  if(prevHead){
-    prevHead.style.cursor='ns-resize';
-    prevHead.title='Arrastra para redimensionar preview';
-    prevHead.addEventListener('mousedown', (ev)=>{
-      if(ev.target.closest('.icon-btn')) return;
-      ev.preventDefault();
-      const sy=ev.clientY; const base=previewPane.offsetHeight;
-      const move=(e)=>{ const h=Math.max(120, Math.min(window.innerHeight*0.7, base-(e.clientY-sy))); previewPane.style.height=h+'px'; };
-      const up=()=>{ window.removeEventListener('mousemove',move); window.removeEventListener('mouseup',up); };
-      window.addEventListener('mousemove',move); window.addEventListener('mouseup',up);
-    });
-  }
-  const botHead = bottomPane.querySelector('.pane-head');
-  if(botHead){
-    botHead.style.cursor='ns-resize';
-    botHead.addEventListener('mousedown', (ev)=>{
-      if(ev.target.closest('.icon-btn')) return;
-      ev.preventDefault();
-      const sy=ev.clientY; const base=bottomPane.offsetHeight;
-      const move=(e)=>{ const h=Math.max(80, Math.min(400, base-(e.clientY-sy))); bottomPane.style.height=h+'px'; };
-      const up=()=>{ window.removeEventListener('mousemove',move); window.removeEventListener('mouseup',up); };
-      window.addEventListener('mousemove',move); window.addEventListener('mouseup',up);
-    });
-  }
+  dragSplit(splitPreview, 'h', (_,dy,base)=>{
+    // splitter above preview: drag down → taller preview
+    layout.preview = Math.max(60, Math.min(Math.floor(window.innerHeight*0.7), base.preview - dy));
+  });
+  dragSplit(splitBottom, 'h', (_,dy,base)=>{
+    layout.bottom = Math.max(48, Math.min(Math.floor(window.innerHeight*0.45), base.bottom - dy));
+  });
 
+  function setPaneOpen(id, open){
+    const map={left:'pane-left',right:'pane-right',bottom:'pane-bottom',preview:'pane-preview'};
+    const pane=document.getElementById(map[id]);
+    if(!pane) return;
+    pane.classList.toggle('collapsed', !open);
+    document.querySelector('.panel-tog[data-panel="'+id+'"]')?.classList.toggle('active', open);
+    applyLayout();
+  }
   document.querySelectorAll('.panel-tog').forEach(btn=>{
     btn.onclick=()=>{
       const id=btn.dataset.panel;
       const pane=document.getElementById(id==='preview'?'pane-preview':id==='bottom'?'pane-bottom':id==='left'?'pane-left':'pane-right');
       if(!pane) return;
-      pane.classList.toggle('collapsed');
-      btn.classList.toggle('active');
+      const open = pane.classList.contains('collapsed');
+      setPaneOpen(id, open);
     };
   });
   document.querySelectorAll('[data-close]').forEach(btn=>{
-    btn.onclick=()=>{
-      const map={left:'pane-left',right:'pane-right',bottom:'pane-bottom',preview:'pane-preview'};
-      document.getElementById(map[btn.dataset.close])?.classList.add('collapsed');
-      document.querySelector('.panel-tog[data-panel="'+btn.dataset.close+'"]')?.classList.remove('active');
-    };
+    btn.onclick=()=> setPaneOpen(btn.dataset.close, false);
   });
+
   document.querySelectorAll('.dev').forEach(btn=>{
     btn.onclick=()=>{
       document.querySelectorAll('.dev').forEach(x=>x.classList.remove('on'));
@@ -371,65 +388,10 @@ ${body}
   };
   $('#btn-close-examples').onclick=()=>$('#examples-drawer').classList.add('hidden');
 
-
-  /** Extrae IR UI mínimo del texto .aos si el API no devuelve surfaces */
-  function clientUIFromAOS(src){
-    if(!src) return null;
-    const hasUI = /\(kind\s+UI\)/.test(src) || /\(ui\s+\(/.test(src);
-    if(!hasUI) return null;
-    const kids = [];
-    const splash = src.match(/\(splash\s+"([^"]*)"/);
-    if(splash) kids.push({type:'splash', text:splash[1]});
-    if(/\(gradient/.test(src)) kids.push({type:'gradient', text:''});
-    const badges = [...src.matchAll(/\(badge\s+\(bind\s+([a-zA-Z0-9_.-]+)\)/g)];
-    badges.forEach(m => kids.push({type:'badge', bind:m[1]}));
-    const labels = [...src.matchAll(/\(label\s+"([^"]*)"/g)];
-    labels.forEach(m => kids.push({type:'label', text:m[1]}));
-    const buttons = [...src.matchAll(/\(button\s+"([^"]*)"\s+\(emit\s+([a-zA-Z0-9_.=-]+)\)/g)];
-    if(buttons.length){
-      const row = {type:'row', kids: buttons.map(m => ({type:'button', text:m[1], emit:m[2]}))};
-      kids.push(row);
-    }
-    if(!kids.length) kids.push({type:'label', text:'UI (sin nodos parseables en cliente)'});
-    return {type:'column', kids};
-  }
-
-  function applyAlsetProps(el, n){
-    if(!el || !n || el.nodeType!==1) return el;
-    const p = n.props || {};
-    const st = el.style;
-    if(p.padding) st.padding = p.padding;
-    if(p.margin) st.margin = p.margin;
-    if(p.gap) st.gap = p.gap;
-    if(p.radius) st.borderRadius = p.radius;
-    if(p.color) st.color = p.color;
-    if(p.bg || p.background) st.background = p.bg || p.background;
-    if(p.width) st.width = p.width;
-    if(p.height) st.height = p.height;
-    if(p.fontsize || p['font-size']) st.fontSize = p.fontsize || p['font-size'];
-    if(p.weight) st.fontWeight = p.weight;
-    if(p.opacity) st.opacity = p.opacity;
-    if(p.border) st.border = p.border;
-    if(p.shadow) st.boxShadow = p.shadow;
-    if(p.align) st.alignItems = p.align;
-    if(p.justify) st.justifyContent = p.justify;
-    return el;
-  }
-  function pickSurface(res){
-    const surfacesMap = res && res.surfaces ? res.surfaces : surfaces;
-    const oid = (res && res.surface) || surfaceOID || Object.keys(surfacesMap||{})[0] || '';
-    let tree = oid ? surfacesMap[oid] : null;
-    if(!tree) tree = Object.values(surfacesMap||{})[0];
-    if(!tree) tree = clientUIFromAOS(aos && aos.value);
-    return { tree, oid, surfacesMap };
-  }
-
   async function api(path, body){
     const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});
     const t=await r.text();
-    let j; try{j=JSON.parse(t);}catch{j={ok:false,error:t};}
-    if(!r.ok){ throw new Error(j.error||t||r.statusText); }
-    return j;
+    try{return JSON.parse(t);}catch{return {ok:false,error:t};}
   }
 
   function paint(tree){
@@ -478,20 +440,12 @@ ${body}
     surfaces=res.surfaces||{}; surfaceOID=res.surface||Object.keys(surfaces)[0]||'';
     sessionApp=res.app||name; appName.value=sessionApp;
     if(res.state) liveState=res.state;
-    if(stateView) stateView.textContent=JSON.stringify(liveState,null,2);
-    log('OK instancia '+sessionApp+' · orgs '+(res.organismos||0)+' · surface '+(surfaceOID||'—'));
-    const picked = pickSurface(res);
-    surfaces = picked.surfacesMap || surfaces;
-    surfaceOID = picked.oid || surfaceOID;
-    paint(picked.tree);
-    try{ inspectorAnalyze(); }catch(_){}
+    stateView.textContent=JSON.stringify(liveState,null,2);
+    log('OK instancia '+sessionApp+' · orgs '+(res.organismos||0));
+    paint(surfaces[surfaceOID]||Object.values(surfaces)[0]);
     refreshApps();
   };
-  $('#btn-run-preview').onclick=()=>{
-    const picked = pickSurface({surfaces, surface: surfaceOID});
-    paint(picked.tree);
-    log('Preview '+deviceMode+(picked.tree?' · UI ok':' · sin UI'));
-  };
+  $('#btn-run-preview').onclick=()=>{ paint(surfaces[surfaceOID]||Object.values(surfaces)[0]); log('Preview '+deviceMode); };
   $('#btn-test').onclick=async()=>{
     const res=await api('/api/flow/test',{source:aos.value, app:appName.value});
     if(res.ok) log('Tests OK · '+res.app); else log('Tests: '+JSON.stringify(res.errors||res.error), true);
@@ -540,7 +494,7 @@ ${body}
       editMode = !editMode;
       b.classList.toggle('active', editMode);
       b.textContent = editMode ? 'Layout ON' : 'Editar layout';
-      log(editMode ? 'Layout ON: usa el handle dorado para mover. Clic selecciona props.' : 'Clic en un componente del preview para editar props');
+      log(editMode ? 'Modo edición: arrastra y redimensiona elementos en el preview' : 'Modo edición off');
       paint(surfaces[surfaceOID]||Object.values(surfaces)[0]);
     };
   })();
@@ -556,33 +510,21 @@ ${body}
   }
 
   function makeEditable(el, path){
-    if(!el || el.nodeType!==1) return;
-    el.dataset.path = path;
-    el.classList.add('ui-selectable');
-    // Click = seleccionar para props (no mueve el layout)
-    el.addEventListener('click', function(ev){
-      // no interceptar botones funcionales salvo en editMode
-      if(ev.target.closest && ev.target.closest('button') && !editMode) return;
-      if(ev.target.classList && ev.target.classList.contains('ui-drag-handle')) return;
-      ev.stopPropagation();
-      document.querySelectorAll('#previewRoot .ui-selected').forEach(function(x){ x.classList.remove('ui-selected'); });
-      el.classList.add('ui-selected');
-      // Recuperar nodo del IR si está en dataset — selectUINode se llama desde fuera con n
-      if(el.__uiNode && typeof selectUINode==='function') selectUINode(el.__uiNode, path);
-    });
     if(!editMode) return;
-    el.style.outline = '1px dashed rgba(244,180,0,.35)';
-    if(getComputedStyle(el).position==='static') el.style.position='relative';
-    applyLayout(el, path);
-    // Solo el handle mueve/redimensiona — evita desajustar al hacer clic
+    el.dataset.path = path;
+    el.style.outline = '1px dashed rgba(244,180,0,.45)';
+    el.style.cursor = 'move';
+    el.style.position = el.style.position || 'relative';
     const handle = document.createElement('div');
-    handle.className = 'ui-drag-handle';
-    handle.title = 'Arrastrar / redimensionar';
-    handle.style.cssText = 'position:absolute;right:2px;bottom:2px;width:14px;height:14px;background:#f4b400;border-radius:3px;cursor:nwse-resize;z-index:6';
+    handle.style.cssText = 'position:absolute;right:0;bottom:0;width:12px;height:12px;background:#f4b400;cursor:nwse-resize;z-index:5';
+    el.style.minHeight = '24px';
+    if(getComputedStyle(el).position==='static') el.style.position='relative';
     el.appendChild(handle);
+    applyLayout(el, path);
+
     let mode=null, sx, sy, sl, st, sw, sh;
-    handle.addEventListener('mousedown', function(ev){
-      mode = (ev.shiftKey ? 'resize' : 'drag');
+    el.addEventListener('mousedown', (ev)=>{
+      if(ev.target===handle) mode='resize'; else mode='drag';
       ev.preventDefault(); ev.stopPropagation();
       const r = el.getBoundingClientRect();
       const pr = previewRoot.getBoundingClientRect();
@@ -590,7 +532,7 @@ ${body}
       sl=r.left-pr.left; st=r.top-pr.top; sw=r.width; sh=r.height;
       el.style.position='absolute';
       el.style.left=sl+'px'; el.style.top=st+'px';
-      const move=function(e){
+      const move=(e)=>{
         if(mode==='drag'){
           el.style.left=(sl+e.clientX-sx)+'px';
           el.style.top=(st+e.clientY-sy)+'px';
@@ -599,7 +541,7 @@ ${body}
           el.style.height=Math.max(24, sh+e.clientY-sy)+'px';
         }
       };
-      const up=function(){
+      const up=()=>{
         window.removeEventListener('mousemove', move);
         window.removeEventListener('mouseup', up);
         const key=layoutKey();
@@ -618,28 +560,15 @@ ${body}
     });
   }
 
-
   // Patch paint/render to attach paths — replace paint function body usage
   const _paint = paint;
   paint = function(tree){
-    if(!previewRoot) return;
     previewRoot.innerHTML='';
     previewRoot.style.position='relative';
-    previewRoot.style.minHeight='160px';
-    previewRoot.classList.add('alset-ui');
-    if(!tree || (typeof tree==='object' && !tree.type && !(tree.kids||[]).length)){
-      const fb = clientUIFromAOS(aos && aos.value);
-      tree = fb;
-    }
-    if(!tree){ previewRoot.innerHTML='<p class="muted">Sin UI — añade (orge … (kind UI) (ui …)) y (surface …), luego Aplicar flow</p>'; return; }
-    try {
-      const rootEl = renderEditable(tree, '0');
-      if(rootEl) previewRoot.appendChild(rootEl);
-      else previewRoot.innerHTML='<p class="muted">UI vacía</p>';
-    } catch(err) {
-      console.error(err);
-      previewRoot.innerHTML='<p class="muted">Error render: '+(err.message||err)+'</p>';
-    }
+    previewRoot.style.minHeight='200px';
+    if(!tree){ previewRoot.innerHTML='<p class="muted">Sin UI</p>'; return; }
+    const rootEl = renderEditable(tree, '0');
+    previewRoot.appendChild(rootEl);
   };
 
   function renderEditable(n, path){
@@ -668,54 +597,15 @@ ${body}
     else if(t==='qr'){ el=document.createElement('code'); el.textContent=val(n.bind)||n.text||'QR'; }
     else if(t==='file'){ el=document.createElement('input'); el.type='file'; }
     else if(t==='doclist'){ el=document.createElement('ul'); String(val(n.bind)).split('|').filter(Boolean).forEach(x=>{ const li=document.createElement('li'); li.textContent=x; el.appendChild(li); }); }
-        else if(t==='top-tabs'||t==='tabs'||t==='bottom-tabs'){
-      el=document.createElement('div'); el.className='alset-tabs '+t;
-      const bar=document.createElement('div'); bar.className='alset-tabs-bar';
-      const panels=document.createElement('div'); panels.className='alset-tabs-panels';
-      (n.kids||[]).forEach(function(k,i){
-        const btn=document.createElement('button'); btn.type='button';
-        btn.className='alset-tab-btn'+(i===0?' on':'');
-        btn.textContent=k.text||('Tab '+(i+1));
-        const panel=document.createElement('div'); panel.className='alset-tab-panel';
-        panel.style.display=i===0?'block':'none';
-        (k.kids||[]).forEach(function(c,j){ panel.appendChild(renderEditable(c, path+'.'+i+'.'+j)); });
-        btn.onclick=function(ev){
-          ev.stopPropagation();
-          bar.querySelectorAll('.alset-tab-btn').forEach(function(b){ b.classList.remove('on'); });
-          btn.classList.add('on');
-          panels.querySelectorAll('.alset-tab-panel').forEach(function(p){ p.style.display='none'; });
-          panel.style.display='block';
-        };
-        bar.appendChild(btn); panels.appendChild(panel);
-      });
-      if(t==='bottom-tabs'){ el.appendChild(panels); el.appendChild(bar); }
-      else { el.appendChild(bar); el.appendChild(panels); }
-    }
-    else if(t==='drawer'){
-      el=document.createElement('div'); el.className='alset-drawer open';
-      const head=document.createElement('div'); head.className='alset-drawer-head';
-      head.innerHTML='<span>'+(n.text||'Menu')+'</span><span>▾</span>';
-      const body=document.createElement('div'); body.className='alset-drawer-body'; body.style.display='block';
-      (n.kids||[]).forEach(function(k,i){ body.appendChild(renderEditable(k, path+'.'+i)); });
-      head.onclick=function(ev){ ev.stopPropagation(); el.classList.toggle('open'); body.style.display=el.classList.contains('open')?'block':'none'; };
-      el.appendChild(head); el.appendChild(body);
-    }
-    else if(t==='stack'){
-      el=document.createElement('div'); el.className='alset-stack';
-      (n.kids||[]).forEach(function(k,i){ el.appendChild(renderEditable(k, path+'.'+i)); });
-    }
-    else if(t==='tab'){
+    else if(t==='drawer'||t==='tabs'||t==='top-tabs'||t==='bottom-tabs'||t==='stack'){
       el=document.createElement('div'); el.className='col';
-      (n.kids||[]).forEach(function(k,i){ el.appendChild(renderEditable(k, path+'.'+i)); });
+      const lab=document.createElement('div'); lab.className='muted'; lab.textContent=t+(n.text?': '+n.text:''); el.appendChild(lab);
+      (n.kids||[]).forEach((k,i)=>el.appendChild(renderEditable(k, path+'.'+i)));
     }
+    else if(t==='tab'){ el=document.createElement('div'); el.textContent='Tab '+(n.text||''); (n.kids||[]).forEach((k,i)=>el.appendChild(renderEditable(k, path+'.'+i))); }
     else if(t==='field'){ el=document.createElement('input'); el.className='rt-input'; el.placeholder=n.text||''; }
     else { el=document.createElement('div'); el.textContent=n.type||''; }
-    if(el && el.nodeType===1){
-      el.__uiNode = n;
-      applyAlsetProps(el, n);
-      el.dataset.uiPath = path;
-      makeEditable(el, path);
-    }
+    if(el && el.nodeType===1) makeEditable(el, path);
     return el;
   }
 
@@ -775,19 +665,12 @@ ${body}
         var name = (appName && appName.value.trim()) || 'mi-app';
         var src = aos.value.replace(/\(flow\s+[^\s)]+/, '(flow '+name);
         var res = await api('/api/flow/apply',{source:src, app:name});
-        if(res && res.error) { try{ inspectorAnalyze(); }catch(_){} return; }
-        surfaces = (res && res.surfaces) || {};
-        surfaceOID = (res && res.surface) || Object.keys(surfaces)[0] || '';
-        if(res && res.state) liveState = res.state;
+        if(res.error) return;
+        surfaces = res.surfaces||{}; surfaceOID = res.surface||Object.keys(surfaces)[0]||'';
+        if(res.state) liveState = res.state;
         if(stateView) stateView.textContent = JSON.stringify(liveState,null,2);
-        var picked = pickSurface(res || {});
-        paint(picked.tree);
-        try{ inspectorAnalyze(); }catch(_){}
-      }catch(e){
-        // API falló: al menos pintar fallback cliente + inspector local
-        paint(clientUIFromAOS(aos.value));
-        try{ inspectorAnalyze(); }catch(_){}
-      }
+        paint(surfaces[surfaceOID]||Object.values(surfaces)[0]);
+      }catch(e){}
     }, 700);
   }
   document.querySelectorAll('[data-aos-tab]').forEach(function(btn){
@@ -890,77 +773,34 @@ ${body}
       else sug.classList.add('hidden');
     });
   }
-  async function mindAnalyze(){
-    const src = aos.value || '';
-    setStatus('Mind analiza…');
-    try {
-      const res = await api('/api/mind/analyze', { source: src, mode: 'analyze', message: '' });
-      renderMindResponse(res);
-      setStatus('Mind listo');
-    } catch (e) {
-      // fallback local if API down
-      document.getElementById('mind-out').textContent = 'Mind local (API no disponible): ' + (e.message||e);
-      setStatus('Mind offline', true);
+  function mindAnalyze(){
+    var src = aos.value||'';
+    var orges=[], rules=[], binds=[], emits=[], m, re;
+    re=/\(orge\s+([^\s)]+)/g; while((m=re.exec(src))) orges.push(m[1]);
+    re=/\(rule\s+([^\s)]+)/g; while((m=re.exec(src))) rules.push(m[1]);
+    re=/\(bind\s+([^\s)]+)/g; while((m=re.exec(src))) binds.push(m[1]);
+    re=/\(emit\s+([^\s)]+)/g; while((m=re.exec(src))) emits.push(m[1]);
+    var hasUI = /\(kind\s+UI\)|\(ui\s/.test(src);
+    var parts = [];
+    parts.push('ORGES: '+(orges.join(', ')||'ninguno'));
+    parts.push('Reglas: '+(rules.join(', ')||'ninguna'));
+    parts.push('Binds: '+(binds.join(', ')||'—'));
+    parts.push('Emits: '+(emits.join(', ')||'—'));
+    parts.push(hasUI ? 'Superficie UI presente (vista = organismo).' : 'Sin UI-orge: añade vista que reaccione al estado.');
+    if(rules.length && !hasUI) parts.push('Mind: reglas sin vista — sugiere UI con bind a los átomos que escriben las reglas.');
+    if(orges.length>=2 && !/\(assemble/.test(src)) parts.push('Mind: falta (assemble …) para acoplar LEGO.');
+    if(!/\(pulse/.test(src) && orges.length>=2) parts.push('Mind: documenta Pulse firmado entre organismos (Ed25519 + nonce).');
+    document.getElementById('mind-out').textContent = parts.join('\n');
+    if(!hasUI && orges[0]){
+      mindSuggestion = '  (orge ui-main (kind UI) (ui (column\n    (splash "'+orges[0]+'")\n    (gradient "Reactivo Alset" (style "animated"))\n    (badge (bind '+(binds[0]||orges[0]+'.estado')+'))\n    (row (button "Acción" (emit '+(emits[0]||orges[0]+'.tick')+')))))\n  (assemble '+orges.join(' ')+' ui-main)\n  (surface ui-main)\n';
+    } else if(rules.length){
+      mindSuggestion = '    (rule mind-check (when (exists '+(binds[0]||'estado.atom')+')) (then mind.visto true))\n';
+    } else {
+      mindSuggestion = SNIPPETS.orge + SNIPPETS.ui + '  (assemble nombre ui-main)\n  (surface ui-main)\n';
     }
-  }
-
-  function renderMindResponse(res){
-    if(!res) return;
-    const out = document.getElementById('mind-out');
-    if(out) out.textContent = res.reply || '';
-    const diags = document.getElementById('mind-diags');
-    if(diags){
-      diags.innerHTML = (res.diagnostics||[]).map(d=>'<div class="diag">⚠ '+escapeHtml(d)+'</div>').join('');
-    }
-    const sugs = document.getElementById('mind-sugs');
-    mindSuggestionsList = res.suggestions || [];
-    if(sugs){
-      sugs.innerHTML = mindSuggestionsList.map((s,i)=>
-        '<button type="button" class="sug-btn" data-sug="'+i+'"><b>'+escapeHtml(s.title)+'</b> <span class="muted">'+escapeHtml(s.kind)+'</span><br/><small>'+escapeHtml(s.reason||'')+'</small></button>'
-      ).join('');
-      sugs.querySelectorAll('[data-sug]').forEach(btn=>{
-        btn.onclick = ()=>{
-          const s = mindSuggestionsList[+btn.dataset.sug];
-          if(!s) return;
-          mindSuggestion = s.snippet || '';
-          document.getElementById('mind-code').textContent = mindSuggestion;
-        };
-      });
-    }
-    if(mindSuggestionsList[0]){
-      mindSuggestion = mindSuggestionsList[0].snippet || '';
-      document.getElementById('mind-code').textContent = mindSuggestion;
-    }
-  }
-
-  function escapeHtml(s){
-    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  }
-
-  let mindSuggestionsList = [];
-
-  async function mindChat(){
-    const input = document.getElementById('mind-chat-input');
-    const msg = (input && input.value || '').trim();
-    if(!msg) return;
-    const log = document.getElementById('mind-chat-log');
-    if(log) log.innerHTML += '<div class="chat-user"><b>Tú:</b> '+escapeHtml(msg)+'</div>';
-    if(input) input.value = '';
-    setStatus('Mind piensa…');
-    try {
-      const res = await api('/api/mind/chat', { source: aos.value||'', message: msg, mode: 'chat' });
-      renderMindResponse(res);
-      if(log) log.innerHTML += '<div class="chat-mind"><b>Mind:</b> '+escapeHtml(res.reply||'').replace(/\n/g,'<br/>')+'</div>';
-      log && (log.scrollTop = log.scrollHeight);
-      setStatus('Mind listo');
-    } catch(e){
-      if(log) log.innerHTML += '<div class="chat-mind"><b>Mind:</b> error '+escapeHtml(e.message||e)+'</div>';
-      setStatus('Mind error', true);
-    }
+    document.getElementById('mind-code').textContent = mindSuggestion.replace(/\\n/g, '\n');
   }
   if((_b=document.getElementById('btn-mind-analyze'))) _b.onclick=mindAnalyze;
-  if((_b=document.getElementById('btn-mind-chat'))) _b.onclick=mindChat;
-  if((_b=document.getElementById('mind-chat-input'))) _b.addEventListener('keydown',function(e){ if(e.key==='Enter') mindChat(); });
   if((_b=document.getElementById('btn-mind-suggest-ui'))) _b.onclick=function(){
     mindSuggestion = SNIPPETS.ui + '  (assemble stock ui-main)\n  (surface ui-main)\n';
     document.getElementById('mind-code').textContent = mindSuggestion.replace(/\\n/g, '\n');
@@ -1163,224 +1003,5 @@ ${body}
   }
 
   log('Studio · .aos live + Mind declarar + emits componentes · ' + Object.keys(EXAMPLES).length + ' plantillas');
-
-  /* ——— AlsetInspector permanente (derecha del preview) ——— */
-  let inspectorSnippet = '';
-  let inspectorBuilt = '';
-
-  async function inspectorAnalyze(){
-    const src = (aos && aos.value) || '';
-    const badge = document.getElementById('inspector-badge');
-    if(badge){ badge.textContent='analizando…'; badge.classList.remove('ok'); }
-    try {
-      const res = await api('/api/mind/analyze', { source: src, mode: 'analyze', message: '' });
-      renderInspector(res);
-      if(badge){ badge.textContent='activo'; badge.classList.add('ok'); }
-    } catch(e) {
-      const out = document.getElementById('inspector-out');
-      if(out) out.textContent = 'Inspector offline: '+(e.message||e)+'\nRevisa sintaxis localmente (paréntesis, flow, surface).';
-      if(badge) badge.textContent='offline';
-      // local paren check
-      let bal=0; for(const c of src){ if(c==='(')bal++; else if(c===')')bal--; if(bal<0)break; }
-      const diags = document.getElementById('inspector-diags');
-      if(diags && bal!==0) diags.innerHTML = '<div class="diag">⚠ Paréntesis desbalanceados (Δ '+bal+')</div>';
-    }
-  }
-
-  function renderInspector(res){
-    if(!res) return;
-    const out = document.getElementById('inspector-out');
-    if(out) out.textContent = res.reply || '';
-    const diags = document.getElementById('inspector-diags');
-    if(diags) diags.innerHTML = (res.diagnostics||[]).map(d=>'<div class="diag">⚠ '+escapeHtml(d)+'</div>').join('');
-    const sugs = document.getElementById('inspector-sugs');
-    const list = res.suggestions || [];
-    if(sugs){
-      sugs.innerHTML = list.map((s,i)=>
-        '<button type="button" class="sug-btn" data-isug="'+i+'"><b>'+escapeHtml(s.title)+'</b> <span class="muted">'+escapeHtml(s.kind)+'</span><br/><small>'+escapeHtml(s.reason||'')+'</small></button>'
-      ).join('');
-      sugs.querySelectorAll('[data-isug]').forEach(btn=>{
-        btn.onclick = ()=>{
-          const s = list[+btn.dataset.isug];
-          if(!s) return;
-          inspectorSnippet = s.snippet || '';
-          if(s.kind==='build') inspectorBuilt = s.snippet || '';
-          const code = document.getElementById('inspector-code');
-          if(code) code.textContent = inspectorSnippet;
-        };
-      });
-    }
-    if(res.built_aos){ inspectorBuilt = res.built_aos; inspectorSnippet = res.built_aos; }
-    else if(list[0]){ inspectorSnippet = list[0].snippet || ''; }
-    const code = document.getElementById('inspector-code');
-    if(code && inspectorSnippet) code.textContent = inspectorSnippet;
-  }
-
-  async function inspectorChat(){
-    const input = document.getElementById('inspector-chat-input');
-    const msg = (input && input.value || '').trim();
-    if(!msg) return;
-    const logEl = document.getElementById('inspector-chat-log');
-    if(logEl) logEl.innerHTML += '<div class="chat-user"><b>Tú:</b> '+escapeHtml(msg)+'</div>';
-    if(input) input.value = '';
-    try {
-      const res = await api('/api/mind/chat', { source: (aos&&aos.value)||'', message: msg, mode: 'chat' });
-      renderInspector(res);
-      if(res.built_aos){
-        inspectorBuilt = res.built_aos;
-        const code = document.getElementById('inspector-code');
-        if(code) code.textContent = res.built_aos;
-      }
-      if(logEl) logEl.innerHTML += '<div class="chat-mind"><b>Inspector:</b> '+escapeHtml(res.reply||'').replace(/\n/g,'<br/>')+'</div>';
-      if(logEl) logEl.scrollTop = logEl.scrollHeight;
-    } catch(e) {
-      if(logEl) logEl.innerHTML += '<div class="chat-mind">Error: '+escapeHtml(e.message||e)+'</div>';
-    }
-  }
-
-  (function wireInspector(){
-    const ins = document.getElementById('btn-inspector-insert');
-    if(ins) ins.onclick = ()=>{
-      if(!inspectorSnippet || !aos) return;
-      insertAtCursor('\n'+inspectorSnippet+'\n');
-      log('Inspector: snippet insertado');
-      scheduleLive();
-    };
-    const apl = document.getElementById('btn-inspector-apply-build');
-    if(apl) apl.onclick = ()=>{
-      const src = inspectorBuilt || inspectorSnippet;
-      if(!src || !aos) return;
-      aos.value = src;
-      if(typeof syncHl==='function') syncHl();
-      log('Inspector: flow cargado en editor');
-      scheduleLive();
-      $('#btn-apply') && $('#btn-apply').click();
-    };
-    const chat = document.getElementById('btn-inspector-chat');
-    if(chat) chat.onclick = inspectorChat;
-    const cin = document.getElementById('inspector-chat-input');
-    if(cin) cin.addEventListener('keydown', function(e){ if(e.key==='Enter') inspectorChat(); });
-    // continuous
-    setTimeout(inspectorAnalyze, 400);
-    setInterval(function(){ if(document.getElementById('pane-inspector')) inspectorAnalyze(); }, 12000);
-  })();
-
-  // Device tabs if present
-  document.querySelectorAll('#device-tabs [data-device]').forEach(function(btn){
-    btn.onclick = function(){
-      document.querySelectorAll('#device-tabs [data-device]').forEach(b=>b.classList.remove('on'));
-      btn.classList.add('on');
-      deviceMode = btn.getAttribute('data-device')||'mobile';
-      if(device){ device.className = 'device '+deviceMode; }
-      const lab = document.getElementById('devLabel');
-      if(lab) lab.textContent = deviceMode;
-      const picked = pickSurface({surfaces, surface: surfaceOID});
-      paint(picked.tree);
-    };
-  });
-
-  // Initial paint attempt from editor
-  setTimeout(function(){ try{ scheduleLive(); }catch(_){} }, 600);
-
-
-  /* ——— Props de órganos UI + Inspector chrome ——— */
-  var selectedNode = null, selectedPath = '';
-  function selectUINode(n, path){
-    selectedNode = n; selectedPath = path || '';
-    var sel = document.getElementById('prop-sel');
-    if(sel) sel.value = ((n && n.type) || '') + (path ? (' @ ' + path) : '');
-    var emit = document.getElementById('prop-emit');
-    if(emit) emit.value = (n && n.emit) || '';
-    var bind = document.getElementById('prop-bind');
-    if(bind) bind.value = (n && n.bind) || '';
-    var p = (n && n.props) || {};
-    function set(id, k){ var el=document.getElementById(id); if(el) el.value = p[k] || ''; }
-    set('prop-padding','padding'); set('prop-margin','margin'); set('prop-gap','gap');
-    set('prop-radius','radius'); set('prop-color','color'); set('prop-bg','bg');
-    set('prop-width','width'); set('prop-height','height'); set('prop-fontsize','fontsize');
-    log('Seleccionado: ' + ((n && n.type) || '?') + ' ' + selectedPath);
-  }
-
-  function applyPropsToAOS(){
-    if(!selectedNode){ log('Haz clic en un componente del preview para seleccionarlo', true); return; }
-    if(!selectedNode.props) selectedNode.props = {};
-    var map = {
-      padding:'prop-padding', margin:'prop-margin', gap:'prop-gap', radius:'prop-radius',
-      color:'prop-color', bg:'prop-bg', width:'prop-width', height:'prop-height', fontsize:'prop-fontsize'
-    };
-    Object.keys(map).forEach(function(k){
-      var el = document.getElementById(map[k]);
-      if(el && el.value.trim()) selectedNode.props[k] = el.value.trim();
-      else if(selectedNode.props[k]) delete selectedNode.props[k];
-    });
-    var emit = document.getElementById('prop-emit');
-    var bind = document.getElementById('prop-bind');
-    if(emit && emit.value.trim()) selectedNode.emit = emit.value.trim();
-    if(bind && bind.value.trim()) selectedNode.bind = bind.value.trim();
-    // Anotar en .aos si hay texto de botón
-    var propsPairs = Object.keys(selectedNode.props||{}).map(function(k){ return '('+k+' '+selectedNode.props[k]+')'; }).join(' ');
-    if(propsPairs && selectedNode.text && aos){
-      var label = selectedNode.text;
-      var re = new RegExp('(\\(button\\s+"'+label.replace(/[.*+?^${}()|[\\]\\\\]/g,'\\$&')+'"[^\\)]*?)(\\))');
-      if(re.test(aos.value)){
-        aos.value = aos.value.replace(re, function(m,a,b){
-          if(/\bpadding\b|\bradius\b|\bbg\b/.test(a)) return m;
-          return a + ' ' + propsPairs + b;
-        });
-        if(typeof syncHl==='function') syncHl();
-      }
-    }
-    log('Props del órgano aplicadas');
-    paint(pickSurface({surfaces: surfaces, surface: surfaceOID}).tree);
-    if(typeof scheduleLive==='function') scheduleLive();
-  }
-  var _bp = document.getElementById('btn-apply-prop');
-  if(_bp) _bp.onclick = applyPropsToAOS;
-
-  (function wireInspectorChrome(){
-    var insp = document.getElementById('pane-inspector');
-    var row = document.getElementById('preview-row');
-    if(!insp || !row) return;
-    var head = insp.querySelector('.pane-head');
-    if(head && !head.querySelector('[data-close-inspector]')){
-      var x = document.createElement('button');
-      x.type = 'button'; x.className = 'icon-btn'; x.setAttribute('data-close-inspector','1');
-      x.textContent = '×'; x.title = 'Cerrar inspector';
-      head.appendChild(x);
-      x.onclick = function(){ insp.classList.add('collapsed'); };
-    }
-    var top = document.getElementById('topbar');
-    if(top && !document.getElementById('btn-toggle-inspector')){
-      var t = document.createElement('button');
-      t.type = 'button'; t.id = 'btn-toggle-inspector'; t.className = 'btn btn-ghost';
-      t.textContent = 'Inspector';
-      top.appendChild(t);
-      t.onclick = function(){ insp.classList.toggle('collapsed'); };
-    }
-    if(!document.getElementById('splitter-inspector')){
-      var sp = document.createElement('div');
-      sp.id = 'splitter-inspector'; sp.className = 'splitter-inspector';
-      row.insertBefore(sp, insp);
-      var startX=0, startW=0;
-      sp.addEventListener('mousedown', function(ev){
-        ev.preventDefault();
-        startX = ev.clientX;
-        startW = insp.getBoundingClientRect().width;
-        function move(e){
-          var w = Math.max(200, Math.min(window.innerWidth*0.55, startW - (e.clientX - startX)));
-          insp.style.flex = '0 0 ' + w + 'px';
-          insp.style.maxWidth = w + 'px';
-          insp.style.width = w + 'px';
-        }
-        function up(){
-          window.removeEventListener('mousemove', move);
-          window.removeEventListener('mouseup', up);
-        }
-        window.addEventListener('mousemove', move);
-        window.addEventListener('mouseup', up);
-      });
-    }
-  })();
-
 })();
 

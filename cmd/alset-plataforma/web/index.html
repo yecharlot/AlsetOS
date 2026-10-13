@@ -57,7 +57,8 @@
     <div class="drawer-body" id="examples-list"></div>
   </aside>
 
-  <div class="workbench" id="workbench">
+    <div class="main-shell" id="main-shell">
+    <div class="workbench" id="workbench">
     <aside class="pane pane-left" id="pane-left">
       <div class="pane-head"><span>Toolbox</span>
         <button type="button" class="icon-btn" data-close="left">×</button></div>
@@ -72,7 +73,7 @@
         <div class="toolbox" id="toolbox-templates"></div>
       </div>
     </aside>
-    <div class="splitter v" data-split="left"></div>
+        <div class="splitter v" data-split="left" title="Arrastra para redimensionar el toolbox"></div>
 
     <section class="pane pane-center" id="pane-center">
       <div class="pane-head">
@@ -82,8 +83,9 @@
           <button type="button" class="btn btn-ghost dev" data-dev="tablet">Tablet</button>
           <button type="button" class="btn btn-ghost dev" data-dev="desktop">Desktop</button>
         </div>
-      </div>
-      <div class="pane-body center-body">
+      <div class="center-stack" id="center-stack">
+        <div class="pane-body center-body" id="center-work">
+
         <div id="canvas" class="canvas" title="Suelta piezas LEGO aquí"></div>
         <div class="aos-tabs">
           <button type="button" class="btn btn-ghost aos-tab on" data-aos-tab="editor">Reglas · .aos inteligente</button>
@@ -159,10 +161,19 @@
           <pre id="declare-draft" class="mind-code"></pre>
           <button type="button" class="btn btn-primary" id="d-to-aos" style="width:100%">Pasar borrador al .aos</button>
         </div>
+        </div>
+        <div class="splitter h" data-split="preview" title="Arrastra para redimensionar el preview"></div>
+        <section class="pane pane-preview" id="pane-preview">
+            <div class="pane-head"><span>Preview · <span id="devLabel">mobile</span></span>
+              <button type="button" class="icon-btn" data-close="preview" title="Cerrar preview">×</button></div>
+            <div class="preview-stage">
+              <div id="device" class="device mobile"><div id="previewRoot"></div></div>
+            </div>
+        </section>
       </div>
     </section>
-    <div class="splitter v" data-split="right"></div>
 
+    <div class="splitter v" data-split="right" title="Arrastra para redimensionar propiedades"></div>
     <aside class="pane pane-right" id="pane-right">
       <div class="pane-head"><span>Propiedades · lógica</span>
         <button type="button" class="icon-btn" data-close="right">×</button></div>
@@ -180,23 +191,18 @@
         <div id="apps-list" class="apps-list"></div>
       </div>
     </aside>
+  
+
+    </div>
+
+    <div class="splitter h" data-split="bottom" title="Arrastra para redimensionar la consola"></div>
+    <section class="pane pane-bottom" id="pane-bottom">
+      <div class="pane-head"><span>Consola</span>
+        <button type="button" class="icon-btn" data-close="bottom" title="Cerrar">×</button></div>
+      <pre id="console" class="console"></pre>
+    </section>
   </div>
 
-  <div class="splitter h" data-split="bottom"></div>
-  <section class="pane pane-bottom" id="pane-bottom">
-    <div class="pane-head"><span>Consola</span>
-      <button type="button" class="icon-btn" data-close="bottom">×</button></div>
-    <pre id="console" class="console"></pre>
-  </section>
-
-  <section class="pane pane-preview" id="pane-preview">
-    <div class="pane-head"><span>Preview · <span id="devLabel">mobile</span></span>
-      <button type="button" class="icon-btn" data-close="preview">×</button></div>
-    <div class="preview-stage">
-      <div id="device" class="device mobile"><div id="previewRoot"></div></div>
-    </div>
-  </section>
-
-  <script src="studio.js"></script>
+<script src="studio.js"></script>
 </body>
 </html>

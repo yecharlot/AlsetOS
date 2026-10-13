@@ -201,179 +201,121 @@ h3{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--mute
 .aos-inline-suggest li small { color: #94a3b8; display: block; }
 .aos-inline-suggest li:hover, .aos-inline-suggest li.active { background: #4f46e5; }
 
-/* Mind agent panel */
-.mind-panel { display:flex; flex-direction:column; gap:8px; }
-.mind-head { font-weight:700; color:var(--gold); }
-.mind-out { white-space:pre-wrap; font-size:12px; line-height:1.45; max-height:140px; overflow:auto; }
-.mind-diags .diag { font-size:11px; color:#fbbf24; margin:2px 0; }
-.mind-sugs { display:flex; flex-direction:column; gap:6px; max-height:160px; overflow:auto; }
-.sug-btn { text-align:left; background:var(--panel2); border:1px solid var(--line); border-radius:10px; padding:8px; cursor:pointer; color:var(--text); font-size:12px; }
-.sug-btn:hover { border-color:var(--gold); }
-.mind-code { background:#0a0e14; border:1px solid var(--line); border-radius:10px; padding:10px; font-size:11px; max-height:160px; overflow:auto; white-space:pre-wrap; }
-.mind-chat { margin-top:8px; border-top:1px solid var(--line); padding-top:8px; }
-.mind-chat-log { max-height:140px; overflow:auto; font-size:12px; margin-bottom:8px; }
-.chat-user { margin:4px 0; color:var(--muted); }
-.chat-mind { margin:4px 0; color:var(--text); }
-.mind-chat-row { display:flex; gap:6px; }
-.mind-chat-row .rt-input { flex:1; }
-
-/* Animated UI in preview (Alset style) */
-#previewRoot .splash, .device .splash {
-  animation: alsetSplash 1.1s ease;
-  background: linear-gradient(135deg, #1b4965, #e85d04 80%);
-  color:#fff; border-radius:14px; padding:18px; font-weight:800; letter-spacing:.04em;
-  box-shadow:0 8px 24px rgba(0,0,0,.25);
+/* ===== Layout redimensionable (main-shell) ===== */
+body.studio-full {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
 }
-@keyframes alsetSplash {
-  from { opacity:0; transform:translateY(12px) scale(.96); }
-  to { opacity:1; transform:none; }
+.main-shell {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
-#previewRoot button, .device button {
-  transition: transform .15s ease, box-shadow .15s ease, background .2s;
-  border-radius:10px;
-}
-#previewRoot button:hover, .device button:hover {
-  transform: translateY(-1px);
-  box-shadow:0 4px 12px rgba(232,93,4,.35);
-}
-#previewRoot .gradient, .device .gradient {
-  min-height:48px; border-radius:12px;
-  background: linear-gradient(120deg,#1b4965,#5fa8d3,#e85d04,#ffb703);
-  background-size:300% 300%;
-  animation: alsetGrad 6s ease infinite;
-}
-@keyframes alsetGrad {
-  0%{background-position:0% 50%}
-  50%{background-position:100% 50%}
-  100%{background-position:0% 50%}
-}
-#previewRoot .badge, .device .badge {
-  animation: alsetPulse 2s ease infinite;
-}
-@keyframes alsetPulse {
-  0%,100%{ box-shadow:0 0 0 0 rgba(95,168,211,.4); }
-  50%{ box-shadow:0 0 0 6px rgba(95,168,211,0); }
-}
-
-/* Preview + AlsetInspector side by side */
-.preview-row {
+.workbench {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
   display: flex;
   flex-direction: row;
-  min-height: 280px;
-  height: 320px;
+  overflow: hidden;
+}
+.pane-center {
+  flex: 1 1 auto;
+  min-width: 120px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.center-stack {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+#center-work {
+  flex: 1 1 auto;
+  min-height: 80px;
+  overflow: auto;
+}
+.pane-left, .pane-right {
+  flex: 0 0 auto;
+  min-width: 120px;
+  max-width: 50vw;
+  overflow: hidden;
+}
+.pane-preview {
+  flex: 0 0 auto;
+  min-height: 48px;
+  max-height: 80vh;
   border-top: 1px solid var(--line);
   background: var(--panel2);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.pane-preview .preview-stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+.pane-bottom {
   flex: 0 0 auto;
+  min-height: 40px;
+  max-height: 50vh;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
-.preview-row .pane-preview {
-  flex: 1 1 58%;
-  height: 100% !important;
-  border-top: 0;
-  min-width: 0;
+.pane-bottom .console {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  height: auto;
+  overflow: auto;
 }
-.preview-row .pane-inspector {
-  flex: 1 1 42%;
-  border-left: 1px solid var(--line);
-  background: var(--panel);
-  min-width: 260px;
-  max-width: 420px;
-  height: 100%;
+.splitter.v {
+  flex: 0 0 6px;
+  width: 6px;
+  cursor: col-resize;
+  background: var(--line);
+  position: relative;
+  z-index: 6;
+  transition: background .15s;
 }
-.inspector-body { display: flex; flex-direction: column; gap: 6px; }
-.preview-stage { min-height: 180px; }
-#previewRoot { min-height: 140px; color: var(--text); }
-#previewRoot .muted { color: var(--muted); padding: 12px; }
-.rt-splash, #previewRoot .rt-splash {
-  animation: alsetSplash 1.1s ease;
-  background: linear-gradient(135deg, #1b4965, #e85d04 80%);
-  color: #fff; border-radius: 14px; padding: 16px; font-weight: 800;
+.splitter.v:hover, .splitter.v.dragging {
+  background: var(--gold);
 }
-
-/* Shared skin — same tokens as deploy SharedUISkin */
-#previewRoot.alset-ui, .alset-ui {
-  --alset-bg:#0f1419; --alset-card:#1a2332; --alset-ink:#e8eef8;
-  --alset-accent:#F4B400; --alset-muted:#8b9bb4; --alset-line:#243044;
-  --alset-blue:#1b4965; --alset-orange:#e85d04;
-  color: var(--alset-ink);
+.splitter.h {
+  flex: 0 0 6px;
+  height: 6px;
+  cursor: row-resize;
+  background: var(--line);
+  position: relative;
+  z-index: 6;
+  transition: background .15s;
 }
-#previewRoot.alset-ui .col { display:flex; flex-direction:column; gap:.65rem; }
-#previewRoot.alset-ui .row { display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; }
-#previewRoot.alset-ui button {
-  background:var(--alset-accent); border:0; padding:.55rem .9rem; border-radius:10px;
-  font-weight:700; cursor:pointer; color:#111;
+.splitter.h:hover, .splitter.h.dragging {
+  background: var(--gold);
 }
-#previewRoot.alset-ui .badge-ui, #previewRoot.alset-ui .badge {
-  background:var(--alset-card); padding:.35rem .7rem; border-radius:999px;
-  border:1px solid var(--alset-line); display:inline-block;
+.pane.collapsed {
+  display: none !important;
 }
-#previewRoot.alset-ui .rt-splash, #previewRoot.alset-ui .splash {
-  background:linear-gradient(135deg,var(--alset-blue),var(--alset-orange) 80%);
-  color:#fff; border-radius:14px; padding:1rem 1.15rem; font-weight:800;
+.splitter.collapsed-hide {
+  display: none !important;
 }
-
-/* Inspector close/resize */
-.preview-row { position: relative; }
-.pane-inspector { position: relative; transition: flex-basis .15s, width .15s, max-width .15s; }
-.pane-inspector.collapsed { display: none !important; }
-.splitter-inspector {
-  width: 5px; cursor: col-resize; background: transparent; flex: 0 0 5px;
-  align-self: stretch;
+body.resizing-panels {
+  cursor: col-resize !important;
+  user-select: none !important;
 }
-.splitter-inspector:hover { background: rgba(244,180,0,.25); }
-.prop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
-.prop-grid label { font-size: 11px; color: var(--muted); display: flex; flex-direction: column; gap: 2px; }
-.prop-grid input { font-size: 12px; }
-.organo-hint { font-size: 11px; color: var(--muted); margin: 6px 0; line-height: 1.35; }
-
-/* Nav components — mirror deploy */
-#previewRoot.alset-ui .alset-tabs {
-  display:flex; flex-direction:column; border:1px solid var(--line); border-radius:12px;
-  overflow:hidden; background: var(--panel2);
+body.resizing-panels-h {
+  cursor: row-resize !important;
+  user-select: none !important;
 }
-#previewRoot.alset-ui .alset-tabs-bar { display:flex; gap:4px; padding:6px; background:#121820; flex-wrap:wrap; }
-#previewRoot.alset-ui .alset-tab-btn {
-  background:#243044; color:var(--text); border:0; border-radius:8px 8px 0 0;
-  padding:6px 12px; font-weight:700; cursor:pointer;
-}
-#previewRoot.alset-ui .alset-tab-btn.on { background: var(--gold); color:#111; }
-#previewRoot.alset-ui .alset-tabs.bottom-tabs .alset-tabs-bar { border-top:1px solid var(--line); justify-content:space-around; }
-#previewRoot.alset-ui .alset-tabs.bottom-tabs .alset-tab-btn { border-radius:8px; flex:1; }
-#previewRoot.alset-ui .alset-tabs-panels { padding:10px 12px; min-height:48px; }
-#previewRoot.alset-ui .alset-drawer {
-  border:1px solid var(--line); border-radius:12px; overflow:hidden; background:var(--panel2);
-}
-#previewRoot.alset-ui .alset-drawer-head {
-  display:flex; justify-content:space-between; padding:10px 12px; background:#121820;
-  cursor:pointer; font-weight:700;
-}
-#previewRoot.alset-ui .alset-drawer-body { padding:10px 12px; }
-#previewRoot.alset-ui .ui-selected { outline:2px solid var(--gold)!important; outline-offset:2px; }
-#previewRoot.alset-ui .blob {
-  width:64px; height:64px; border-radius:40%;
-  background:linear-gradient(135deg,#f4b400,#5b9cf5);
-}
-#previewRoot.alset-ui .ui-selectable { cursor: default; }
-
-/* Work modes — Arquitecto de negocios */
-.work-modes {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
-  padding: 8px 12px; background: #121820; border-bottom: 1px solid var(--line, #243044);
-}
-.wm-label { font-size: 11px; color: var(--muted, #8b9bb4); text-transform: uppercase; letter-spacing: .06em; margin-right: 6px; }
-.wm-btn {
-  background: #1a2332; border: 1px solid #243044; color: #e8eef8;
-  padding: 5px 10px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer;
-}
-.wm-btn.on { background: #F4B400; color: #111; border-color: #F4B400; }
-.mode-panel {
-  padding: 10px 12px; background: #0c1016; border-bottom: 1px solid #243044;
-}
-.mode-summary { font-size: 12px; color: #8b9bb4; margin: 0 0 8px; }
-.domain-spec { width: 100%; min-height: 64px; font-family: inherit; }
-.mode-actions { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
-.mode-out {
-  margin-top: 8px; max-height: 180px; overflow: auto; font-size: 11px;
-  background: #0a0e14; padding: 8px; border-radius: 8px; white-space: pre-wrap;
-}
-.ingest-box { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
-.ingest-box.hidden { display: none; }

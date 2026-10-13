@@ -200,3 +200,122 @@ h3{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--mute
 }
 .aos-inline-suggest li small { color: #94a3b8; display: block; }
 .aos-inline-suggest li:hover, .aos-inline-suggest li.active { background: #4f46e5; }
+
+/* ===== Layout redimensionable (main-shell) ===== */
+body.studio-full {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+}
+.main-shell {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.workbench {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+}
+.pane-center {
+  flex: 1 1 auto;
+  min-width: 120px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.center-stack {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+#center-work {
+  flex: 1 1 auto;
+  min-height: 80px;
+  overflow: auto;
+}
+.pane-left, .pane-right {
+  flex: 0 0 auto;
+  min-width: 120px;
+  max-width: 50vw;
+  overflow: hidden;
+}
+.pane-preview {
+  flex: 0 0 auto;
+  min-height: 48px;
+  max-height: 80vh;
+  border-top: 1px solid var(--line);
+  background: var(--panel2);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.pane-preview .preview-stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+.pane-bottom {
+  flex: 0 0 auto;
+  min-height: 40px;
+  max-height: 50vh;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.pane-bottom .console {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  height: auto;
+  overflow: auto;
+}
+.splitter.v {
+  flex: 0 0 6px;
+  width: 6px;
+  cursor: col-resize;
+  background: var(--line);
+  position: relative;
+  z-index: 6;
+  transition: background .15s;
+}
+.splitter.v:hover, .splitter.v.dragging {
+  background: var(--gold);
+}
+.splitter.h {
+  flex: 0 0 6px;
+  height: 6px;
+  cursor: row-resize;
+  background: var(--line);
+  position: relative;
+  z-index: 6;
+  transition: background .15s;
+}
+.splitter.h:hover, .splitter.h.dragging {
+  background: var(--gold);
+}
+.pane.collapsed {
+  display: none !important;
+}
+.splitter.collapsed-hide {
+  display: none !important;
+}
+body.resizing-panels {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+body.resizing-panels-h {
+  cursor: row-resize !important;
+  user-select: none !important;
+}

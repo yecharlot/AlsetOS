@@ -26,33 +26,6 @@
     <button type="button" class="btn btn-gold" id="btn-deploy">Desplegar producción</button>
   </header>
 
-  <div class="work-modes" id="work-modes" title="Modos de trabajo del Arquitecto">
-    <span class="wm-label">Modo</span>
-    <button type="button" class="wm-btn on" data-mode="analyze">Análisis</button>
-    <button type="button" class="wm-btn" data-mode="model">Modelo</button>
-    <button type="button" class="wm-btn" data-mode="ingest">Ingestión</button>
-    <button type="button" class="wm-btn" data-mode="implement">Implementación</button>
-    <button type="button" class="wm-btn" data-mode="audit">Auditoría</button>
-  </div>
-  <div id="mode-panel" class="mode-panel">
-    <p id="mode-summary" class="mode-summary">Análisis: describe el negocio; obtén ruta de digitalización sin pantallas obligatorias.</p>
-    <textarea id="domain-spec" class="rt-input domain-spec" rows="3" placeholder="Describe el dominio: actores, procesos, datos, dolores, sistemas actuales…"></textarea>
-    <div class="mode-actions">
-      <button type="button" class="btn btn-primary" id="btn-domain-run">Traducir dominio → ORGES</button>
-      <button type="button" class="btn btn-blue" id="btn-domain-to-editor">Cargar draft en editor</button>
-    </div>
-    <div id="ingest-box" class="ingest-box hidden">
-      <select id="ingest-kind" class="rt-input">
-        <option value="sql">SQL (CREATE TABLE)</option>
-        <option value="schema">Schema JSON</option>
-        <option value="rest">API REST / paths</option>
-      </select>
-      <textarea id="ingest-text" class="rt-input" rows="4" placeholder="Pega DDL SQL, JSON de tablas o paths/OpenAPI…"></textarea>
-      <button type="button" class="btn btn-primary" id="btn-ingest-run">Ingerir → draft .aos</button>
-    </div>
-    <pre id="mode-out" class="mode-out muted"></pre>
-  </div>
-
   <div id="error-box" class="error-box hidden" role="alert"></div>
 
   <aside id="help-drawer" class="drawer hidden">
@@ -84,7 +57,8 @@
     <div class="drawer-body" id="examples-list"></div>
   </aside>
 
-  <div class="workbench" id="workbench">
+    <div class="main-shell" id="main-shell">
+    <div class="workbench" id="workbench">
     <aside class="pane pane-left" id="pane-left">
       <div class="pane-head"><span>Toolbox</span>
         <button type="button" class="icon-btn" data-close="left">×</button></div>
@@ -99,7 +73,7 @@
         <div class="toolbox" id="toolbox-templates"></div>
       </div>
     </aside>
-    <div class="splitter v" data-split="left"></div>
+        <div class="splitter v" data-split="left" title="Arrastra para redimensionar el toolbox"></div>
 
     <section class="pane pane-center" id="pane-center">
       <div class="pane-head">
@@ -109,8 +83,9 @@
           <button type="button" class="btn btn-ghost dev" data-dev="tablet">Tablet</button>
           <button type="button" class="btn btn-ghost dev" data-dev="desktop">Desktop</button>
         </div>
-      </div>
-      <div class="pane-body center-body">
+      <div class="center-stack" id="center-stack">
+        <div class="pane-body center-body" id="center-work">
+
         <div id="canvas" class="canvas" title="Suelta piezas LEGO aquí"></div>
         <div class="aos-tabs">
           <button type="button" class="btn btn-ghost aos-tab on" data-aos-tab="editor">Reglas · .aos inteligente</button>
@@ -132,27 +107,16 @@
           </div>
           <ul id="aos-suggest" class="aos-suggest hidden"></ul>
         </div>
-                <div id="mind-panel" class="mind-panel hidden">
-          <div class="mind-head">Mind · agente de código (tiempo real)</div>
-          <p class="muted">Analiza el flow, diagnostica contratos/ARL/UI y propone snippets. Chat de dominio → ORGES.</p>
+        <div id="mind-panel" class="mind-panel hidden">
+          <div class="mind-head">Mind · agente de código ORGES / UI</div>
+          <div id="mind-out" class="mind-out muted">Mind analiza el .aos y sugiere reglas, emits y vistas.</div>
           <div class="mind-actions">
-            <button type="button" class="btn btn-blue" id="btn-mind-analyze">Analizar flow</button>
+            <button type="button" class="btn btn-blue" id="btn-mind-analyze">Analizar reglas</button>
             <button type="button" class="btn btn-ghost" id="btn-mind-suggest-ui">Sugerir UI animada</button>
-            <button type="button" class="btn btn-ghost" id="btn-mind-pulse">Pulse seguro</button>
+            <button type="button" class="btn btn-ghost" id="btn-mind-pulse">Plantilla Pulse</button>
           </div>
-          <div id="mind-out" class="mind-out muted">Mind espera tu flow o un mensaje de dominio.</div>
-          <div id="mind-diags" class="mind-diags"></div>
-          <div id="mind-sugs" class="mind-sugs"></div>
           <pre id="mind-code" class="mind-code"></pre>
-          <button type="button" class="btn btn-primary" id="btn-mind-insert" style="width:100%;margin-top:8px">Insertar snippet activo en .aos</button>
-          <div class="mind-chat">
-            <h4>Chat con Mind</h4>
-            <div id="mind-chat-log" class="mind-chat-log"></div>
-            <div class="mind-chat-row">
-              <input id="mind-chat-input" class="rt-input" placeholder="Ej: pedidos a domicilio con stock y ruta"/>
-              <button type="button" class="btn btn-blue" id="btn-mind-chat">Enviar</button>
-            </div>
-          </div>
+          <button type="button" class="btn btn-primary" id="btn-mind-insert" style="width:100%;margin-top:8px">Insertar sugerencia en .aos</button>
         </div>
         <div id="declare-panel" class="declare-panel hidden">
           <div class="mind-head">Declarar piezas independientes → ensamblar</div>
@@ -197,10 +161,19 @@
           <pre id="declare-draft" class="mind-code"></pre>
           <button type="button" class="btn btn-primary" id="d-to-aos" style="width:100%">Pasar borrador al .aos</button>
         </div>
+        </div>
+        <div class="splitter h" data-split="preview" title="Arrastra para redimensionar el preview"></div>
+        <section class="pane pane-preview" id="pane-preview">
+            <div class="pane-head"><span>Preview · <span id="devLabel">mobile</span></span>
+              <button type="button" class="icon-btn" data-close="preview" title="Cerrar preview">×</button></div>
+            <div class="preview-stage">
+              <div id="device" class="device mobile"><div id="previewRoot"></div></div>
+            </div>
+        </section>
       </div>
     </section>
-    <div class="splitter v" data-split="right"></div>
 
+    <div class="splitter v" data-split="right" title="Arrastra para redimensionar propiedades"></div>
     <aside class="pane pane-right" id="pane-right">
       <div class="pane-head"><span>Propiedades · lógica</span>
         <button type="button" class="icon-btn" data-close="right">×</button></div>
@@ -211,71 +184,25 @@
           <input id="prop-emit" class="rt-input" placeholder="stock.inc"/></div>
         <div class="field-row"><label>Bind estado</label>
           <input id="prop-bind" class="rt-input" placeholder="stock.unidades"/></div>
-        <p class="organo-hint">Cada componente es un <b>órgano UI</b>. Activa «Editar layout», haz clic en un elemento y ajusta props. Mismo aspecto en preview y deploy.</p>
-        <div class="prop-grid">
-          <label>Padding <input id="prop-padding" class="rt-input" placeholder="8px"/></label>
-          <label>Margin <input id="prop-margin" class="rt-input" placeholder="4px"/></label>
-          <label>Gap <input id="prop-gap" class="rt-input" placeholder="8px"/></label>
-          <label>Radius <input id="prop-radius" class="rt-input" placeholder="10px"/></label>
-          <label>Color <input id="prop-color" class="rt-input" placeholder="#e8eef8"/></label>
-          <label>Fondo <input id="prop-bg" class="rt-input" placeholder="#F4B400"/></label>
-          <label>Width <input id="prop-width" class="rt-input" placeholder="100%"/></label>
-          <label>Height <input id="prop-height" class="rt-input" placeholder="auto"/></label>
-          <label>Font size <input id="prop-fontsize" class="rt-input" placeholder="14px"/></label>
-        </div>
-        <button type="button" class="btn btn-blue" id="btn-apply-prop" style="width:100%;margin-top:8px">Aplicar props al órgano</button>
+        <button type="button" class="btn btn-blue" id="btn-apply-prop" style="width:100%;margin-top:8px">Aplicar al .aos</button>
         <h3>Estado vivo</h3>
         <pre id="state-view" class="state-view">{}</pre>
         <h3>Apps en producción</h3>
         <div id="apps-list" class="apps-list"></div>
       </div>
     </aside>
-  </div>
+  
 
-  <div class="splitter h" data-split="bottom"></div>
-  <section class="pane pane-bottom" id="pane-bottom">
-    <div class="pane-head"><span>Consola</span>
-      <button type="button" class="icon-btn" data-close="bottom">×</button></div>
-    <pre id="console" class="console"></pre>
-  </section>
+    </div>
 
-  <div class="preview-row" id="preview-row">
-    <section class="pane pane-preview" id="pane-preview">
-      <div class="pane-head">
-        <span>Preview · <span id="devLabel">mobile</span></span>
-        <div class="device-tabs" id="device-tabs">
-          <button type="button" class="btn btn-ghost on" data-device="mobile">Móvil</button>
-          <button type="button" class="btn btn-ghost" data-device="tablet">Tablet</button>
-          <button type="button" class="btn btn-ghost" data-device="desktop">Desktop</button>
-        </div>
-        <button type="button" class="icon-btn" data-close="preview">×</button>
-      </div>
-      <div class="preview-stage">
-        <div id="device" class="device mobile"><div id="previewRoot"><p class="muted">Aplica un flow o activa Live para ver la UI</p></div></div>
-      </div>
+    <div class="splitter h" data-split="bottom" title="Arrastra para redimensionar la consola"></div>
+    <section class="pane pane-bottom" id="pane-bottom">
+      <div class="pane-head"><span>Consola</span>
+        <button type="button" class="icon-btn" data-close="bottom" title="Cerrar">×</button></div>
+      <pre id="console" class="console"></pre>
     </section>
-    <aside class="pane pane-inspector" id="pane-inspector">
-      <div class="pane-head"><span>AlsetInspector · Mind</span>
-        <span class="badge" id="inspector-badge">activo</span></div>
-      <div class="pane-body inspector-body">
-        <div id="inspector-out" class="mind-out muted">Analizando flow en tiempo real…</div>
-        <div id="inspector-diags" class="mind-diags"></div>
-        <div id="inspector-sugs" class="mind-sugs"></div>
-        <pre id="inspector-code" class="mind-code"></pre>
-        <button type="button" class="btn btn-primary" id="btn-inspector-insert" style="width:100%">Insertar snippet / flow en .aos</button>
-        <button type="button" class="btn btn-blue" id="btn-inspector-apply-build" style="width:100%;margin-top:6px">Reemplazar .aos con flow generado</button>
-        <div class="mind-chat">
-          <h4>Dominio → ORGES</h4>
-          <div id="inspector-chat-log" class="mind-chat-log"></div>
-          <div class="mind-chat-row">
-            <input id="inspector-chat-input" class="rt-input" placeholder="Ej: pedidos a domicilio con stock y estados"/>
-            <button type="button" class="btn btn-blue" id="btn-inspector-chat">Enviar</button>
-          </div>
-        </div>
-      </div>
-    </aside>
   </div>
 
-  <script src="studio.js"></script>
+<script src="studio.js"></script>
 </body>
 </html>

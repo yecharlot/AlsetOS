@@ -260,88 +260,112 @@ ${body}
     save(); log('LEGO '+label);
   });
 
-  // --- Resizable panels (real) ---
-  function enableSplit(selector, orient, onMove){
-    const el = document.querySelector(selector);
+  // --- Resizable panels (persistidos) ---
+  const LS_KEY = 'alset-studio-layout-v2';
+  function loadLayout(){
+    try { return JSON.parse(localStorage.getItem(LS_KEY)||'{}'); } catch(e){ return {}; }
+  }
+  function saveLayout(s){
+    try { localStorage.setItem(LS_KEY, JSON.stringify(s)); } catch(e){}
+  }
+  const layout = Object.assign({ left:220, right:260, preview:200, bottom:100 }, loadLayout());
+  const leftPane=$('#pane-left'), rightPane=$('#pane-right'), bottomPane=$('#pane-bottom'), previewPane=$('#pane-preview');
+  const splitLeft=document.querySelector('.splitter.v[data-split="left"]');
+  const splitRight=document.querySelector('.splitter.v[data-split="right"]');
+  const splitPreview=document.querySelector('.splitter.h[data-split="preview"]');
+  const splitBottom=document.querySelector('.splitter.h[data-split="bottom"]');
+
+  function applyLayout(){
+    if(leftPane && !leftPane.classList.contains('collapsed')){
+      leftPane.style.width = layout.left+'px';
+      leftPane.style.flex = '0 0 auto';
+    }
+    if(rightPane && !rightPane.classList.contains('collapsed')){
+      rightPane.style.width = layout.right+'px';
+      rightPane.style.flex = '0 0 auto';
+    }
+    if(previewPane && !previewPane.classList.contains('collapsed')){
+      previewPane.style.height = layout.preview+'px';
+      previewPane.style.flex = '0 0 auto';
+      if(splitPreview) splitPreview.classList.remove('collapsed-hide');
+    } else if(splitPreview) {
+      splitPreview.classList.add('collapsed-hide');
+    }
+    if(bottomPane && !bottomPane.classList.contains('collapsed')){
+      bottomPane.style.height = layout.bottom+'px';
+      bottomPane.style.flex = '0 0 auto';
+      if(splitBottom) splitBottom.classList.remove('collapsed-hide');
+    } else if(splitBottom) {
+      splitBottom.classList.add('collapsed-hide');
+    }
+    if(splitLeft) splitLeft.classList.toggle('collapsed-hide', !!(leftPane&&leftPane.classList.contains('collapsed')));
+    if(splitRight) splitRight.classList.toggle('collapsed-hide', !!(rightPane&&rightPane.classList.contains('collapsed')));
+    saveLayout(layout);
+  }
+  applyLayout();
+
+  function dragSplit(el, orient, onDelta){
     if(!el) return;
     el.addEventListener('mousedown', (ev)=>{
+      if(ev.button!==0) return;
       ev.preventDefault();
-      const startX=ev.clientX, startY=ev.clientY;
+      el.classList.add('dragging');
+      document.body.classList.add(orient==='v'?'resizing-panels':'resizing-panels-h');
+      const sx=ev.clientX, sy=ev.clientY;
+      const base = orient==='v'
+        ? { left: layout.left, right: layout.right }
+        : { preview: layout.preview, bottom: layout.bottom };
       const move=(e)=>{
-        onMove(e.clientX-startX, e.clientY-startY, e);
+        const dx=e.clientX-sx, dy=e.clientY-sy;
+        onDelta(dx, dy, base);
+        applyLayout();
       };
-      const up=()=>{ window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); document.body.style.cursor=''; };
+      const up=()=>{
+        window.removeEventListener('mousemove', move);
+        window.removeEventListener('mouseup', up);
+        el.classList.remove('dragging');
+        document.body.classList.remove('resizing-panels','resizing-panels-h');
+        saveLayout(layout);
+      };
       window.addEventListener('mousemove', move);
       window.addEventListener('mouseup', up);
-      document.body.style.cursor = orient==='v'?'col-resize':'row-resize';
     });
   }
-  const leftPane=$('#pane-left'), rightPane=$('#pane-right'), bottomPane=$('#pane-bottom'), previewPane=$('#pane-preview');
-  let leftW=leftPane.offsetWidth||240, rightW=rightPane.offsetWidth||280, bottomH=140, previewH=280;
-  enableSplit('.splitter.v[data-split="left"]','v',(dx)=>{ leftW=Math.max(160, Math.min(420, leftW+dx)); leftPane.style.width=leftW+'px'; leftPane.style.flex='0 0 auto'; });
-  // right splitter is before right pane - need second splitter handler: use data-split right
-  document.querySelectorAll('.splitter.v').forEach((sp, idx)=>{
-    if(sp.getAttribute('data-split')==='right'){
-      let base=rightW;
-      sp.addEventListener('mousedown', (ev)=>{
-        ev.preventDefault();
-        const sx=ev.clientX; base=rightPane.offsetWidth;
-        const move=(e)=>{ const w=Math.max(180, Math.min(480, base-(e.clientX-sx))); rightPane.style.width=w+'px'; rightPane.style.flex='0 0 auto'; };
-        const up=()=>{ window.removeEventListener('mousemove',move); window.removeEventListener('mouseup',up); };
-        window.addEventListener('mousemove',move); window.addEventListener('mouseup',up);
-      });
-    }
+  dragSplit(splitLeft, 'v', (dx,_,base)=>{
+    layout.left = Math.max(140, Math.min(Math.floor(window.innerWidth*0.45), base.left + dx));
   });
-  enableSplit('.splitter.h[data-split="bottom"]','h',(dx,dy)=>{
-    // This splitter is above bottom - actually structure may need fix
+  dragSplit(splitRight, 'v', (dx,_,base)=>{
+    layout.right = Math.max(140, Math.min(Math.floor(window.innerWidth*0.45), base.right - dx));
   });
-  // Preview height drag: top border of preview
-  previewPane.style.flex='0 0 auto';
-  previewPane.style.height=previewH+'px';
-  bottomPane.style.flex='0 0 auto';
-  bottomPane.style.height=bottomH+'px';
-  const prevHead = previewPane.querySelector('.pane-head');
-  if(prevHead){
-    prevHead.style.cursor='ns-resize';
-    prevHead.title='Arrastra para redimensionar preview';
-    prevHead.addEventListener('mousedown', (ev)=>{
-      if(ev.target.closest('.icon-btn')) return;
-      ev.preventDefault();
-      const sy=ev.clientY; const base=previewPane.offsetHeight;
-      const move=(e)=>{ const h=Math.max(120, Math.min(window.innerHeight*0.7, base-(e.clientY-sy))); previewPane.style.height=h+'px'; };
-      const up=()=>{ window.removeEventListener('mousemove',move); window.removeEventListener('mouseup',up); };
-      window.addEventListener('mousemove',move); window.addEventListener('mouseup',up);
-    });
-  }
-  const botHead = bottomPane.querySelector('.pane-head');
-  if(botHead){
-    botHead.style.cursor='ns-resize';
-    botHead.addEventListener('mousedown', (ev)=>{
-      if(ev.target.closest('.icon-btn')) return;
-      ev.preventDefault();
-      const sy=ev.clientY; const base=bottomPane.offsetHeight;
-      const move=(e)=>{ const h=Math.max(80, Math.min(400, base-(e.clientY-sy))); bottomPane.style.height=h+'px'; };
-      const up=()=>{ window.removeEventListener('mousemove',move); window.removeEventListener('mouseup',up); };
-      window.addEventListener('mousemove',move); window.addEventListener('mouseup',up);
-    });
-  }
+  dragSplit(splitPreview, 'h', (_,dy,base)=>{
+    // splitter above preview: drag down → taller preview
+    layout.preview = Math.max(60, Math.min(Math.floor(window.innerHeight*0.7), base.preview - dy));
+  });
+  dragSplit(splitBottom, 'h', (_,dy,base)=>{
+    layout.bottom = Math.max(48, Math.min(Math.floor(window.innerHeight*0.45), base.bottom - dy));
+  });
 
+  function setPaneOpen(id, open){
+    const map={left:'pane-left',right:'pane-right',bottom:'pane-bottom',preview:'pane-preview'};
+    const pane=document.getElementById(map[id]);
+    if(!pane) return;
+    pane.classList.toggle('collapsed', !open);
+    document.querySelector('.panel-tog[data-panel="'+id+'"]')?.classList.toggle('active', open);
+    applyLayout();
+  }
   document.querySelectorAll('.panel-tog').forEach(btn=>{
     btn.onclick=()=>{
       const id=btn.dataset.panel;
       const pane=document.getElementById(id==='preview'?'pane-preview':id==='bottom'?'pane-bottom':id==='left'?'pane-left':'pane-right');
       if(!pane) return;
-      pane.classList.toggle('collapsed');
-      btn.classList.toggle('active');
+      const open = pane.classList.contains('collapsed');
+      setPaneOpen(id, open);
     };
   });
   document.querySelectorAll('[data-close]').forEach(btn=>{
-    btn.onclick=()=>{
-      const map={left:'pane-left',right:'pane-right',bottom:'pane-bottom',preview:'pane-preview'};
-      document.getElementById(map[btn.dataset.close])?.classList.add('collapsed');
-      document.querySelector('.panel-tog[data-panel="'+btn.dataset.close+'"]')?.classList.remove('active');
-    };
+    btn.onclick=()=> setPaneOpen(btn.dataset.close, false);
   });
+
   document.querySelectorAll('.dev').forEach(btn=>{
     btn.onclick=()=>{
       document.querySelectorAll('.dev').forEach(x=>x.classList.remove('on'));
