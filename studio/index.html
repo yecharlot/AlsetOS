@@ -8,7 +8,7 @@
 </head>
 <body class="studio-full">
   <header class="top" id="topbar">
-    <div class="brand">ALSET STUDIO <small>ORGES · LISPAI-AOS · PWA</small></div>
+    <div class="brand">ALSET STUDIO <small>Arquitecto de Sistemas · Tokenizador</small></div>
     <input id="app-name" class="name-input" value="mi-app" title="Nombre de la app (deploy)"/>
     <span id="status" class="badge">listo</span>
     <div class="spacer"></div>
@@ -27,6 +27,64 @@
   </header>
 
   <div id="error-box" class="error-box hidden" role="alert"></div>
+
+  <nav class="architect-bar" id="architect-bar" aria-label="Modos del Arquitecto">
+    <span class="arch-label">Rol Arquitecto</span>
+    <button type="button" class="arch-mode on" data-work-mode="analyze">1 · Análisis</button>
+    <button type="button" class="arch-mode" data-work-mode="ingest">2 · Ingestión</button>
+    <button type="button" class="arch-mode" data-work-mode="model">3 · Modelo ORGES</button>
+    <button type="button" class="arch-mode" data-work-mode="implement">4 · Implementación</button>
+    <button type="button" class="arch-mode" data-work-mode="audit">5 · Auditoría / Tokenizar</button>
+    <span class="arch-hint" id="arch-hint">Entrevista o reglas → Mind genera ORGES</span>
+  </nav>
+
+  <section class="architect-workspace" id="architect-workspace">
+    <div class="arch-cols">
+      <div class="arch-card">
+        <h3>Entrevista técnica → ORGES</h3>
+        <p class="muted">Requisitos funcionales y no funcionales de una empresa o sector. Mind los convierte en organismos.</p>
+        <label>Empresa / organización</label>
+        <input id="iv-empresa" class="rt-input" placeholder="Ej. PyME comercial Guantánamo"/>
+        <label>Sector</label>
+        <select id="iv-sector" class="rt-input">
+          <option value="comercio">Comercio / retail</option>
+          <option value="finanzas">Finanzas / contabilidad</option>
+          <option value="salud">Salud</option>
+          <option value="logistica">Logística</option>
+          <option value="manufactura">Manufactura</option>
+          <option value="servicios">Servicios</option>
+          <option value="otro">Otro</option>
+        </select>
+        <label>Procesos críticos actuales</label>
+        <textarea id="iv-procesos" class="rt-input arch-ta" placeholder="Ventas, inventario, cobranza, nómina…"></textarea>
+        <label>Requisitos funcionales</label>
+        <textarea id="iv-func" class="rt-input arch-ta" placeholder="Registrar ventas, controlar stock, reportes…"></textarea>
+        <label>Requisitos no funcionales</label>
+        <textarea id="iv-nfunc" class="rt-input arch-ta" placeholder="Offline-first, multi-usuario, auditoría…"></textarea>
+        <label>Sistemas / datos actuales</label>
+        <textarea id="iv-sistemas" class="rt-input arch-ta" placeholder="Excel, papel, software X, PDF…"></textarea>
+        <div class="arch-actions">
+          <button type="button" class="btn btn-blue" id="btn-interview-orges">Generar ORGES</button>
+          <button type="button" class="btn btn-ghost" id="btn-interview-roadmap">Solo análisis / roadmap</button>
+        </div>
+      </div>
+      <div class="arch-card">
+        <h3>Reglas manuales → ORGES (Mind)</h3>
+        <p class="muted">Describe reglas; la plataforma las transforma a flow .aos de organismos.</p>
+        <label>Nombre del modelo</label>
+        <input id="rules-name" class="rt-input" placeholder="modelo-negocio"/>
+        <label>Reglas y políticas</label>
+        <textarea id="rules-text" class="rt-input arch-ta-lg" placeholder="Si stock < 3 entonces alerta&#10;Toda venta descuenta inventario&#10;Solo cajero puede cobrar"></textarea>
+        <div class="arch-actions">
+          <button type="button" class="btn btn-blue" id="btn-rules-to-orges">Transformar en ORGES</button>
+          <button type="button" class="btn btn-ghost" id="btn-rules-to-editor">Enviar al editor .aos</button>
+        </div>
+        <h4>Mind / Arquitecto</h4>
+        <pre id="arch-mind-out" class="arch-mind-out">Listo para entrevista o reglas…</pre>
+      </div>
+    </div>
+  </section>
+
 
   <aside id="help-drawer" class="drawer hidden">
     <div class="drawer-head"><strong>Ayuda · Alset Studio ORGES</strong>
@@ -86,9 +144,9 @@
       <div class="pane-body center-body">
         <div id="canvas" class="canvas" title="Suelta piezas LEGO aquí"></div>
         <div class="aos-tabs">
-          <button type="button" class="btn btn-ghost aos-tab on" data-aos-tab="editor">Reglas · .aos inteligente</button>
+          <button type="button" class="btn btn-ghost aos-tab on" data-aos-tab="editor">Editor .aos · Mind</button>
           <button type="button" class="btn btn-ghost aos-tab" data-aos-tab="mind">Mind agente</button>
-          <button type="button" class="btn btn-ghost aos-tab" data-aos-tab="declare">Mind · declarar</button>
+          <button type="button" class="btn btn-ghost aos-tab" data-aos-tab="declare">Declarar piezas</button>
         </div>
         <div id="aos-editor-wrap" class="aos-editor-wrap">
           <div class="aos-toolbar">

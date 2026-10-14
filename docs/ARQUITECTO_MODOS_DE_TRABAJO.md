@@ -28,3 +28,6 @@ sistemas legados, **implementación** con UI, o **auditoría / anclaje** con Pri
 - **ÁbacoPhy / verticales** — plantillas de dominio comercial
 
 El arquitecto firma el manifiesto; el token no es especulación: es **versión del modelo + cadena de evidencia**.
+
+## UI del Studio (Arquitecto)
+Ver [ARQUITECTO_STUDIO.md](ARQUITECTO_STUDIO.md): barra de modos, entrevista técnica y reglas → ORGES.

@@ -1031,5 +1031,282 @@ ${body}
   }
 
   log('Studio · .aos live + Mind declarar + emits componentes · ' + Object.keys(EXAMPLES).length + ' plantillas');
+
+
+  /* ========== ARQUITECTO: modos + entrevista + reglas → ORGES ========== */
+  var workMode = 'analyze';
+  var lastBuiltAOS = '';
+  var archOut = document.getElementById('arch-mind-out');
+  function archLog(msg) {
+    if (archOut) archOut.textContent = msg;
+    if (typeof log === 'function') log(String(msg).split('\n')[0]);
+  }
+  function setWorkMode(mode) {
+    workMode = mode || 'analyze';
+    document.querySelectorAll('.arch-mode').forEach(function(b) {
+      b.classList.toggle('on', b.getAttribute('data-work-mode') === workMode);
+    });
+    document.body.className = (document.body.className || '').replace(/\bmode-\w+/g, '') + ' mode-' + workMode;
+    var hints = {
+      analyze: 'Análisis: entrevista o describe el dominio → roadmap + draft sin UI obligatoria',
+      ingest: 'Ingestión: pega schema/SQL/JSON o usa CLI finance → draft ORGES',
+      model: 'Modelo: reglas y ORGES de dominio (UI opcional)',
+      implement: 'Implementación: surface UI + preview + deploy',
+      audit: 'Auditoría / Tokenizar: políticas, Pulse, fingerprint del manifiesto'
+    };
+    var h = document.getElementById('arch-hint');
+    if (h) h.textContent = hints[workMode] || '';
+    archLog('Modo Arquitecto: ' + workMode);
+  }
+  document.querySelectorAll('.arch-mode').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      setWorkMode(btn.getAttribute('data-work-mode'));
+    });
+  });
+  setWorkMode('analyze');
+
+  function val(id) {
+    var el = document.getElementById(id);
+    return el ? String(el.value || '').trim() : '';
+  }
+  function slugify(s) {
+    return String(s || 'modelo')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 40) || 'modelo';
+  }
+
+  /** Genera .aos local a partir de entrevista (fallback + base para Mind) */
+  function buildAOSFromInterview(opts) {
+    var name = slugify(opts.empresa || opts.name || 'empresa');
+    var sector = opts.sector || 'servicios';
+    var procs = (opts.procesos || 'operacion').split(/[,;\n]+/).map(function(x){ return x.trim(); }).filter(Boolean);
+    if (!procs.length) procs = ['operacion'];
+    var funcs = opts.funcionales || '';
+    var nfuncs = opts.nfuncionales || '';
+    var lines = [];
+    lines.push('(flow ' + name);
+    lines.push('  (version "1.0.0")');
+    lines.push('  (desc ' + JSON.stringify('Modelo ' + (opts.empresa || name) + ' · ' + sector) + ')');
+    lines.push('  (policy (mode ' + (workMode === 'implement' ? 'implement' : 'model') + ') (domain ' + sector + '))');
+    lines.push('');
+    // organismo contexto
+    lines.push('  (orge contexto');
+    lines.push('    (kind ORGES)');
+    lines.push('    (cap "dominio.consultar")');
+    lines.push('    (provides "contexto.entity" "1.0")');
+    lines.push('    (state');
+    lines.push('      (contexto.empresa ' + JSON.stringify(opts.empresa || name) + ')');
+    lines.push('      (contexto.sector ' + JSON.stringify(sector) + ')');
+    lines.push('      (contexto.nfunc ' + JSON.stringify(nfuncs.slice(0, 200)) + '))');
+    lines.push('    )');
+    lines.push('');
+    var assemble = ['contexto'];
+    procs.slice(0, 8).forEach(function(pr, i) {
+      var oid = slugify(pr) || ('proc' + i);
+      assemble.push(oid);
+      lines.push('  (orge ' + oid);
+      lines.push('    (kind ORGES)');
+      lines.push('    (cap "' + oid + '.operar")');
+      lines.push('    (provides "' + oid + '.entity" "1.0")');
+      lines.push('    (state (' + oid + '.activo true) (' + oid + '.eventos 0))');
+      // simple rules from keywords
+      if (/stock|inventario|almacen/i.test(pr + funcs)) {
+        lines.push('    (state (' + oid + '.stock 10))');
+        lines.push('    (rule alerta-stock (when (lt ' + oid + '.stock 3)) (then ' + oid + '.alerta true))');
+      }
+      if (/venta|cobro|caja|pos/i.test(pr + funcs)) {
+        lines.push('    (state (' + oid + '.ventas 0))');
+        lines.push('    (rule venta-ok (when (gt ' + oid + '.stock 0)) (then ' + oid + '.puede_vender true))');
+      }
+      lines.push('  )');
+      lines.push('');
+    });
+    if (workMode === 'implement') {
+      lines.push('  (orge ui-main (kind UI) (ui (column');
+      lines.push('    (splash ' + JSON.stringify((opts.empresa || name) + ' · ' + sector) + ')');
+      lines.push('    (gradient "Modelo de negocio · organismos Alset" (style "animated"))');
+      lines.push('    (badge (bind contexto.empresa))');
+      lines.push('    (label "Procesos modelados")');
+      assemble.filter(function(x){ return x !== 'contexto'; }).forEach(function(oid) {
+        lines.push('    (row (label ' + JSON.stringify(oid) + ') (badge (bind ' + oid + '.activo)))');
+      });
+      lines.push('    (button "Registrar evento" (emit contexto.tick))');
+      lines.push('  )))');
+      assemble.push('ui-main');
+      lines.push('  (assemble ' + assemble.join(' ') + ')');
+      lines.push('  (surface ui-main)');
+    } else {
+      lines.push('  (assemble ' + assemble.join(' ') + ')');
+    }
+    lines.push('  (deploy web (devices mobile tablet desktop))');
+    lines.push(')');
+    return lines.join('\n');
+  }
+
+  function buildAOSFromRules(name, rulesText) {
+    name = slugify(name || 'reglas-modelo');
+    var rules = String(rulesText || '').split(/\n+/).map(function(l){ return l.replace(/^[-*•]\s*/, '').trim(); }).filter(Boolean);
+    var lines = [];
+    lines.push('(flow ' + name);
+    lines.push('  (version "1.0.0")');
+    lines.push('  (desc "Reglas transformadas a ORGES por Mind/Arquitecto")');
+    lines.push('  (policy (mode model) (domain rules))');
+    lines.push('  (orge nucleo');
+    lines.push('    (kind ORGES)');
+    lines.push('    (cap "reglas.evaluar")');
+    lines.push('    (provides "nucleo.entity" "1.0")');
+    lines.push('    (state (nucleo.ok true) (nucleo.alertas 0))');
+    rules.slice(0, 12).forEach(function(r, i) {
+      var rid = 'r' + (i + 1);
+      // heuristic: stock
+      if (/stock|inventario/i.test(r) && (/</.test(r) || /menor|bajo|alerta/i.test(r))) {
+        lines.push('    (state (stock.unidades 10) (stock.alerta false))');
+        lines.push('    (rule ' + rid + ' (when (lt stock.unidades 3)) (then stock.alerta true))');
+      } else if (/venta|descont/i.test(r)) {
+        lines.push('    (state (venta.total 0))');
+        lines.push('    (rule ' + rid + ' (when (gt stock.unidades 0)) (then venta.habilitada true))');
+      } else if (/cajero|rol|permiso|solo/i.test(r)) {
+        lines.push('    (state (auth.rol "cajero") (auth.ok false))');
+        lines.push('    (rule ' + rid + ' (when (eq auth.rol "cajero")) (then auth.ok true))');
+      } else {
+        lines.push('    ;; ' + r.replace(/\(/g, '[').replace(/\)/g, ']'));
+        lines.push('    (rule ' + rid + ' (when (true)) (then nucleo.ok true))');
+      }
+    });
+    lines.push('  )');
+    if (workMode === 'implement') {
+      lines.push('  (orge ui-main (kind UI) (ui (column');
+      lines.push('    (splash ' + JSON.stringify(name) + ')');
+      lines.push('    (gradient "Reglas como organismos" (style "animated"))');
+      lines.push('    (badge (bind nucleo.ok))');
+      lines.push('    (button "Evaluar" (emit nucleo.tick))');
+      lines.push('  )))');
+      lines.push('  (assemble nucleo ui-main)');
+      lines.push('  (surface ui-main)');
+    } else {
+      lines.push('  (assemble nucleo)');
+    }
+    lines.push(')');
+    return lines.join('\n');
+  }
+
+  async function callWorkDomain(message, mode, name) {
+    try {
+      var res = await fetch('/api/work/domain', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: message,
+          work_mode: mode || workMode,
+          mode: mode || workMode,
+          name: name || '',
+          source: (typeof aos !== 'undefined' && aos) ? aos.value : ''
+        })
+      });
+      return await res.json();
+    } catch (e) {
+      return { ok: false, reply: String(e) };
+    }
+  }
+
+  function applyBuiltToEditor(aosText, appName) {
+    if (!aosText) return;
+    lastBuiltAOS = aosText;
+    if (typeof aos !== 'undefined' && aos) {
+      aos.value = aosText;
+      if (typeof syncHl === 'function') syncHl();
+      if (typeof scheduleLive === 'function') scheduleLive();
+    }
+    if (appName && typeof appName === 'string') {
+      var an = document.getElementById('app-name');
+      if (an) an.value = slugify(appName);
+    }
+    // switch to editor tab
+    var tab = document.querySelector('[data-aos-tab="editor"]');
+    if (tab) tab.click();
+  }
+
+  var btnIv = document.getElementById('btn-interview-orges');
+  if (btnIv) btnIv.onclick = async function() {
+    var empresa = val('iv-empresa');
+    var sector = val('iv-sector');
+    var procesos = val('iv-procesos');
+    var funcionales = val('iv-func');
+    var nfunc = val('iv-nfunc');
+    var sistemas = val('iv-sistemas');
+    var msg = [
+      'Entrevista técnica empresa: ' + empresa,
+      'Sector: ' + sector,
+      'Procesos: ' + procesos,
+      'Requisitos funcionales: ' + funcionales,
+      'Requisitos no funcionales: ' + nfunc,
+      'Sistemas actuales: ' + sistemas,
+      'Genera modelo ORGES del negocio.'
+    ].join('\n');
+    archLog('Mind procesando entrevista…');
+    var mode = workMode === 'implement' ? 'implement' : 'model';
+    var j = await callWorkDomain(msg, mode, empresa || 'empresa');
+    var local = buildAOSFromInterview({
+      empresa: empresa, sector: sector, procesos: procesos,
+      funcionales: funcionales, nfuncionales: nfunc, sistemas: sistemas
+    });
+    var built = j.built_aos || j.BuiltAOS || j.draft_aos || local;
+    var reply = j.reply || j.Reply || j.roadmap || 'ORGES generados desde entrevista.';
+    archLog(reply + '\n\n--- .aos ---\n' + built.slice(0, 1200) + (built.length > 1200 ? '\n…' : ''));
+    applyBuiltToEditor(built, empresa || 'empresa');
+    if (typeof log === 'function') log('Entrevista → ORGES (' + mode + ')');
+  };
+
+  var btnRoad = document.getElementById('btn-interview-roadmap');
+  if (btnRoad) btnRoad.onclick = async function() {
+    setWorkMode('analyze');
+    var msg = [
+      'Análisis de digitalización',
+      'Empresa: ' + val('iv-empresa'),
+      'Sector: ' + val('iv-sector'),
+      'Procesos: ' + val('iv-procesos'),
+      'Funcionales: ' + val('iv-func'),
+      'No funcionales: ' + val('iv-nfunc'),
+      'Sistemas: ' + val('iv-sistemas')
+    ].join('\n');
+    archLog('Generando roadmap…');
+    var j = await callWorkDomain(msg, 'analyze', val('iv-empresa'));
+    var text = j.roadmap || j.reply || j.Reply || JSON.stringify(j, null, 2);
+    archLog(text);
+    if (j.built_aos || j.BuiltAOS) applyBuiltToEditor(j.built_aos || j.BuiltAOS, val('iv-empresa'));
+  };
+
+  var btnRules = document.getElementById('btn-rules-to-orges');
+  if (btnRules) btnRules.onclick = async function() {
+    var name = val('rules-name') || 'modelo-reglas';
+    var rules = val('rules-text');
+    if (!rules) { archLog('Escribe al menos una regla.'); return; }
+    archLog('Mind transformando reglas…');
+    var msg = 'Transforma estas reglas de negocio en ORGES LISPAI-AOS:\n' + rules;
+    var j = await callWorkDomain(msg, workMode === 'implement' ? 'implement' : 'model', name);
+    var local = buildAOSFromRules(name, rules);
+    var built = j.built_aos || j.BuiltAOS || local;
+    archLog((j.reply || 'Reglas → ORGES') + '\n\n' + built.slice(0, 1500));
+    lastBuiltAOS = built;
+    applyBuiltToEditor(built, name);
+  };
+
+  var btnRulesEd = document.getElementById('btn-rules-to-editor');
+  if (btnRulesEd) btnRulesEd.onclick = function() {
+    var name = val('rules-name') || 'modelo-reglas';
+    var built = lastBuiltAOS || buildAOSFromRules(name, val('rules-text'));
+    applyBuiltToEditor(built, name);
+    archLog('Enviado al editor .aos');
+  };
+
+  // Load modes catalog (optional)
+  fetch('/api/work/modes').then(function(r){ return r.json(); }).then(function(j) {
+    if (j && j.modes) archLog('Modos disponibles: ' + j.modes.map(function(m){ return m.label || m.Label || m.id; }).join(' · '));
+  }).catch(function(){});
+
+  if (typeof log === 'function') log('Arquitecto: entrevista + reglas → ORGES activos');
+
 })();
 

@@ -64,3 +64,10 @@ Manifiesto → RootCID → Mind → gene → pulso · P2P · embedded multi-arch
 ```
 
 Orden: **Tiny Core → Alset Shell → organismos**.
+
+## Studio Arquitecto (2026-10-14)
+
+- Barra de modos Análisis → Tokenizar
+- Entrevista técnica → ORGES
+- Reglas manuales → ORGES (Mind + editor)
+- Doc: docs/ARQUITECTO_STUDIO.md

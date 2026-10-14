@@ -218,3 +218,53 @@ body.resizing-panels{user-select:none!important;cursor:row-resize}
 #previewRoot .badge, #previewRoot .rt-badge { min-width: 4.5rem; text-align: center; font-variant-numeric: tabular-nums; }
 #previewRoot .col { gap: 10px; }
 #previewRoot .row { gap: 8px; }
+
+
+/* ——— Arquitecto de Sistemas ——— */
+.architect-bar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  padding: 8px 12px; background: linear-gradient(90deg, #0b1220, #132238);
+  border-bottom: 1px solid #243044;
+}
+.arch-label {
+  font-size: 0.7rem; font-weight: 800; letter-spacing: 0.06em;
+  text-transform: uppercase; color: #f4b400; margin-right: 8px;
+}
+.arch-mode {
+  border: 1px solid #334155; background: #0f172a; color: #cbd5e1;
+  border-radius: 999px; padding: 6px 12px; font-size: 0.78rem;
+  cursor: pointer; font-weight: 600;
+}
+.arch-mode:hover { border-color: #f4b400; color: #fff; }
+.arch-mode.on {
+  background: linear-gradient(135deg, #1e3a5f, #7c3aed);
+  border-color: #a78bfa; color: #fff;
+}
+.arch-hint { font-size: 0.75rem; color: #8b9bb4; margin-left: auto; }
+.architect-workspace {
+  padding: 10px 12px; background: #0a0f18;
+  border-bottom: 1px solid #1e293b;
+}
+.arch-cols {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+}
+@media (max-width: 960px) { .arch-cols { grid-template-columns: 1fr; } }
+.arch-card {
+  background: #111827; border: 1px solid #243044; border-radius: 12px;
+  padding: 14px 16px;
+}
+.arch-card h3 { margin: 0 0 6px; color: #e2e8f0; font-size: 1rem; }
+.arch-card h4 { margin: 12px 0 6px; color: #93c5fd; font-size: 0.85rem; }
+.arch-card label {
+  display: block; margin-top: 8px; font-size: 0.75rem; color: #94a3b8;
+}
+.arch-ta { min-height: 56px; resize: vertical; width: 100%; }
+.arch-ta-lg { min-height: 120px; resize: vertical; width: 100%; }
+.arch-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.arch-mind-out {
+  background: #0b1020; border-radius: 8px; padding: 10px;
+  max-height: 180px; overflow: auto; font: 12px/1.4 ui-monospace, monospace;
+  color: #86efac; white-space: pre-wrap; margin: 0;
+}
+body.mode-implement .architect-workspace { opacity: 1; }
+body.mode-model .preview-hint-ui { display: none; }
