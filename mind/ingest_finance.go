@@ -149,12 +149,23 @@ func emitFinanceAOS(name string, st FinanceStatement) string {
 	if period == "" {
 		period = "periodo"
 	}
+	// Precalcular ratios para que la UI muestre valores reales al abrir el flow
+	liq := safeDiv(st.Balance.Assets.Current, st.Balance.Liabilities.Current)
+	acida := safeDiv(st.Balance.Assets.Current, st.Balance.Liabilities.Current) // inventario no siempre disponible
+	end := safeDiv(st.Balance.Liabilities.Total, st.Balance.Assets.Total)
+	roe := safeDiv(st.Income.Net, st.Balance.Equity)
+	roa := safeDiv(st.Income.Net, st.Balance.Assets.Total)
+	margen := safeDiv(st.Income.Net, st.Income.Revenue)
+	alerta := "ok"
+	if liq < 1.0 || end > 0.7 {
+		alerta = "alerta"
+	}
 
 	b := &strings.Builder{}
 	fmt.Fprintf(b, `(flow %s
   (version "1.0.0")
-  (desc "Análisis financiero %s — %s")
-  (policy (mode model) (requires-ui false) (domain finance))
+  (desc "Análisis financiero %s — %s · panel UI Alset")
+  (policy (mode model) (requires-ui true) (domain finance))
 
   (orge balance
     (kind ORGES)
@@ -201,15 +212,16 @@ func emitFinanceAOS(name string, st FinanceStatement) string {
     (requires "balance.entity" "1.0" "dre.entity" "1.0" "flujo.entity" "1.0")
     (provides "analisis.entity" "1.0")
     (state
-      (analisis.liquidez 0)
-      (analisis.prueba_acida 0)
-      (analisis.endeudamiento 0)
-      (analisis.roe 0)
-      (analisis.roa 0)
-      (analisis.margen 0)
+      (analisis.liquidez %.4f)
+      (analisis.prueba_acida %.4f)
+      (analisis.endeudamiento %.4f)
+      (analisis.roe %.4f)
+      (analisis.roa %.4f)
+      (analisis.margen %.4f)
       (analisis.vpn 0)
       (analisis.tir 0)
-      (analisis.alerta false)
+      (analisis.alerta %q)
+      (analisis.entidad %q)
       (analisis.periodo %q))
     (gene gene.ratio.liquidez)
     (gene gene.ratio.prueba_acida)
@@ -221,17 +233,78 @@ func emitFinanceAOS(name string, st FinanceStatement) string {
     (gene gene.tir)
     (rule liquidez-critica
       (when (lt analisis.liquidez 1.0))
-      (then analisis.alerta true))
+      (then analisis.alerta "alerta"))
     (rule endeudamiento-alto
       (when (gt analisis.endeudamiento 0.7))
-      (then analisis.alerta true))
-    (goal analisis.alerta false))
+      (then analisis.alerta "alerta"))
+    (goal analisis.alerta "ok"))
 
-  (assemble balance dre flujo analisis-financiero)
+  (orge ui-finance
+    (kind UI)
+    (ui (column
+      (splash %q)
+      (gradient "Inteligencia financiera · organismos Alset" (style "animated"))
+      (label "Estado del análisis")
+      (badge (bind analisis.alerta))
+      (label "Razones clave")
+      (row
+        (badge (bind analisis.liquidez))
+        (badge (bind analisis.prueba_acida))
+        (badge (bind analisis.endeudamiento)))
+      (row
+        (badge (bind analisis.roe))
+        (badge (bind analisis.roa))
+        (badge (bind analisis.margen)))
+      (bottom-tabs
+        (tab "Resumen" (column
+          (label "Entidad")
+          (badge (bind analisis.entidad))
+          (label "Periodo")
+          (badge (bind analisis.periodo))
+          (label "Utilidad neta")
+          (badge (bind dre.utilidad_neta))
+          (button "Recalcular" (emit finance.recalcular))
+          (button "Exportar informe" (emit finance.exportar))))
+        (tab "Balance" (column
+          (label "Activo corriente")
+          (badge (bind balance.activo_corriente))
+          (label "Activo total")
+          (badge (bind balance.activo_total))
+          (label "Pasivo total")
+          (badge (bind balance.pasivo_total))
+          (label "Patrimonio")
+          (badge (bind balance.patrimonio))))
+        (tab "DRE" (column
+          (label "Ingresos")
+          (badge (bind dre.ingresos))
+          (label "Utilidad bruta")
+          (badge (bind dre.utilidad_bruta))
+          (label "EBITDA")
+          (badge (bind dre.ebitda))
+          (label "Utilidad neta")
+          (badge (bind dre.utilidad_neta))))
+        (tab "Flujo" (column
+          (label "Operativo")
+          (badge (bind flujo.operativo))
+          (label "Inversión")
+          (badge (bind flujo.inversion))
+          (label "Financiación")
+          (badge (bind flujo.financiacion))
+          (label "Neto")
+          (badge (bind flujo.neto))))
+        (tab "Alertas" (column
+          (label "Semáforo financiero")
+          (badge (bind analisis.alerta))
+          (label "Liquidez < 1 o endeudamiento > 0.7 dispara alerta")
+          (button "Marcar revisado" (emit analisis.alerta=ok)))))))
+
+  (assemble balance dre flujo analisis-financiero ui-finance)
+  (surface ui-finance)
   (bind analisis-financiero balance balance.entity 1.0)
   (bind analisis-financiero dre dre.entity 1.0)
   (bind analisis-financiero flujo flujo.entity 1.0)
-  (test ini (eq analisis.alerta false))
+  (deploy web (devices mobile tablet desktop))
+  (test ini (eq analisis.alerta %q))
 )
 `, name, entName, period,
 		st.Balance.Assets.Current, st.Balance.Assets.NonCurrent, st.Balance.Assets.Total,
@@ -240,7 +313,9 @@ func emitFinanceAOS(name string, st FinanceStatement) string {
 		st.Income.Revenue, st.Income.COGS, st.Income.Gross, st.Income.Opex,
 		st.Income.EBITDA, st.Income.EBIT, st.Income.Net, period,
 		st.Cashflow.Operating, st.Cashflow.Investing, st.Cashflow.Financing, st.Cashflow.Net, period,
-		period)
+		liq, acida, end, roe, roa, margen, alerta, entName, period,
+		entName+" · "+period,
+		alerta)
 
 	return b.String()
 }

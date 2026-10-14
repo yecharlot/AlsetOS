@@ -213,3 +213,8 @@ body.resizing-panels{user-select:none!important;cursor:row-resize}
 .pane-preview{max-height:70vh}
 .pane-bottom{max-height:45vh}
 .workbench{flex:1 1 auto;min-height:0}
+
+/* Finance dashboard polish in preview */
+#previewRoot .badge, #previewRoot .rt-badge { min-width: 4.5rem; text-align: center; font-variant-numeric: tabular-nums; }
+#previewRoot .col { gap: 10px; }
+#previewRoot .row { gap: 8px; }

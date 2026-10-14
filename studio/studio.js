@@ -20,6 +20,25 @@ ${body}
   }
 
   const EXAMPLES = {
+    'analisis-financiero': flowShell('analisis-financiero','Panel financiero Alset',`
+  (orge balance (kind ORGES) (state (balance.activo_total 470000000) (balance.patrimonio 270000000)))
+  (orge dre (kind ORGES) (state (dre.ingresos 410000000) (dre.utilidad_neta 77000000)))
+  (orge analisis-financiero (kind ORGES) (state
+    (analisis.liquidez 1.875) (analisis.endeudamiento 0.4255) (analisis.roe 0.2852)
+    (analisis.roa 0.1638) (analisis.margen 0.1878) (analisis.alerta "ok")
+    (analisis.entidad "Demo PyME") (analisis.periodo "2025-Q3")))
+  (orge ui-finance (kind UI) (ui (column
+    (splash "Demo PyME · 2025-Q3")
+    (gradient "Inteligencia financiera · organismos Alset" (style "animated"))
+    (badge (bind analisis.alerta))
+    (row (badge (bind analisis.liquidez)) (badge (bind analisis.roe)) (badge (bind analisis.margen)))
+    (bottom-tabs
+      (tab "Resumen" (column (badge (bind analisis.entidad)) (badge (bind dre.utilidad_neta))))
+      (tab "Balance" (column (badge (bind balance.activo_total)) (badge (bind balance.patrimonio))))
+      (tab "Alertas" (column (badge (bind analisis.alerta)) (button "OK" (emit analisis.alerta=ok)))))))
+  (assemble balance dre analisis-financiero ui-finance) (surface ui-finance)`),
+
+
     'cafeteria-mostrador': flowShell('cafeteria-mostrador','Stock + venta',`
   (orge stock (kind ORGES) (cap "stock.consultar") (provides "stock.consulta" "1.0")
     (state (stock.unidades 10)) (rule a (when (lte stock.unidades 3)) (then stock.alerta true)))

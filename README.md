@@ -1,5 +1,7 @@
 # AlsetOS
 
+> **Vertical financiero:** panel UI LISPAI-AOS (`ui-finance`) + genes + ingestión. Ver [docs/GUIA_FINANCE.md](docs/GUIA_FINANCE.md) y [docs/FINANCE_UI_LISPAI.md](docs/FINANCE_UI_LISPAI.md).
+
 **Estado actual:** ver [docs/STATUS.md](docs/STATUS.md) (Go 1.26, suite verde).
 
 

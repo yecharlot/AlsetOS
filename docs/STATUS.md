@@ -1,3 +1,33 @@
+# Estado AlsetOS
+
+**Última actualización:** 2026-10-14
+
+## Vertical financiero (listo para demo)
+
+| Pieza | Estado |
+|-------|--------|
+| Genes (liquidez, ácida, ROE, ROA, margen, VPN, TIR) | `gene/finance.go` |
+| Ingestión PDF/XLS/DOCX/JSON | `ingest/` |
+| Mind → draft `.aos` con **UI** | `mind/ingest_finance.go` → `ui-finance` |
+| Plantilla Studio | `plantillas/analisis-financiero.aos` + ejemplo en Studio |
+| CLI | `go run ./cmd/alset-finance -file …` |
+| Guía | `docs/GUIA_FINANCE.md` |
+
+## Studio
+
+- Editor .aos inteligente, Mind agente, panel declarar, Live preview
+- Ejemplo **analisis-financiero** con panel moderno (splash, gradient, tabs, badges)
+- Deploy sin header del Studio
+
+## Cómo arrancar
+
+```bash
+go run ./cmd/alset-plataforma studio --addr 127.0.0.1:5178
+go run ./cmd/alset-finance -file ejemplos/finance/sample.json -out /tmp/f.aos
+```
+
+Ver también: `docs/GUIA_FINANCE.md`, `docs/PIPELINE_INGESTION.md`, `docs/GENES_FINANCIEROS.md`, `docs/ROADMAP_SAAS.md`.
+
 # AlsetOS — Estado
 
 **Toolchain:** Go 1.26 · suite (verificar en entorno con toolchain 1.26)  

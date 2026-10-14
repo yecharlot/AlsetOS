@@ -106,3 +106,35 @@ Ejemplo: liquidez &lt; 1.0 → NO; endeudamiento &gt; 0.70 → NO.
 - Que el Studio Windows ya empaquete solo el vertical financiero sin compilar.
 
 La rebanada **sí** te deja probar localmente: archivo → ratios → `.aos` → ingest Mind.
+
+
+## Panel visual LISPAI-AOS (UI moderna)
+
+El flow generado incluye el organismo **`ui-finance`** (`kind UI`):
+
+- Splash con entidad y periodo
+- Gradient animado de marca
+- Badges reactivos de ratios (liquidez, ROE, ROA, margen, endeudamiento)
+- Tabs: Resumen · Balance · DRE · Flujo · Alertas
+- Botones de acción (`finance.recalcular`, `finance.exportar`, marcar revisado)
+- Surface: `ui-finance` — listo para **Aplicar flow** y **Desplegar** en Studio
+
+### Probar la UI en Studio
+
+```bash
+go run ./cmd/alset-plataforma studio --addr 127.0.0.1:5178
+```
+
+1. Abre **Ejemplos** → `analisis-financiero` (o carga `plantillas/analisis-financiero.aos`).
+2. **Aplicar flow** — el preview muestra el panel.
+3. Cambia de pestaña (Resumen / Balance / Alertas).
+4. **Desplegar producción** → `/apps/analisis-financiero/` sin header del Studio.
+
+### Generar .aos con UI desde datos
+
+```bash
+go run ./cmd/alset-finance -file ejemplos/finance/sample.json -out /tmp/demo-ui.aos
+# El draft incluye ui-finance con ratios precalculados
+```
+
+Los ratios se precalculan al emitir el draft para que el panel muestre números reales de inmediato; los genes siguen declarados en el organismo de análisis.
