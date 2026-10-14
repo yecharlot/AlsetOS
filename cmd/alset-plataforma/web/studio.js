@@ -260,22 +260,18 @@ ${body}
     save(); log('LEGO '+label);
   });
 
-  // --- Resizable panels (persistidos) ---
-  const LS_KEY = 'alset-studio-layout-v2';
+  // --- Resizable panels (sin cambiar el DOM) ---
+  const LS_KEY = 'alset-studio-layout-v3';
   function loadLayout(){
     try { return JSON.parse(localStorage.getItem(LS_KEY)||'{}'); } catch(e){ return {}; }
   }
   function saveLayout(s){
     try { localStorage.setItem(LS_KEY, JSON.stringify(s)); } catch(e){}
   }
-  const layout = Object.assign({ left:220, right:260, preview:200, bottom:100 }, loadLayout());
+  const layout = Object.assign({ left:220, right:240, preview:160, bottom:90 }, loadLayout());
   const leftPane=$('#pane-left'), rightPane=$('#pane-right'), bottomPane=$('#pane-bottom'), previewPane=$('#pane-preview');
-  const splitLeft=document.querySelector('.splitter.v[data-split="left"]');
-  const splitRight=document.querySelector('.splitter.v[data-split="right"]');
-  const splitPreview=document.querySelector('.splitter.h[data-split="preview"]');
-  const splitBottom=document.querySelector('.splitter.h[data-split="bottom"]');
 
-  function applyLayout(){
+  function applySizes(){
     if(leftPane && !leftPane.classList.contains('collapsed')){
       leftPane.style.width = layout.left+'px';
       leftPane.style.flex = '0 0 auto';
@@ -287,83 +283,96 @@ ${body}
     if(previewPane && !previewPane.classList.contains('collapsed')){
       previewPane.style.height = layout.preview+'px';
       previewPane.style.flex = '0 0 auto';
-      if(splitPreview) splitPreview.classList.remove('collapsed-hide');
-    } else if(splitPreview) {
-      splitPreview.classList.add('collapsed-hide');
     }
     if(bottomPane && !bottomPane.classList.contains('collapsed')){
       bottomPane.style.height = layout.bottom+'px';
       bottomPane.style.flex = '0 0 auto';
-      if(splitBottom) splitBottom.classList.remove('collapsed-hide');
-    } else if(splitBottom) {
-      splitBottom.classList.add('collapsed-hide');
     }
-    if(splitLeft) splitLeft.classList.toggle('collapsed-hide', !!(leftPane&&leftPane.classList.contains('collapsed')));
-    if(splitRight) splitRight.classList.toggle('collapsed-hide', !!(rightPane&&rightPane.classList.contains('collapsed')));
     saveLayout(layout);
   }
-  applyLayout();
+  applySizes();
 
-  function dragSplit(el, orient, onDelta){
+  function drag(el, onMove){
     if(!el) return;
     el.addEventListener('mousedown', (ev)=>{
       if(ev.button!==0) return;
       ev.preventDefault();
-      el.classList.add('dragging');
-      document.body.classList.add(orient==='v'?'resizing-panels':'resizing-panels-h');
       const sx=ev.clientX, sy=ev.clientY;
-      const base = orient==='v'
-        ? { left: layout.left, right: layout.right }
-        : { preview: layout.preview, bottom: layout.bottom };
-      const move=(e)=>{
-        const dx=e.clientX-sx, dy=e.clientY-sy;
-        onDelta(dx, dy, base);
-        applyLayout();
-      };
+      const base={ left:layout.left, right:layout.right, preview:layout.preview, bottom:layout.bottom };
+      el.classList.add('dragging');
+      document.body.classList.add('resizing-panels');
+      const move=(e)=>{ onMove(e.clientX-sx, e.clientY-sy, base); applySizes(); };
       const up=()=>{
-        window.removeEventListener('mousemove', move);
-        window.removeEventListener('mouseup', up);
+        window.removeEventListener('mousemove',move);
+        window.removeEventListener('mouseup',up);
         el.classList.remove('dragging');
-        document.body.classList.remove('resizing-panels','resizing-panels-h');
+        document.body.classList.remove('resizing-panels');
         saveLayout(layout);
       };
-      window.addEventListener('mousemove', move);
-      window.addEventListener('mouseup', up);
+      window.addEventListener('mousemove',move);
+      window.addEventListener('mouseup',up);
     });
   }
-  dragSplit(splitLeft, 'v', (dx,_,base)=>{
-    layout.left = Math.max(140, Math.min(Math.floor(window.innerWidth*0.45), base.left + dx));
+
+  drag(document.querySelector('.splitter.v[data-split="left"]'), (dx,_,b)=>{
+    layout.left = Math.max(140, Math.min(Math.floor(window.innerWidth*0.4), b.left+dx));
   });
-  dragSplit(splitRight, 'v', (dx,_,base)=>{
-    layout.right = Math.max(140, Math.min(Math.floor(window.innerWidth*0.45), base.right - dx));
+  drag(document.querySelector('.splitter.v[data-split="right"]'), (dx,_,b)=>{
+    layout.right = Math.max(140, Math.min(Math.floor(window.innerWidth*0.4), b.right-dx));
   });
-  dragSplit(splitPreview, 'h', (_,dy,base)=>{
-    // splitter above preview: drag down → taller preview
-    layout.preview = Math.max(60, Math.min(Math.floor(window.innerHeight*0.7), base.preview - dy));
-  });
-  dragSplit(splitBottom, 'h', (_,dy,base)=>{
-    layout.bottom = Math.max(48, Math.min(Math.floor(window.innerHeight*0.45), base.bottom - dy));
+  drag(document.querySelector('.splitter.h[data-split="bottom"]'), (_,dy,b)=>{
+    // splitter is above bottom+preview block; dragging up grows bottom
+    layout.bottom = Math.max(48, Math.min(Math.floor(window.innerHeight*0.4), b.bottom-dy));
   });
 
-  function setPaneOpen(id, open){
-    const map={left:'pane-left',right:'pane-right',bottom:'pane-bottom',preview:'pane-preview'};
-    const pane=document.getElementById(map[id]);
-    if(!pane) return;
-    pane.classList.toggle('collapsed', !open);
-    document.querySelector('.panel-tog[data-panel="'+id+'"]')?.classList.toggle('active', open);
-    applyLayout();
+  // Preview: arrastrar la cabecera (mismo truco que antes, con base correcta)
+  const prevHead = previewPane && previewPane.querySelector('.pane-head');
+  if(prevHead){
+    prevHead.style.cursor='ns-resize';
+    prevHead.title='Arrastra para redimensionar preview';
+    prevHead.addEventListener('mousedown', (ev)=>{
+      if(ev.target.closest('.icon-btn')) return;
+      ev.preventDefault();
+      const sy=ev.clientY; const baseH=layout.preview;
+      document.body.classList.add('resizing-panels');
+      const move=(e)=>{ layout.preview=Math.max(60, Math.min(Math.floor(window.innerHeight*0.65), baseH-(e.clientY-sy))); applySizes(); };
+      const up=()=>{ window.removeEventListener('mousemove',move); window.removeEventListener('mouseup',up); document.body.classList.remove('resizing-panels'); saveLayout(layout); };
+      window.addEventListener('mousemove',move); window.addEventListener('mouseup',up);
+    });
   }
+  const botHead = bottomPane && bottomPane.querySelector('.pane-head');
+  if(botHead){
+    botHead.style.cursor='ns-resize';
+    botHead.title='Arrastra para redimensionar consola';
+    botHead.addEventListener('mousedown', (ev)=>{
+      if(ev.target.closest('.icon-btn')) return;
+      ev.preventDefault();
+      const sy=ev.clientY; const baseH=layout.bottom;
+      document.body.classList.add('resizing-panels');
+      const move=(e)=>{ layout.bottom=Math.max(48, Math.min(Math.floor(window.innerHeight*0.4), baseH-(e.clientY-sy))); applySizes(); };
+      const up=()=>{ window.removeEventListener('mousemove',move); window.removeEventListener('mouseup',up); document.body.classList.remove('resizing-panels'); saveLayout(layout); };
+      window.addEventListener('mousemove',move); window.addEventListener('mouseup',up);
+    });
+  }
+
   document.querySelectorAll('.panel-tog').forEach(btn=>{
     btn.onclick=()=>{
       const id=btn.dataset.panel;
       const pane=document.getElementById(id==='preview'?'pane-preview':id==='bottom'?'pane-bottom':id==='left'?'pane-left':'pane-right');
       if(!pane) return;
-      const open = pane.classList.contains('collapsed');
-      setPaneOpen(id, open);
+      pane.classList.toggle('collapsed');
+      btn.classList.toggle('active', !pane.classList.contains('collapsed'));
+      applySizes();
     };
   });
   document.querySelectorAll('[data-close]').forEach(btn=>{
-    btn.onclick=()=> setPaneOpen(btn.dataset.close, false);
+    btn.onclick=()=>{
+      const map={left:'pane-left',right:'pane-right',bottom:'pane-bottom',preview:'pane-preview'};
+      const pane=document.getElementById(map[btn.dataset.close]);
+      if(pane) pane.classList.add('collapsed');
+      document.querySelector('.panel-tog[data-panel="'+btn.dataset.close+'"]')?.classList.remove('active');
+      applySizes();
+    };
   });
 
   document.querySelectorAll('.dev').forEach(btn=>{
