@@ -72,6 +72,9 @@ Windows: `dist/windows/Iniciar-Alset-Studio.bat` (requiere **W10/W11 x64**; Go y
 
 ## 5. Historial de trabajo (por fecha)
 
+### 2026-10-15 (UX responsiva)
+- Layout a pantalla completa: pestañas **Arquitecto** vs **Editor·Preview·Deploy**; modos muestran/ocultan tarjetas; panel Resultado visible.
+
 ### 2026-10-15
 - Paquete `token/`: mint de modelos de negocio, CID `cid1:sha256`, cadena de eventos, persistencia `data/tokens`.
 - `mind/architect.go`: informe completo de entrevista (estructura, mejoras, riesgos, plan ORGES, oferta comercial).

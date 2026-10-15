@@ -335,3 +335,277 @@ body.mode-audit .arch-mode[data-work-mode="audit"] {
 @media (max-height: 700px) {
   .architect-workspace { max-height: 45vh; }
 }
+/* ===== LAYOUT RESPONSIVO ALSET STUDIO (2026-10-15) ===== */
+html, body.studio-full {
+  height: 100%;
+  height: 100dvh;
+  margin: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg, #0b0f14);
+  color: var(--text, #e8eef7);
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+}
+.top {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--line, #243044);
+  background: var(--panel, #121820);
+  max-height: none;
+}
+.top .brand { font-weight: 800; font-size: 13px; }
+.top .brand small { display: block; font-weight: 500; font-size: 10px; color: var(--muted, #8b9bb4); }
+.top .name-input { width: 100px; min-width: 80px; }
+.top .spacer { flex: 1 1 8px; }
+.top .btn, .top .panel-tog { font-size: 11px; padding: 5px 8px; white-space: nowrap; }
+
+.architect-bar {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  padding: 8px 10px;
+  background: #0f141c;
+  border-bottom: 1px solid var(--line, #243044);
+  z-index: 30;
+}
+.arch-mode {
+  background: #1a222e;
+  border: 1px solid #2a3548;
+  color: #9aa8bd;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  min-height: 36px;
+}
+.arch-mode.on {
+  background: rgba(244, 180, 0, 0.18);
+  border-color: #f4b400;
+  color: #f4b400;
+  font-weight: 700;
+}
+.arch-label, .arch-hint { font-size: 11px; color: #8b9bb4; }
+.arch-hint { flex: 1 1 140px; }
+
+/* Zona principal: ocupa TODO el resto de la pantalla */
+.studio-main {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.architect-workspace {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  background: #0c1018;
+  border-bottom: 2px solid #f4b400;
+}
+body.view-implement .architect-workspace {
+  flex: 0 0 auto;
+  max-height: 44px;
+  overflow: hidden;
+}
+body.view-implement .architect-workspace.is-open {
+  max-height: min(45vh, 360px);
+  overflow: auto;
+}
+
+.arch-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 12px;
+  background: #121820;
+  border-bottom: 1px solid #243044;
+}
+.arch-cols {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  padding: 12px;
+  padding-bottom: 24px;
+}
+@media (min-width: 900px) {
+  body.view-architect .arch-cols {
+    grid-template-columns: 1fr 1fr;
+  }
+  body.view-architect .arch-card.arch-result {
+    grid-column: 1 / -1;
+  }
+}
+.arch-card {
+  background: #151c27;
+  border: 1px solid #2a3548;
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.arch-card.hidden-mode { display: none !important; }
+.arch-card.arch-result {
+  border-color: #f4b400;
+  min-height: 180px;
+}
+.arch-howto { font-size: 13px; line-height: 1.45; color: #9aa8bd; margin: 0; }
+.arch-howto b { color: #e8eef7; }
+.arch-ta { min-height: 56px; }
+.arch-ta-lg { min-height: 96px; }
+.arch-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.arch-mind-out, .arch-out {
+  background: #0a0e14;
+  border: 1px solid #2a3548;
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 13px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  max-height: min(40vh, 320px);
+  overflow: auto;
+  color: #e8eef7;
+  margin: 0;
+}
+
+/* Workbench: editor + toolbox + preview */
+.workbench {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: none;
+  flex-direction: column;
+  overflow: hidden;
+}
+body.view-implement .workbench {
+  display: flex;
+  flex: 1 1 auto;
+}
+body.view-architect .workbench {
+  display: none;
+}
+/* Permitir ver editor también en modo modelo si el usuario abre implement peek */
+body.view-architect.show-workbench .workbench {
+  display: flex;
+  flex: 0 0 min(40vh, 320px);
+  border-top: 2px solid #3b82f6;
+}
+
+.workbench-row {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+}
+.pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: #121820;
+  border-right: 1px solid #243044;
+}
+.pane-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  border-bottom: 1px solid #243044;
+  background: #0f141c;
+}
+.pane-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px;
+}
+.pane-left { flex: 0 0 200px; max-width: 40vw; }
+.pane-center { flex: 1 1 auto; }
+.pane-right { flex: 0 0 240px; max-width: 40vw; border-right: 0; border-left: 1px solid #243044; }
+.pane-bottom {
+  flex: 0 0 auto;
+  max-height: 120px;
+  border-top: 1px solid #243044;
+  border-right: 0;
+}
+.pane-preview {
+  flex: 0 0 auto;
+  height: min(36vh, 320px);
+  border-top: 1px solid #243044;
+  border-right: 0;
+}
+body.hide-left .pane-left,
+body.hide-right .pane-right,
+body.hide-bottom .pane-bottom,
+body.hide-preview .pane-preview { display: none !important; }
+
+textarea#aos, .aos-input {
+  width: 100%;
+  min-height: 160px;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+/* Móvil / laptop pequeña */
+@media (max-width: 860px) {
+  .top .panel-toggles { display: none; }
+  .top .brand small { display: none; }
+  .workbench-row {
+    flex-direction: column;
+  }
+  .pane-left, .pane-right {
+    flex: 0 0 auto;
+    max-width: none;
+    max-height: 28vh;
+    border-right: 0;
+    border-bottom: 1px solid #243044;
+  }
+  body.view-implement.hide-left-mobile .pane-left,
+  body.view-implement.hide-right-mobile .pane-right {
+    display: none !important;
+  }
+  .pane-preview {
+    height: min(42vh, 360px);
+  }
+  .arch-mode { flex: 1 1 auto; text-align: center; }
+}
+
+/* Barra de vista: Arquitecto vs Implementación */
+.view-switch {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid #243044;
+  background: #0a0e14;
+}
+.view-switch button {
+  flex: 1;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 0;
+  background: transparent;
+  color: #8b9bb4;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+}
+.view-switch button.on {
+  color: #f4b400;
+  border-bottom-color: #f4b400;
+  background: #121820;
+}

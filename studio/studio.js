@@ -1035,6 +1035,32 @@ ${body}
 
   /* ========== ARQUITECTO: modos + entrevista + reglas → ORGES ========== */
   var workMode = 'analyze';
+
+  // —— Vista Arquitecto vs Implementación (responsive) ——
+  function setStudioView(view) {
+    view = view === 'implement' ? 'implement' : 'architect';
+    document.body.classList.remove('view-architect', 'view-implement');
+    document.body.classList.add('view-' + view);
+    document.querySelectorAll('#view-switch button').forEach(function(b) {
+      b.classList.toggle('on', b.getAttribute('data-view') === view);
+    });
+    if (view === 'implement') {
+      document.body.classList.add('hide-left-mobile', 'hide-right-mobile');
+      var ws = document.getElementById('architect-workspace');
+      if (ws) ws.classList.remove('is-open');
+    }
+    try {
+      localStorage.setItem('alset.studio.view', view);
+    } catch (e) {}
+  }
+  document.querySelectorAll('#view-switch button').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      setStudioView(btn.getAttribute('data-view'));
+    });
+  });
+  // default
+  setStudioView('architect');
+
   var lastBuiltAOS = '';
   var archOut = document.getElementById('arch-mind-out');
   function archLog(msg) {
@@ -1075,6 +1101,10 @@ ${body}
     if (typeof archLog === 'function') archLog('Modo: ' + (titles[workMode] || workMode) + '\n\n' + (helps[workMode] || ''));
     var ws = document.getElementById('architect-workspace');
     if (ws) ws.classList.remove('collapsed');
+    if (typeof setStudioView === 'function') {
+      if (workMode === 'implement') setStudioView('implement');
+      else setStudioView('architect');
+    }
   }
 
   document.querySelectorAll('.arch-mode').forEach(function(btn) {
@@ -1336,13 +1366,20 @@ ${body}
   if (btnCol) btnCol.onclick = function() {
     var ws = document.getElementById('architect-workspace');
     if (!ws) return;
-    ws.classList.toggle('collapsed');
-    btnCol.textContent = ws.classList.contains('collapsed') ? 'Panel Arquitecto ▸' : 'Panel Arquitecto ▾';
+    if (document.body.classList.contains('view-implement')) {
+      ws.classList.toggle('is-open');
+      btnCol.textContent = ws.classList.contains('is-open') ? 'Ocultar entrevista ▴' : 'Ver entrevista ▾';
+    } else {
+      if (typeof setStudioView === 'function') setStudioView('implement');
+    }
   };
   var btnScrollEd = document.getElementById('btn-arch-scroll-editor');
   if (btnScrollEd) btnScrollEd.onclick = function() {
-    var ed = document.getElementById('aos');
-    if (ed) ed.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (typeof setStudioView === 'function') setStudioView('implement');
+    setTimeout(function(){
+      var ed = document.getElementById('aos');
+      if (ed) ed.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 50);
   };
   var btnToEd = document.getElementById('btn-arch-to-editor');
   if (btnToEd) btnToEd.onclick = function() {
@@ -1518,7 +1555,8 @@ ${body}
           '\n\n## Riesgos\n- '+(j.risks||[]).join('\n- ')+
           '\n\n## Plan ORGES\n- '+(j.orges_plan||[]).join('\n- ')+
           '\n\n'+(j.commercial||'')+
-          '\n\n>>> Draft .aos enviado al editor del banco de trabajo (desplázate hacia abajo).';
+          '\n\n>>> Draft .aos en el editor. Abre la pestaña «Editor · Preview · Deploy» para implementar.');
+        if (typeof setStudioView === 'function') { /* stay on architect to read report */ }
         if (typeof archLog==='function') archLog(text);
         window.__lastArchitectAOS = j.draft_aos || '';
         window.lastBuiltAOS = j.draft_aos || '';

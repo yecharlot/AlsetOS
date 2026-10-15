@@ -6,7 +6,7 @@
   <title>Alset Studio · ORGES</title>
   <link rel="stylesheet" href="studio.css"/>
 </head>
-<body class="studio-full">
+<body class="studio-full view-architect">
   <header class="top" id="topbar">
     <div class="brand">ALSET STUDIO <small>Arquitecto de Sistemas · Tokenizador</small></div>
     <input id="app-name" class="name-input" value="mi-app" title="Nombre de la app (deploy)"/>
@@ -38,6 +38,12 @@
     <span class="arch-hint" id="arch-hint">Entrevista o reglas → Mind genera ORGES</span>
   </nav>
 
+  <div class="view-switch" id="view-switch" role="tablist">
+    <button type="button" class="on" data-view="architect" id="tab-architect">📋 Arquitecto</button>
+    <button type="button" data-view="implement" id="tab-implement">🛠️ Editor · Preview · Deploy</button>
+  </div>
+
+  <div class="studio-main" id="studio-main">
   <section class="architect-workspace" id="architect-workspace">
     <div class="arch-toolbar">
       <strong id="arch-step-title">Paso: Análisis</strong>
@@ -141,36 +147,8 @@
       </div>
     </div>
   </section>
-<aside id="help-drawer" class="drawer hidden">
-    <div class="drawer-head"><strong>Ayuda · Alset Studio ORGES</strong>
-      <button type="button" class="btn btn-ghost" id="btn-close-help">Cerrar</button></div>
-    <div class="drawer-body">
-      <p><b>Objetivo:</b> definir organismos (ORGES) en LISPAI-AOS, unirlos como LEGO, probarlos y desplegarlos listos para producción.</p>
-      <ol>
-        <li>Arrastra componentes del <b>Toolbox</b> al canvas o edita el <code>.aos</code>.</li>
-        <li><b>Aplicar flow</b> carga el runtime (contratos, estado, reglas).</li>
-        <li><b>Correr preview</b> monta la UI-orge; los botones ejecutan acciones reales (<code>stock.inc</code>, <code>venta.registrar</code>…).</li>
-        <li><b>Probar</b> ejecuta los <code>(test …)</code> del flow.</li>
-        <li><b>Desplegar producción</b> escribe <code>/apps/&lt;nombre&gt;/</code> servida por este Studio (PWA lista).</li>
-      </ol>
-      <h4>Emits con funcionalidad real</h4>
-      <ul>
-        <li><code>stock.inc</code> / <code>stock.dec</code> — suman/restan <code>stock.unidades</code></li>
-        <li><code>venta.registrar</code> — descuenta stock y marca venta</li>
-        <li><code>campo=valor</code> — escribe átomo de estado</li>
-      </ul>
-      <h4>Formas LISPAI-AOS</h4>
-      <p><code>flow orge provides requires bind state rule ui assemble surface test deploy</code></p>
-    </div>
-  </aside>
-
-  <aside id="examples-drawer" class="drawer hidden">
-    <div class="drawer-head"><strong>Ejemplos</strong>
-      <button type="button" class="btn btn-ghost" id="btn-close-examples">Cerrar</button></div>
-    <div class="drawer-body" id="examples-list"></div>
-  </aside>
-
-  <div class="workbench" id="workbench">
+<div class="workbench" id="workbench">
+    <div class="workbench-row">
     <aside class="pane pane-left" id="pane-left">
       <div class="pane-head"><span>Toolbox</span>
         <button type="button" class="icon-btn" data-close="left">×</button></div>
@@ -293,9 +271,8 @@
         <div id="apps-list" class="apps-list"></div>
       </div>
     </aside>
-  </div>
+    </div><!-- /workbench-row -->
 
-  <div class="splitter h" data-split="bottom"></div>
   <section class="pane pane-bottom" id="pane-bottom">
     <div class="pane-head"><span>Consola</span>
       <button type="button" class="icon-btn" data-close="bottom">×</button></div>
@@ -304,12 +281,51 @@
 
   <section class="pane pane-preview" id="pane-preview">
     <div class="pane-head"><span>Preview · <span id="devLabel">mobile</span></span>
+      <div class="device-tabs" style="margin-left:auto;display:flex;gap:4px">
+        <button type="button" class="btn btn-ghost dev-btn" data-dev="mobile">Móvil</button>
+        <button type="button" class="btn btn-ghost dev-btn" data-dev="tablet">Tablet</button>
+        <button type="button" class="btn btn-ghost dev-btn" data-dev="desktop">Desktop</button>
+      </div>
       <button type="button" class="icon-btn" data-close="preview">×</button></div>
     <div class="preview-stage">
       <div id="device" class="device mobile"><div id="previewRoot"></div></div>
     </div>
   </section>
+</div><!-- /workbench -->
 
-  <script src="studio.js"></script>
+</div><!-- /studio-main -->
+
+<aside id="help-drawer" class="drawer hidden">
+    <div class="drawer-head"><strong>Ayuda · Alset Studio ORGES</strong>
+      <button type="button" class="btn btn-ghost" id="btn-close-help">Cerrar</button></div>
+    <div class="drawer-body">
+      <p><b>Objetivo:</b> definir organismos (ORGES) en LISPAI-AOS, unirlos como LEGO, probarlos y desplegarlos listos para producción.</p>
+      <ol>
+        <li>Arrastra componentes del <b>Toolbox</b> al canvas o edita el <code>.aos</code>.</li>
+        <li><b>Aplicar flow</b> carga el runtime (contratos, estado, reglas).</li>
+        <li><b>Correr preview</b> monta la UI-orge; los botones ejecutan acciones reales (<code>stock.inc</code>, <code>venta.registrar</code>…).</li>
+        <li><b>Probar</b> ejecuta los <code>(test …)</code> del flow.</li>
+        <li><b>Desplegar producción</b> escribe <code>/apps/&lt;nombre&gt;/</code> servida por este Studio (PWA lista).</li>
+      </ol>
+      <h4>Emits con funcionalidad real</h4>
+      <ul>
+        <li><code>stock.inc</code> / <code>stock.dec</code> — suman/restan <code>stock.unidades</code></li>
+        <li><code>venta.registrar</code> — descuenta stock y marca venta</li>
+        <li><code>campo=valor</code> — escribe átomo de estado</li>
+      </ul>
+      <h4>Formas LISPAI-AOS</h4>
+      <p><code>flow orge provides requires bind state rule ui assemble surface test deploy</code></p>
+    </div>
+  </aside>
+
+  
+<aside id="examples-drawer" class="drawer hidden">
+    <div class="drawer-head"><strong>Ejemplos</strong>
+      <button type="button" class="btn btn-ghost" id="btn-close-examples">Cerrar</button></div>
+    <div class="drawer-body" id="examples-list"></div>
+  </aside>
+
+  
+<script src="studio.js"></script>
 </body>
 </html>
