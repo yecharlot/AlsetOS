@@ -4,11 +4,21 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
   <title>Alset Studio · ORGES</title>
-  <link rel="stylesheet" href="studio.css?v=20261015d"/>
-  <link rel="stylesheet" href="layout-v2.css?v=20261015d"/>
+  <link rel="stylesheet" href="studio.css?v=20261015e"/>
+  <link rel="stylesheet" href="layout-v2.css?v=20261015e"/>
+  <style id="critical-show">
+    body.studio-full{display:flex;flex-direction:column;min-height:100vh;background:#0b0f14;color:#eee;margin:0}
+    #architect-workspace{display:block!important;flex:1;overflow:auto;min-height:200px}
+    body.view-implement #workbench{display:flex!important;flex:1;flex-direction:column}
+    body.view-implement #architect-workspace{display:none}
+    body.view-implement #architect-workspace.is-open{display:block!important}
+    .arch-mode{cursor:pointer;padding:8px 12px;margin:2px;border:1px solid #444;background:#1a222e;color:#ccc;border-radius:8px}
+    .arch-mode.on{border-color:#f4b400;color:#f4b400}
+    #ui-version-banner{background:#14532d;color:#bbf7d0;padding:6px;text-align:center}
+  </style>
 </head>
 <body class="studio-full view-architect">
-  <div id="ui-version-banner">Alset Studio UI v20261015d — si no ves este aviso verde, estás en caché vieja (Ctrl+Shift+R)</div>
+  <div id="ui-version-banner">Alset Studio UI v20261015e — si no ves este aviso verde, estás en caché vieja (Ctrl+Shift+R)</div>
   <header class="top" id="topbar">
     <div class="brand">ALSET STUDIO <small>Arquitecto de Sistemas · Tokenizador</small></div>
     <input id="app-name" class="name-input" value="mi-app" title="Nombre de la app (deploy)"/>
@@ -329,6 +339,36 @@
   </aside>
 
   
-<script src="studio.js?v=20261015d"></script>
+<script id="force-visible-boot">
+try { localStorage.removeItem('alset.studio.view'); } catch(e) {}
+document.body.classList.remove('view-implement');
+document.body.classList.add('view-architect','studio-full');
+document.addEventListener('click', function(ev) {
+  var btn = ev.target.closest && ev.target.closest('.arch-mode');
+  if (!btn) return;
+  var mode = btn.getAttribute('data-work-mode');
+  if (!mode) return;
+  document.querySelectorAll('.arch-mode').forEach(function(b){ b.classList.toggle('on', b===btn); });
+  document.querySelectorAll('.arch-card[data-modes]').forEach(function(card){
+    var modes = (card.getAttribute('data-modes')||'').split(',').map(function(s){return s.trim();});
+    var show = modes.indexOf(mode) >= 0;
+    card.classList.toggle('hidden-mode', !show);
+    card.style.display = show ? '' : 'none';
+  });
+  if (mode === 'implement') {
+    document.body.classList.remove('view-architect');
+    document.body.classList.add('view-implement');
+  } else {
+    document.body.classList.remove('view-implement');
+    document.body.classList.add('view-architect');
+  }
+  var t = document.getElementById('arch-step-title');
+  if (t) t.textContent = 'Modo: ' + mode;
+  var out = document.getElementById('arch-mind-out');
+  if (out) out.textContent = 'Modo activo: ' + mode + '\n\nUsa el formulario de este modo y el panel Resultado.';
+  console.log('[inline] mode', mode);
+}, true);
+</script>
+<script src="studio.js?v=20261015e"></script>
 </body>
 </html>

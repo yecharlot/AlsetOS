@@ -1,5 +1,5 @@
 
-// BOOT v20261015c — fuerza vista y limpia clases rotas
+// BOOT v20261015e — fuerza vista y limpia clases rotas
 (function(){
   function bootView(){
     var v = 'architect';
@@ -10,13 +10,13 @@
     document.querySelectorAll('#view-switch button').forEach(function(b){
       b.classList.toggle('on', b.getAttribute('data-view') === v);
     });
-    console.log('[Alset Studio] UI v20261015c view=' + v);
+    console.log('[Alset Studio] UI v20261015e view=' + v);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootView);
   else bootView();
 })();
 
-// NAV MODES v20261015d — delegación de eventos (no depende de otros bloques)
+// NAV MODES v20261015e — delegación de eventos (no depende de otros bloques)
 (function(){
   var MODE_TITLES = {
     analyze: '1 · Análisis',
@@ -1206,8 +1206,13 @@ ${body}
     document.querySelectorAll('.arch-mode').forEach(function(b) {
       b.classList.toggle('on', b.getAttribute('data-work-mode') === workMode);
     });
-    document.body.classList.forEach(function(c){ if(c.indexOf('mode-')===0) document.body.classList.remove(c); });
+    (function(){ var cl=[]; for(var i=0;i<document.body.classList.length;i++) cl.push(document.body.classList.item(i));
+      cl.forEach(function(c){ if(c && c.indexOf('mode-')===0) document.body.classList.remove(c); });
+    })();
     document.body.classList.add('mode-' + workMode);
+    if (!document.body.classList.contains('view-implement') && !document.body.classList.contains('view-architect')) {
+      document.body.classList.add('view-architect');
+    }
     document.querySelectorAll('.arch-card[data-modes]').forEach(function(card) {
       var modes = (card.getAttribute('data-modes') || '').split(',');
       var show = modes.some(function(m) { return m.trim() === workMode; });
