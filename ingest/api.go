@@ -34,6 +34,9 @@ func ExtractFromFile(path string) (*ExtractResult, error) {
 	case ".docx":
 		st, warnings, err = ExtractFromDOCX(path)
 		source = "docx"
+	case ".csv":
+		st, warnings, err = ExtractFromCSV(path)
+		source = "csv"
 	case ".json":
 		data, e := os.ReadFile(path)
 		if e != nil {
@@ -48,7 +51,7 @@ func ExtractFromFile(path string) (*ExtractResult, error) {
 		}
 		source = "json"
 	default:
-		return nil, fmt.Errorf("extensión no soportada: %s (usa .pdf .xlsx .xls .docx .json)", ext)
+		return nil, fmt.Errorf("extensión no soportada: %s (usa .pdf .xlsx .xls .docx .csv .json)", ext)
 	}
 
 	if err != nil {

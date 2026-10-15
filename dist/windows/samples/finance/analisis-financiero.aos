@@ -1,0 +1,142 @@
+(flow analisis-financiero-ejemplo
+  (version "1.0.0")
+  (desc "Panel de inteligencia financiera — UI moderna LISPAI-AOS")
+  (policy (mode model) (requires-ui true) (domain finance))
+
+  (orge balance
+    (kind ORGES)
+    (cap "balance.consultar")
+    (provides "balance.entity" "1.0")
+    (state
+      (balance.activo_corriente 150000000)
+      (balance.activo_no_corriente 320000000)
+      (balance.activo_total 470000000)
+      (balance.pasivo_corriente 80000000)
+      (balance.pasivo_no_corriente 120000000)
+      (balance.pasivo_total 200000000)
+      (balance.patrimonio 270000000)
+      (balance.periodo "2025-Q3")))
+
+  (orge dre
+    (kind ORGES)
+    (cap "dre.consultar")
+    (provides "dre.entity" "1.0")
+    (state
+      (dre.ingresos 410000000)
+      (dre.costo_ventas 180000000)
+      (dre.utilidad_bruta 230000000)
+      (dre.gastos_operativos 95000000)
+      (dre.ebitda 135000000)
+      (dre.ebit 120000000)
+      (dre.utilidad_neta 77000000)
+      (dre.periodo "2025-Q3")))
+
+  (orge flujo
+    (kind ORGES)
+    (cap "flujo.consultar")
+    (provides "flujo.entity" "1.0")
+    (state
+      (flujo.operativo 110000000)
+      (flujo.inversion -45000000)
+      (flujo.financiacion -20000000)
+      (flujo.neto 45000000)
+      (flujo.periodo "2025-Q3")))
+
+  (orge analisis-financiero
+    (kind ORGES)
+    (cap "finance.analizar" "finance.alertar")
+    (requires "balance.entity" "1.0" "dre.entity" "1.0" "flujo.entity" "1.0")
+    (provides "analisis.entity" "1.0")
+    (state
+      (analisis.liquidez 1.875)
+      (analisis.prueba_acida 1.875)
+      (analisis.endeudamiento 0.4255)
+      (analisis.roe 0.2852)
+      (analisis.roa 0.1638)
+      (analisis.margen 0.1878)
+      (analisis.vpn 0)
+      (analisis.tir 0)
+      (analisis.alerta "ok")
+      (analisis.entidad "Demo PyME")
+      (analisis.periodo "2025-Q3"))
+    (gene gene.ratio.liquidez)
+    (gene gene.ratio.prueba_acida)
+    (gene gene.ratio.endeudamiento)
+    (gene gene.ratio.roe)
+    (gene gene.ratio.roa)
+    (gene gene.ratio.margen_neto)
+    (rule liquidez-critica
+      (when (lt analisis.liquidez 1.0))
+      (then analisis.alerta "alerta"))
+    (rule endeudamiento-alto
+      (when (gt analisis.endeudamiento 0.7))
+      (then analisis.alerta "alerta"))
+    (goal analisis.alerta "ok"))
+
+  (orge ui-finance
+    (kind UI)
+    (ui (column
+      (splash "Demo PyME · 2025-Q3")
+      (gradient "Inteligencia financiera · organismos Alset" (style "animated"))
+      (label "Estado del análisis")
+      (badge (bind analisis.alerta))
+      (label "Razones clave")
+      (row
+        (badge (bind analisis.liquidez))
+        (badge (bind analisis.prueba_acida))
+        (badge (bind analisis.endeudamiento)))
+      (row
+        (badge (bind analisis.roe))
+        (badge (bind analisis.roa))
+        (badge (bind analisis.margen)))
+      (bottom-tabs
+        (tab "Resumen" (column
+          (label "Entidad")
+          (badge (bind analisis.entidad))
+          (label "Periodo")
+          (badge (bind analisis.periodo))
+          (label "Utilidad neta")
+          (badge (bind dre.utilidad_neta))
+          (button "Recalcular" (emit finance.recalcular))
+          (button "Exportar informe" (emit finance.exportar))))
+        (tab "Balance" (column
+          (label "Activo corriente")
+          (badge (bind balance.activo_corriente))
+          (label "Activo total")
+          (badge (bind balance.activo_total))
+          (label "Pasivo total")
+          (badge (bind balance.pasivo_total))
+          (label "Patrimonio")
+          (badge (bind balance.patrimonio))))
+        (tab "DRE" (column
+          (label "Ingresos")
+          (badge (bind dre.ingresos))
+          (label "Utilidad bruta")
+          (badge (bind dre.utilidad_bruta))
+          (label "EBITDA")
+          (badge (bind dre.ebitda))
+          (label "Utilidad neta")
+          (badge (bind dre.utilidad_neta))))
+        (tab "Flujo" (column
+          (label "Operativo")
+          (badge (bind flujo.operativo))
+          (label "Inversión")
+          (badge (bind flujo.inversion))
+          (label "Financiación")
+          (badge (bind flujo.financiacion))
+          (label "Neto")
+          (badge (bind flujo.neto))))
+        (tab "Alertas" (column
+          (label "Semáforo financiero")
+          (badge (bind analisis.alerta))
+          (label "Liquidez < 1 o endeudamiento > 0.7 dispara alerta")
+          (button "Marcar revisado" (emit analisis.alerta=ok)))))))
+
+  (assemble balance dre flujo analisis-financiero ui-finance)
+  (surface ui-finance)
+  (bind analisis-financiero balance balance.entity 1.0)
+  (bind analisis-financiero dre dre.entity 1.0)
+  (bind analisis-financiero flujo flujo.entity 1.0)
+  (deploy web (devices mobile tablet desktop))
+  (test ini (eq analisis.alerta "ok"))
+)

@@ -40,6 +40,20 @@
 
   <section class="architect-workspace" id="architect-workspace">
     <div class="arch-cols">
+
+      <div class="arch-card" id="finance-card">
+        <h3>Finanzas → ORGES (ratios, VPN, TIR)</h3>
+        <p class="muted">Sube JSON/CSV/PDF/DOCX de estados financieros o pega el JSON canónico. Genes Zyrion evalúan liquidez, ROE, ROA, margen.</p>
+        <input type="file" id="finance-file" class="rt-input" accept=".json,.csv,.pdf,.docx,.xlsx,.xls"/>
+        <label>O pega JSON canónico alset.finance.statement</label>
+        <textarea id="finance-json" class="rt-input arch-ta" placeholder='{"schema":"alset.finance.statement/1.0","balance":{...}}'></textarea>
+        <div class="arch-actions">
+          <button type="button" class="btn btn-gold" id="btn-finance-run">Analizar → draft ORGES</button>
+          <button type="button" class="btn btn-blue" id="btn-finance-sample">Cargar ejemplo</button>
+        </div>
+        <pre id="finance-out" class="arch-out muted" style="max-height:120px;overflow:auto"></pre>
+      </div>
+
       <div class="arch-card">
         <h3>Entrevista técnica → ORGES</h3>
         <p class="muted">Requisitos funcionales y no funcionales de una empresa o sector. Mind los convierte en organismos.</p>

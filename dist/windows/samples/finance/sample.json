@@ -1,0 +1,35 @@
+{
+  "schema": "alset.finance.statement/1.0",
+  "entity": {
+    "name": "Demo PyME",
+    "nit": "900123456",
+    "period": "2025-Q3",
+    "currency": "CUP"
+  },
+  "balance": {
+    "assets": { "current": 150000000, "non_current": 320000000, "total": 470000000 },
+    "liabilities": { "current": 80000000, "non_current": 120000000, "total": 200000000 },
+    "equity": 270000000
+  },
+  "income": {
+    "revenue": 410000000,
+    "cogs": 180000000,
+    "gross": 230000000,
+    "opex": 95000000,
+    "ebitda": 135000000,
+    "ebit": 120000000,
+    "interest": 15000000,
+    "tax": 28000000,
+    "net": 77000000
+  },
+  "cashflow": {
+    "operating": 110000000,
+    "investing": -45000000,
+    "financing": -20000000,
+    "net": 45000000
+  },
+  "source": {
+    "files": ["sample.json"],
+    "extracted_at": "2026-10-13T00:00:00Z"
+  }
+}

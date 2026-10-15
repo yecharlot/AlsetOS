@@ -1310,3 +1310,65 @@ ${body}
 
 })();
 
+
+
+  // —— Finanzas → ORGES ——
+  var btnFin = document.getElementById('btn-finance-run');
+  var btnFinSample = document.getElementById('btn-finance-sample');
+  var financeOut = document.getElementById('finance-out');
+  if (btnFinSample) {
+    btnFinSample.addEventListener('click', function() {
+      var sample = {
+        schema: "alset.finance.statement/1.0",
+        entity: { name: "Demo PyME", period: "2025", currency: "USD" },
+        balance: {
+          assets: { current: 120000, non_current: 80000, total: 200000 },
+          liabilities: { current: 50000, non_current: 30000, total: 80000 },
+          equity: 120000
+        },
+        income: { revenue: 300000, cogs: 180000, gross: 120000, opex: 60000, ebitda: 70000, ebit: 55000, net: 40000 },
+        cashflow: { operating: 45000, investing: -15000, financing: -10000, net: 20000 }
+      };
+      var el = document.getElementById('finance-json');
+      if (el) el.value = JSON.stringify(sample, null, 2);
+    });
+  }
+  if (btnFin) {
+    btnFin.addEventListener('click', async function() {
+      var fileEl = document.getElementById('finance-file');
+      var jsonEl = document.getElementById('finance-json');
+      try {
+        var data;
+        if (fileEl && fileEl.files && fileEl.files[0]) {
+          var fd = new FormData();
+          fd.append('file', fileEl.files[0]);
+          fd.append('name', 'analisis-financiero');
+          var res = await fetch('/api/finance/upload', { method: 'POST', body: fd });
+          data = await res.json();
+        } else {
+          var text = jsonEl ? jsonEl.value.trim() : '';
+          if (!text) { alert('Sube un archivo o pega JSON financiero'); return; }
+          var res2 = await fetch('/api/ingest', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ kind: 'finance-json', name: 'analisis-financiero', text: text })
+          });
+          data = await res2.json();
+        }
+        if (financeOut) financeOut.textContent = JSON.stringify({ ok: data.ok, warnings: data.warnings, agent: data.agent }, null, 2);
+        if (data.draft_aos || data.draft || data.built_aos || data.source || data.aos) {
+          var src = data.draft_aos || data.draft || data.built_aos || data.source || data.aos;
+          if (typeof setSource === 'function') setSource(src);
+          else if (window.editor) window.editor.value = src;
+          var ta = document.getElementById('aos-source') || document.querySelector('textarea.aos-editor') || document.getElementById('source');
+          if (ta && src) ta.value = src;
+          logLine('Finanzas → draft ORGES listo');
+        } else {
+          logLine('Finanzas: sin draft — ' + (data.warnings || []).join('; '));
+        }
+      } catch (e) {
+        if (financeOut) financeOut.textContent = String(e);
+        logLine('Error finanzas: ' + e);
+      }
+    });
+  }

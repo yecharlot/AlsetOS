@@ -1,0 +1,13 @@
+etiqueta,valor
+activo_corriente,150000
+activo_no_corriente,320000
+pasivo_corriente,80000
+pasivo_no_corriente,120000
+patrimonio,270000
+ingresos,410000
+cogs,180000
+gastos,95000
+utilidad neta,77000
+flujo operativo,110000
+flujo inversion,-45000
+flujo financiacion,-20000

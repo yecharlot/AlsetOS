@@ -4,6 +4,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/fs"
 	"net/http"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"sync"
 
 	"github.com/yecharlot/AlsetOS/declarativo"
+	"github.com/yecharlot/AlsetOS/ingest"
 	"github.com/yecharlot/AlsetOS/mind"
 )
 
@@ -314,6 +316,58 @@ func cmdStudio(args []string) {
 			return
 		}
 		writeJSON(w, mindAgent.Ingest(req))
+	})
+
+	mux.HandleFunc("/api/finance/upload", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "POST", 405)
+			return
+		}
+		if err := r.ParseMultipartForm(32 << 20); err != nil {
+			writeErr(w, err)
+			return
+		}
+		f, hdr, err := r.FormFile("file")
+		if err != nil {
+			writeErr(w, fmt.Errorf("file requerido: %w", err))
+			return
+		}
+		defer f.Close()
+		tmp, err := os.CreateTemp("", "alset-fin-*"+filepath.Ext(hdr.Filename))
+		if err != nil {
+			writeErr(w, err)
+			return
+		}
+		tmpPath := tmp.Name()
+		defer os.Remove(tmpPath)
+		if _, err := io.Copy(tmp, f); err != nil {
+			tmp.Close()
+			writeErr(w, err)
+			return
+		}
+		tmp.Close()
+		res, err := ingest.ExtractFromFile(tmpPath)
+		if res == nil {
+			writeErr(w, err)
+			return
+		}
+		name := r.FormValue("name")
+		if name == "" {
+			name = strings.TrimSuffix(filepath.Base(hdr.Filename), filepath.Ext(hdr.Filename))
+		}
+		payload, _ := json.Marshal(res.Statement)
+		ing := mindAgent.Ingest(mind.IngestRequest{
+			Kind:    "finance-json",
+			Name:    name,
+			Payload: payload,
+		})
+		if len(res.Warnings) > 0 {
+			ing.Warnings = append(res.Warnings, ing.Warnings...)
+		}
+		if err != nil {
+			ing.Warnings = append(ing.Warnings, err.Error())
+		}
+		writeJSON(w, ing)
 	})
 
 	mux.HandleFunc("/api/apps", func(w http.ResponseWriter, r *http.Request) {
