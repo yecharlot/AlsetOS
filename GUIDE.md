@@ -164,3 +164,7 @@ Windows: `dist/windows/Iniciar-Alset-Studio.bat` (requiere **W10/W11 x64**; Go y
 - `docs/STUDIO_UX.md · docs/PACKAGING_WINDOWS.md` · `docs/ALSET_DESKTOP.es.md`  
 
 **Fin de la guía obligatoria.**
+
+### 2026-10-15c
+- UI **v20261015c**: `layout-v2.css`, pestañas forzadas, banner verde de versión (si no aparece → caché).
+- Assets con `?v=20261015c`. `dist/windows` regenerado.

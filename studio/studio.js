@@ -1,3 +1,21 @@
+
+// BOOT v20261015c — fuerza vista y limpia clases rotas
+(function(){
+  function bootView(){
+    var v = 'architect';
+    try { v = localStorage.getItem('alset.studio.view') || 'architect'; } catch(e){}
+    if (v !== 'implement') v = 'architect';
+    document.body.classList.remove('view-architect','view-implement');
+    document.body.classList.add('view-' + v);
+    document.querySelectorAll('#view-switch button').forEach(function(b){
+      b.classList.toggle('on', b.getAttribute('data-view') === v);
+    });
+    console.log('[Alset Studio] UI v20261015c view=' + v);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootView);
+  else bootView();
+})();
+
 (function(){
   const $ = (s)=>document.querySelector(s);
   const aos = $('#aos');

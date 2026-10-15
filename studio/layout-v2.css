@@ -1,0 +1,225 @@
+/* layout-v2.css — layout estricto Alset Studio (v20261015c) */
+html, body {
+  margin: 0 !important;
+  padding: 0 !important;
+  height: 100% !important;
+  height: 100dvh !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+*, *::before, *::after { box-sizing: border-box; }
+
+body.studio-full {
+  display: flex !important;
+  flex-direction: column !important;
+  background: #0b0f14 !important;
+  color: #e8eef7 !important;
+  font-family: system-ui, sans-serif !important;
+}
+
+#topbar {
+  flex: 0 0 auto !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 6px !important;
+  align-items: center !important;
+  padding: 6px 10px !important;
+  background: #121820 !important;
+  border-bottom: 1px solid #2a3548 !important;
+  z-index: 50 !important;
+}
+
+#architect-bar {
+  flex: 0 0 auto !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 6px !important;
+  padding: 8px !important;
+  background: #0f141c !important;
+  border-bottom: 1px solid #2a3548 !important;
+  z-index: 40 !important;
+}
+
+#view-switch {
+  flex: 0 0 auto !important;
+  display: flex !important;
+  width: 100% !important;
+  background: #0a0e14 !important;
+  border-bottom: 1px solid #2a3548 !important;
+  z-index: 40 !important;
+}
+#view-switch button {
+  flex: 1 !important;
+  padding: 12px 8px !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  border: none !important;
+  background: transparent !important;
+  color: #8b9bb4 !important;
+  cursor: pointer !important;
+  border-bottom: 3px solid transparent !important;
+}
+#view-switch button.on {
+  color: #f4b400 !important;
+  border-bottom-color: #f4b400 !important;
+  background: #121820 !important;
+}
+
+#studio-main {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  position: relative !important;
+}
+
+/* —— VISTA ARQUITECTO —— */
+body.view-architect #architect-workspace {
+  display: block !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  background: #0c1018 !important;
+}
+body.view-architect #workbench {
+  display: none !important;
+  height: 0 !important;
+  overflow: hidden !important;
+}
+
+/* —— VISTA IMPLEMENTACIÓN —— */
+body.view-implement #architect-workspace {
+  display: none !important;
+  height: 0 !important;
+  overflow: hidden !important;
+}
+body.view-implement #architect-workspace.is-open {
+  display: block !important;
+  flex: 0 0 auto !important;
+  max-height: 40vh !important;
+  overflow: auto !important;
+  height: auto !important;
+}
+body.view-implement #workbench {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  height: auto !important;
+  overflow: hidden !important;
+}
+
+#workbench .workbench-row {
+  display: flex !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  flex-direction: row !important;
+  overflow: hidden !important;
+}
+
+#pane-left, #pane-right, #pane-center {
+  display: flex !important;
+  flex-direction: column !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+#pane-left { flex: 0 0 200px !important; }
+#pane-right { flex: 0 0 220px !important; }
+#pane-center { flex: 1 1 auto !important; }
+#pane-left.collapsed, #pane-right.collapsed,
+#pane-bottom.collapsed, #pane-preview.collapsed {
+  display: none !important;
+}
+
+#pane-bottom {
+  flex: 0 0 auto !important;
+  height: 100px !important;
+  max-height: 40vh !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+#pane-preview {
+  flex: 0 0 auto !important;
+  height: 220px !important;
+  max-height: 50vh !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.pane-body {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow: auto !important;
+}
+
+.splitter.v {
+  flex: 0 0 8px !important;
+  width: 8px !important;
+  cursor: col-resize !important;
+  background: #2a3548 !important;
+}
+.splitter.h {
+  flex: 0 0 8px !important;
+  height: 8px !important;
+  cursor: row-resize !important;
+  background: #2a3548 !important;
+}
+.splitter.v:hover, .splitter.h:hover { background: #f4b400 !important; }
+
+.arch-cols {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 12px !important;
+  padding: 12px !important;
+}
+@media (min-width: 900px) {
+  body.view-architect .arch-cols {
+    grid-template-columns: 1fr 1fr !important;
+  }
+  body.view-architect .arch-result {
+    grid-column: 1 / -1 !important;
+  }
+}
+.arch-card.hidden-mode { display: none !important; }
+.arch-card {
+  background: #151c27 !important;
+  border: 1px solid #2a3548 !important;
+  border-radius: 12px !important;
+  padding: 14px !important;
+}
+.arch-result { border-color: #f4b400 !important; }
+.arch-mind-out {
+  max-height: 50vh !important;
+  overflow: auto !important;
+  white-space: pre-wrap !important;
+  background: #0a0e14 !important;
+  padding: 12px !important;
+  border-radius: 8px !important;
+}
+
+@media (max-width: 860px) {
+  #workbench .workbench-row { flex-direction: column !important; }
+  #pane-left, #pane-right {
+    flex: 0 0 auto !important;
+    width: 100% !important;
+    max-height: 28vh !important;
+  }
+  .splitter.v { display: none !important; }
+  .top .panel-toggles { display: flex !important; width: 100% !important; }
+}
+
+#ui-version-banner {
+  flex: 0 0 auto !important;
+  background: #14532d !important;
+  color: #bbf7d0 !important;
+  font-size: 11px !important;
+  padding: 4px 10px !important;
+  text-align: center !important;
+}
