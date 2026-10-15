@@ -15,6 +15,7 @@ import (
 	"github.com/yecharlot/AlsetOS/declarativo"
 	"github.com/yecharlot/AlsetOS/ingest"
 	"github.com/yecharlot/AlsetOS/mind"
+	"github.com/yecharlot/AlsetOS/token"
 )
 
 //go:embed all:web
@@ -257,6 +258,10 @@ func cmdStudio(args []string) {
 	})
 
 	mindAgent := mind.NewAgent()
+	tokenReg, errTok := token.NewRegistry(filepath.Join(appsDir, "..", "data", "tokens"))
+	if errTok != nil {
+		tokenReg, _ = token.NewRegistry("data/tokens")
+	}
 	mux.HandleFunc("/api/mind/analyze", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			writeErr(w, fmt.Errorf("POST required"))
@@ -370,6 +375,71 @@ func cmdStudio(args []string) {
 		writeJSON(w, ing)
 	})
 
+	mux.HandleFunc("/api/architect/interview", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "POST", 405)
+			return
+		}
+		var in mind.InterviewInput
+		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+			writeErr(w, err)
+			return
+		}
+		writeJSON(w, mindAgent.AnalyzeInterview(in))
+	})
+	mux.HandleFunc("/api/token/mint", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "POST", 405)
+			return
+		}
+		var body struct {
+			Kind    string            `json:"kind"`
+			Name    string            `json:"name"`
+			Desc    string            `json:"description"`
+			Version string            `json:"version"`
+			Domain  string            `json:"domain"`
+			Source  string            `json:"source"`
+			Meta    map[string]string `json:"meta"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeErr(w, err)
+			return
+		}
+		if body.Source == "" {
+			writeErr(w, fmt.Errorf("source .aos requerido"))
+			return
+		}
+		tok, ev, err := tokenReg.Mint(body.Kind, body.Name, body.Desc, body.Version, body.Domain, body.Source, body.Meta)
+		if err != nil {
+			writeErr(w, err)
+			return
+		}
+		writeJSON(w, map[string]interface{}{"ok": true, "token": tok, "event": ev})
+	})
+	mux.HandleFunc("/api/token/list", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, map[string]interface{}{"ok": true, "tokens": tokenReg.List()})
+	})
+	mux.HandleFunc("/api/token/append", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "POST", 405)
+			return
+		}
+		var body struct {
+			ID      string         `json:"id"`
+			Type    string         `json:"type"`
+			Payload map[string]any `json:"payload"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeErr(w, err)
+			return
+		}
+		ev, err := tokenReg.Append(body.ID, body.Type, body.Payload)
+		if err != nil {
+			writeErr(w, err)
+			return
+		}
+		writeJSON(w, map[string]interface{}{"ok": true, "event": ev})
+	})
 	mux.HandleFunc("/api/apps", func(w http.ResponseWriter, r *http.Request) {
 		entries, _ := os.ReadDir(appsDir)
 		var names []string

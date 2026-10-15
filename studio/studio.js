@@ -1372,3 +1372,76 @@ ${body}
       }
     });
   }
+
+
+  // —— Informe Arquitecto completo + tokenización ——
+  (function(){
+    var btnIv = document.getElementById('btn-interview-orges');
+    if (!btnIv) return;
+    btnIv.addEventListener('click', async function() {
+      var payload = {
+        empresa: val('iv-empresa'),
+        sector: val('iv-sector') || 'servicios',
+        procesos: val('iv-procesos'),
+        funcionales: val('iv-func'),
+        nfuncionales: val('iv-nfunc'),
+        sistemas: val('iv-sistemas'),
+        dolores: val('iv-dolores') || '',
+        work_mode: workMode || 'model'
+      };
+      archLog('Generando informe Arquitecto + ORGES…');
+      try {
+        var res = await fetch('/api/architect/interview', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify(payload)
+        });
+        var j = await res.json();
+        var text = (j.title || 'Informe') + '\n\n' + (j.summary || '') +
+          '\n\n## Estructura\n- ' + (j.structure || []).join('\n- ') +
+          '\n\n## Mejoras\n- ' + (j.improvements || []).join('\n- ') +
+          '\n\n## Riesgos\n- ' + (j.risks || []).join('\n- ') +
+          '\n\n## Plan ORGES\n- ' + (j.orges_plan || []).join('\n- ') +
+          '\n\n' + (j.commercial || '');
+        archLog(text);
+        if (j.draft_aos) {
+          var ta = document.getElementById('aos-source') || document.querySelector('textarea.aos-editor') || document.getElementById('source');
+          if (ta) ta.value = j.draft_aos;
+          if (typeof setSource === 'function') setSource(j.draft_aos);
+          window.__lastArchitectAOS = j.draft_aos;
+          window.__lastArchitectName = payload.empresa || 'negocio';
+        }
+      } catch (e) { archLog('Error entrevista: ' + e); }
+    }, true);
+  })();
+
+  (function(){
+    var btn = document.getElementById('btn-token-mint');
+    if (!btn) {
+      // crear botón junto a acciones de entrevista si existe arch-actions
+      var actions = document.querySelector('.arch-actions');
+      if (actions && !document.getElementById('btn-token-mint')) {
+        btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-gold';
+        btn.id = 'btn-token-mint';
+        btn.textContent = 'Tokenizar modelo (.aos)';
+        actions.appendChild(btn);
+      }
+    }
+    if (!btn) return;
+    btn.addEventListener('click', async function() {
+      var src = window.__lastArchitectAOS;
+      var ta = document.getElementById('aos-source') || document.querySelector('textarea.aos-editor') || document.getElementById('source');
+      if (ta && ta.value) src = ta.value;
+      if (!src) { archLog('No hay .aos para tokenizar'); return; }
+      var name = window.__lastArchitectName || val('iv-empresa') || 'modelo';
+      try {
+        var res = await fetch('/api/token/mint', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ kind: 'model', name: name, description: 'Token Alset de modelo de negocio', version: '1.0.0', domain: val('iv-sector') || 'general', source: src })
+        });
+        var j = await res.json();
+        archLog('Token creado: ' + JSON.stringify(j.token, null, 2));
+      } catch (e) { archLog('Error token: ' + e); }
+    });
+  })();
