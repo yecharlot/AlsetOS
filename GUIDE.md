@@ -72,6 +72,14 @@ Windows: `dist/windows/Iniciar-Alset-Studio.bat` (requiere **W10/W11 x64**; Go y
 
 ## 5. Historial de trabajo (por fecha)
 
+
+### 2026-10-15 (Studio usable)
+- Pestañas **Arquitecto** / **Editor·Preview·Deploy** a pantalla completa (100dvh).
+- Paneles Toolbox / Propiedades / Consola / Preview: **cerrables** (× y toggles) y **redimensionables** (splitters + arrastre de cabecera).
+- Modos 1–5 muestran tarjetas distintas; modo 4 abre automáticamente la vista Editor.
+- Tras **Generar informe + ORGES**, el draft va al editor; usa la pestaña Editor para Aplicar / Preview / Deploy.
+- Windows: `dist/windows/` (W10/W11).
+
 ### 2026-10-15 (UX responsiva)
 - Layout a pantalla completa: pestañas **Arquitecto** vs **Editor·Preview·Deploy**; modos muestran/ocultan tarjetas; panel Resultado visible.
 
@@ -153,6 +161,6 @@ Windows: `dist/windows/Iniciar-Alset-Studio.bat` (requiere **W10/W11 x64**; Go y
 - `docs/GUIA_FINANCE.md` · `docs/GENES_FINANCIEROS.md` · `docs/PIPELINE_INGESTION.md`  
 - `docs/ARQUITECTO_MODOS_DE_TRABAJO.md` · `docs/ARQUITECTO_STUDIO.md`  
 - `docs/ROADMAP_SAAS.md` · `docs/STATUS.md`  
-- `docs/PACKAGING_WINDOWS.md` · `docs/ALSET_DESKTOP.es.md`  
+- `docs/STUDIO_UX.md · docs/PACKAGING_WINDOWS.md` · `docs/ALSET_DESKTOP.es.md`  
 
 **Fin de la guía obligatoria.**

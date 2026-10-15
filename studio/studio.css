@@ -609,3 +609,117 @@ textarea#aos, .aos-input {
   border-bottom-color: #f4b400;
   background: #121820;
 }
+
+/* ===== FIX FINAL RESPONSIVE + PANELES (prioridad alta) ===== */
+html, body.studio-full {
+  height: 100% !important;
+  height: 100dvh !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+  margin: 0 !important;
+}
+.studio-main {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+body.view-architect .architect-workspace {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow: auto !important;
+  display: block !important;
+}
+body.view-architect .workbench {
+  display: none !important;
+}
+body.view-implement .architect-workspace {
+  flex: 0 0 auto !important;
+  max-height: 40px !important;
+  overflow: hidden !important;
+}
+body.view-implement .architect-workspace.is-open {
+  max-height: min(42vh, 380px) !important;
+  overflow: auto !important;
+}
+body.view-implement .workbench {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+.workbench-row {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: row !important;
+  overflow: hidden !important;
+}
+.pane.collapsed { display: none !important; }
+.splitter.v {
+  width: 6px !important;
+  cursor: col-resize !important;
+  background: #243044 !important;
+  flex: 0 0 6px !important;
+  align-self: stretch !important;
+}
+.splitter.v:hover, .splitter.v.dragging { background: #f4b400 !important; }
+.splitter.h {
+  height: 6px !important;
+  cursor: row-resize !important;
+  background: #243044 !important;
+  flex: 0 0 6px !important;
+}
+.splitter.h:hover, .splitter.h.dragging { background: #f4b400 !important; }
+.pane-bottom, .pane-preview {
+  flex: 0 0 auto !important;
+}
+#pane-bottom.collapsed, #pane-preview.collapsed { display: none !important; }
+
+/* Toggles de panel siempre visibles (también móvil) */
+@media (max-width: 860px) {
+  .top .panel-toggles {
+    display: flex !important;
+    width: 100%;
+    order: 20;
+  }
+  .workbench-row {
+    flex-direction: column !important;
+  }
+  .pane-left, .pane-right {
+    flex: 0 0 auto !important;
+    max-width: none !important;
+    max-height: 30vh !important;
+    width: 100% !important;
+  }
+  .splitter.v { display: none !important; }
+  body.view-implement.hide-left-mobile .pane-left,
+  body.view-implement.hide-right-mobile .pane-right {
+    /* anulado: el usuario controla con toggles / × */
+    display: flex !important;
+  }
+  body.view-implement .pane-left.collapsed,
+  body.view-implement .pane-right.collapsed {
+    display: none !important;
+  }
+}
+.view-switch {
+  flex: 0 0 auto !important;
+  display: flex !important;
+  z-index: 20;
+}
+.drawer {
+  position: fixed !important;
+  right: 0; top: 0; bottom: 0;
+  width: min(420px, 100vw);
+  z-index: 100;
+  background: #121820;
+  border-left: 1px solid #243044;
+  overflow: auto;
+  box-shadow: -8px 0 24px rgba(0,0,0,.4);
+}
+.drawer.hidden { display: none !important; }

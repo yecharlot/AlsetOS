@@ -290,7 +290,7 @@ ${body}
   const layout = Object.assign({ left:220, right:240, preview:160, bottom:90 }, loadLayout());
   const leftPane=$('#pane-left'), rightPane=$('#pane-right'), bottomPane=$('#pane-bottom'), previewPane=$('#pane-preview');
 
-  function applySizes(){
+  window.applySizes = function applySizes(){
     if(leftPane && !leftPane.classList.contains('collapsed')){
       leftPane.style.width = layout.left+'px';
       leftPane.style.flex = '0 0 auto';
@@ -340,8 +340,10 @@ ${body}
     layout.right = Math.max(140, Math.min(Math.floor(window.innerWidth*0.4), b.right-dx));
   });
   drag(document.querySelector('.splitter.h[data-split="bottom"]'), (_,dy,b)=>{
-    // splitter is above bottom+preview block; dragging up grows bottom
     layout.bottom = Math.max(48, Math.min(Math.floor(window.innerHeight*0.4), b.bottom-dy));
+  });
+  drag(document.querySelector('.splitter.h[data-split="preview"]'), (_,dy,b)=>{
+    layout.preview = Math.max(60, Math.min(Math.floor(window.innerHeight*0.65), b.preview-dy));
   });
 
   // Preview: arrastrar la cabecera (mismo truco que antes, con base correcta)
@@ -394,9 +396,9 @@ ${body}
     };
   });
 
-  document.querySelectorAll('.dev').forEach(btn=>{
+  document.querySelectorAll('.dev, .dev-btn').forEach(btn=>{
     btn.onclick=()=>{
-      document.querySelectorAll('.dev').forEach(x=>x.classList.remove('on'));
+      document.querySelectorAll('.dev, .dev-btn').forEach(x=>x.classList.remove('on'));
       btn.classList.add('on'); deviceMode=btn.dataset.dev;
       device.className='device '+deviceMode; $('#devLabel').textContent=deviceMode;
     };
@@ -1044,14 +1046,28 @@ ${body}
     document.querySelectorAll('#view-switch button').forEach(function(b) {
       b.classList.toggle('on', b.getAttribute('data-view') === view);
     });
+    var ws = document.getElementById('architect-workspace');
     if (view === 'implement') {
-      document.body.classList.add('hide-left-mobile', 'hide-right-mobile');
-      var ws = document.getElementById('architect-workspace');
       if (ws) ws.classList.remove('is-open');
+      // En pantallas estrechas colapsar laterales por defecto (reabriles con Toolbox/Propiedades)
+      if (window.innerWidth < 860) {
+        var pl = document.getElementById('pane-left');
+        var pr = document.getElementById('pane-right');
+        if (pl) pl.classList.add('collapsed');
+        if (pr) pr.classList.add('collapsed');
+        document.querySelectorAll('.panel-tog').forEach(function(btn) {
+          var id = btn.dataset.panel;
+          if (id === 'left' || id === 'right') btn.classList.remove('active');
+          if (id === 'preview' || id === 'bottom') btn.classList.add('active');
+        });
+        var pp = document.getElementById('pane-preview');
+        var pb = document.getElementById('pane-bottom');
+        if (pp) pp.classList.remove('collapsed');
+        if (pb) pb.classList.remove('collapsed');
+      }
+      if (typeof applySizes === 'function') try { applySizes(); } catch (e) {}
     }
-    try {
-      localStorage.setItem('alset.studio.view', view);
-    } catch (e) {}
+    try { localStorage.setItem('alset.studio.view', view); } catch (e) {}
   }
   document.querySelectorAll('#view-switch button').forEach(function(btn) {
     btn.addEventListener('click', function() {
