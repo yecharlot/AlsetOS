@@ -223,3 +223,15 @@ body.view-implement #workbench {
   padding: 4px 10px !important;
   text-align: center !important;
 }
+#architect-bar, #architect-bar .arch-mode {
+  pointer-events: auto !important;
+  position: relative !important;
+  z-index: 60 !important;
+}
+#architect-bar .arch-mode {
+  cursor: pointer !important;
+  min-height: 40px !important;
+}
+#architect-bar .arch-mode.on {
+  outline: 2px solid #f4b400 !important;
+}

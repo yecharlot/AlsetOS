@@ -16,6 +16,106 @@
   else bootView();
 })();
 
+// NAV MODES v20261015d — delegación de eventos (no depende de otros bloques)
+(function(){
+  var MODE_TITLES = {
+    analyze: '1 · Análisis',
+    ingest: '2 · Ingestión',
+    model: '3 · Modelo ORGES',
+    implement: '4 · Implementación',
+    audit: '5 · Auditoría / Tokenizar'
+  };
+  function applyWorkMode(mode) {
+    if (!mode) mode = 'analyze';
+    window.__workMode = mode;
+    try { if (typeof workMode !== 'undefined') workMode = mode; } catch (e) {}
+    document.querySelectorAll('.arch-mode').forEach(function(b) {
+      var m = b.getAttribute('data-work-mode');
+      b.classList.toggle('on', m === mode);
+      b.setAttribute('aria-pressed', m === mode ? 'true' : 'false');
+    });
+    document.querySelectorAll('.arch-card[data-modes]').forEach(function(card) {
+      var modes = (card.getAttribute('data-modes') || '').split(',').map(function(s){ return s.trim(); });
+      var show = modes.indexOf(mode) >= 0;
+      card.classList.toggle('hidden-mode', !show);
+      card.style.display = show ? '' : 'none';
+    });
+    var titles = {
+      analyze: 'Paso 1 · Análisis',
+      ingest: 'Paso 2 · Ingestión',
+      model: 'Paso 3 · Modelo ORGES',
+      implement: 'Paso 4 · Implementación',
+      audit: 'Paso 5 · Auditoría'
+    };
+    var helps = {
+      analyze: 'Entrevista → Generar informe + ORGES. Resultado en el panel dorado.',
+      ingest: 'SQL/JSON/Finanzas → draft ORGES.',
+      model: 'Entrevista o reglas → organismos sin UI obligatoria.',
+      implement: 'Pestaña Editor: Aplicar flow, Preview, Deploy.',
+      audit: 'Tokenizar el .aos del editor (CID + cadena).'
+    };
+    var t = document.getElementById('arch-step-title');
+    var h = document.getElementById('arch-step-help');
+    var hint = document.getElementById('arch-hint');
+    if (t) t.textContent = titles[mode] || mode;
+    if (h) h.textContent = helps[mode] || '';
+    if (hint) hint.textContent = helps[mode] || '';
+    var out = document.getElementById('arch-mind-out');
+    if (out && mode) {
+      var prev = out.textContent || '';
+      if (prev.indexOf('1) Elige un modo') === 0 || prev.indexOf('Modo:') === 0 || !prev.trim()) {
+        out.textContent = 'Modo activo: ' + (MODE_TITLES[mode] || mode) + '\n\n' + (helps[mode] || '');
+      }
+    }
+    // Vista Studio
+    if (mode === 'implement') {
+      document.body.classList.remove('view-architect');
+      document.body.classList.add('view-implement');
+      document.querySelectorAll('#view-switch button').forEach(function(b) {
+        b.classList.toggle('on', b.getAttribute('data-view') === 'implement');
+      });
+    } else {
+      document.body.classList.remove('view-implement');
+      document.body.classList.add('view-architect');
+      document.querySelectorAll('#view-switch button').forEach(function(b) {
+        b.classList.toggle('on', b.getAttribute('data-view') === 'architect');
+      });
+    }
+    document.body.setAttribute('data-work-mode', mode);
+    console.log('[Alset] work mode =', mode);
+  }
+  window.applyWorkMode = applyWorkMode;
+  window.setWorkMode = applyWorkMode; // alias global
+
+  function bindModes() {
+    var bar = document.getElementById('architect-bar');
+    if (!bar) return;
+    bar.addEventListener('click', function(ev) {
+      var btn = ev.target.closest('.arch-mode');
+      if (!btn || !bar.contains(btn)) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      var mode = btn.getAttribute('data-work-mode');
+      applyWorkMode(mode);
+    });
+    // también onclick directo por botón (por si la delegación falla)
+    bar.querySelectorAll('.arch-mode').forEach(function(btn) {
+      btn.type = 'button';
+      btn.style.cursor = 'pointer';
+      btn.style.pointerEvents = 'auto';
+      btn.onclick = function(e) {
+        e.preventDefault();
+        applyWorkMode(btn.getAttribute('data-work-mode'));
+      };
+    });
+    applyWorkMode('analyze');
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bindModes);
+  else bindModes();
+})();
+
+
+
 (function(){
   const $ = (s)=>document.querySelector(s);
   const aos = $('#aos');
@@ -1106,7 +1206,8 @@ ${body}
     document.querySelectorAll('.arch-mode').forEach(function(b) {
       b.classList.toggle('on', b.getAttribute('data-work-mode') === workMode);
     });
-    document.body.className = (document.body.className || '').replace(/\bmode-\w+/g, '').trim() + ' mode-' + workMode;
+    document.body.classList.forEach(function(c){ if(c.indexOf('mode-')===0) document.body.classList.remove(c); });
+    document.body.classList.add('mode-' + workMode);
     document.querySelectorAll('.arch-card[data-modes]').forEach(function(card) {
       var modes = (card.getAttribute('data-modes') || '').split(',');
       var show = modes.some(function(m) { return m.trim() === workMode; });
@@ -1589,8 +1690,7 @@ ${body}
           '\n\n## Riesgos\n- '+(j.risks||[]).join('\n- ')+
           '\n\n## Plan ORGES\n- '+(j.orges_plan||[]).join('\n- ')+
           '\n\n'+(j.commercial||'')+
-          '\n\n>>> Draft .aos en el editor. Abre la pestaña «Editor · Preview · Deploy» para implementar.');
-        if (typeof setStudioView === 'function') { /* stay on architect to read report */ }
+          '\n\n>>> Draft .aos en el editor. Abre la pestaña Editor para implementar.';
         if (typeof archLog==='function') archLog(text);
         window.__lastArchitectAOS = j.draft_aos || '';
         window.lastBuiltAOS = j.draft_aos || '';
