@@ -39,24 +39,16 @@
   </nav>
 
   <section class="architect-workspace" id="architect-workspace">
-    <div class="arch-cols">
-
-      <div class="arch-card" id="finance-card">
-        <h3>Finanzas → ORGES (ratios, VPN, TIR)</h3>
-        <p class="muted">Sube JSON/CSV/PDF/DOCX de estados financieros o pega el JSON canónico. Genes Zyrion evalúan liquidez, ROE, ROA, margen.</p>
-        <input type="file" id="finance-file" class="rt-input" accept=".json,.csv,.pdf,.docx,.xlsx,.xls"/>
-        <label>O pega JSON canónico alset.finance.statement</label>
-        <textarea id="finance-json" class="rt-input arch-ta" placeholder='{"schema":"alset.finance.statement/1.0","balance":{...}}'></textarea>
-        <div class="arch-actions">
-          <button type="button" class="btn btn-gold" id="btn-finance-run">Analizar → draft ORGES</button>
-          <button type="button" class="btn btn-blue" id="btn-finance-sample">Cargar ejemplo</button>
-        </div>
-        <pre id="finance-out" class="arch-out muted" style="max-height:120px;overflow:auto"></pre>
-      </div>
-
-      <div class="arch-card">
-        <h3>Entrevista técnica → ORGES</h3>
-        <p class="muted">Requisitos funcionales y no funcionales de una empresa o sector. Mind los convierte en organismos.</p>
+    <div class="arch-toolbar">
+      <strong id="arch-step-title">Paso: Análisis</strong>
+      <span id="arch-step-help" class="muted">Completa la entrevista y pulsa el botón azul. El resultado aparece abajo a la derecha.</span>
+      <button type="button" class="btn btn-ghost" id="btn-arch-collapse" title="Ocultar/mostrar panel Arquitecto">Panel Arquitecto ▾</button>
+    </div>
+    <div class="arch-cols" id="arch-cols">
+      <!-- ANALYZE + MODEL + IMPLEMENT: entrevista -->
+      <div class="arch-card" data-modes="analyze,model,implement" id="card-interview">
+        <h3>① Entrevista técnica</h3>
+        <p class="arch-howto"><b>Qué hacer:</b> rellena empresa y procesos → pulsa <b>Generar informe + ORGES</b> → mira el panel <b>Resultado</b> (derecha) y el editor .aos abajo.</p>
         <label>Empresa / organización</label>
         <input id="iv-empresa" class="rt-input" placeholder="Ej. PyME comercial Guantánamo"/>
         <label>Sector</label>
@@ -80,29 +72,76 @@
         <label>Sistemas / datos actuales</label>
         <textarea id="iv-sistemas" class="rt-input arch-ta" placeholder="Excel, papel, software X, PDF…"></textarea>
         <div class="arch-actions">
-          <button type="button" class="btn btn-blue" id="btn-interview-orges">Generar ORGES</button>
-          <button type="button" class="btn btn-ghost" id="btn-interview-roadmap">Solo análisis / roadmap</button>
+          <button type="button" class="btn btn-blue" id="btn-interview-orges">Generar informe + ORGES</button>
+          <button type="button" class="btn btn-ghost" id="btn-interview-roadmap">Solo roadmap (sin .aos completo)</button>
+          <button type="button" class="btn btn-gold" id="btn-token-mint">Tokenizar modelo</button>
         </div>
       </div>
-      <div class="arch-card">
-        <h3>Reglas manuales → ORGES (Mind)</h3>
-        <p class="muted">Describe reglas; la plataforma las transforma a flow .aos de organismos.</p>
-        <label>Nombre del modelo</label>
-        <input id="rules-name" class="rt-input" placeholder="modelo-negocio"/>
-        <label>Reglas y políticas</label>
-        <textarea id="rules-text" class="rt-input arch-ta-lg" placeholder="Si stock < 3 entonces alerta&#10;Toda venta descuenta inventario&#10;Solo cajero puede cobrar"></textarea>
+
+      <!-- INGEST -->
+      <div class="arch-card hidden-mode" data-modes="ingest" id="card-ingest">
+        <h3>② Ingestión (SQL / schema / API)</h3>
+        <p class="arch-howto">Pega un CREATE TABLE, JSON de esquema o notas de API REST. Luego genera draft ORGES.</p>
+        <textarea id="ingest-text" class="rt-input arch-ta-lg" placeholder="CREATE TABLE productos (id INT, stock INT);&#10;o JSON de esquema…"></textarea>
         <div class="arch-actions">
-          <button type="button" class="btn btn-blue" id="btn-rules-to-orges">Transformar en ORGES</button>
-          <button type="button" class="btn btn-ghost" id="btn-rules-to-editor">Enviar al editor .aos</button>
+          <button type="button" class="btn btn-blue" id="btn-ingest-run">Ingestar → draft ORGES</button>
         </div>
-        <h4>Mind / Arquitecto</h4>
-        <pre id="arch-mind-out" class="arch-mind-out">Listo para entrevista o reglas…</pre>
+      </div>
+
+      <!-- FINANCE under ingest + analyze -->
+      <div class="arch-card hidden-mode" data-modes="ingest,analyze" id="finance-card">
+        <h3>Finanzas → ORGES</h3>
+        <p class="arch-howto">JSON/CSV/PDF o ejemplo. Ratios + draft .aos.</p>
+        <input type="file" id="finance-file" class="rt-input" accept=".json,.csv,.pdf,.docx,.xlsx,.xls"/>
+        <label>JSON canónico</label>
+        <textarea id="finance-json" class="rt-input arch-ta" placeholder='{"schema":"alset.finance.statement/1.0",...}'></textarea>
+        <div class="arch-actions">
+          <button type="button" class="btn btn-gold" id="btn-finance-run">Analizar finanzas</button>
+          <button type="button" class="btn btn-blue" id="btn-finance-sample">Cargar ejemplo</button>
+        </div>
+        <pre id="finance-out" class="arch-out muted"></pre>
+      </div>
+
+      <!-- RULES model + implement -->
+      <div class="arch-card hidden-mode" data-modes="model,implement" id="card-rules">
+        <h3>③ Reglas en lenguaje natural → ORGES</h3>
+        <p class="arch-howto">Escribe reglas tipo “si stock &lt; 3 entonces alerta” y convierte a organismos.</p>
+        <label>Nombre del flow</label>
+        <input id="rules-name" class="rt-input" placeholder="modelo-reglas"/>
+        <textarea id="rules-text" class="rt-input arch-ta-lg" placeholder="Si stock < 3 entonces alerta&#10;Toda venta descuenta inventario"></textarea>
+        <div class="arch-actions">
+          <button type="button" class="btn btn-blue" id="btn-rules-to-orges">Reglas → ORGES</button>
+          <button type="button" class="btn btn-ghost" id="btn-rules-to-editor">Solo al editor</button>
+        </div>
+      </div>
+
+      <!-- AUDIT -->
+      <div class="arch-card hidden-mode" data-modes="audit" id="card-audit">
+        <h3>⑤ Auditoría / Tokenizar</h3>
+        <p class="arch-howto">Usa un .aos ya generado (entrevista o editor). Tokenizar crea CID + cadena de evidencia local (estilo PrismaTEC, no coin).</p>
+        <div class="arch-actions">
+          <button type="button" class="btn btn-gold" id="btn-token-mint-audit">Tokenizar .aos del editor</button>
+          <button type="button" class="btn btn-ghost" id="btn-token-list">Listar tokens</button>
+        </div>
+        <pre id="token-out" class="arch-out muted"></pre>
+      </div>
+
+      <!-- RESULT always visible -->
+      <div class="arch-card arch-result" id="card-result" data-modes="analyze,ingest,model,implement,audit">
+        <h3>Resultado del análisis / ORGES</h3>
+        <p class="arch-howto">Aquí aparece el informe. Si generaste ORGES, también se copian al <b>editor .aos</b> del banco de trabajo (más abajo).</p>
+        <pre id="arch-mind-out" class="arch-mind-out">1) Elige un modo arriba (1·Análisis, 2·Ingestión…).
+2) Rellena el formulario del modo.
+3) Pulsa el botón principal azul/dorado.
+4) Lee este panel y revisa el editor .aos.</pre>
+        <div class="arch-actions">
+          <button type="button" class="btn btn-blue" id="btn-arch-to-editor">Forzar resultado → editor .aos</button>
+          <button type="button" class="btn btn-ghost" id="btn-arch-scroll-editor">Ir al editor / preview</button>
+        </div>
       </div>
     </div>
   </section>
-
-
-  <aside id="help-drawer" class="drawer hidden">
+<aside id="help-drawer" class="drawer hidden">
     <div class="drawer-head"><strong>Ayuda · Alset Studio ORGES</strong>
       <button type="button" class="btn btn-ghost" id="btn-close-help">Cerrar</button></div>
     <div class="drawer-body">

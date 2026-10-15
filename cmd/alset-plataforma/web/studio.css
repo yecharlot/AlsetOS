@@ -268,3 +268,70 @@ body.resizing-panels{user-select:none!important;cursor:row-resize}
 }
 body.mode-implement .architect-workspace { opacity: 1; }
 body.mode-model .preview-hint-ui { display: none; }
+
+/* —— Arquitecto: modos y pantallas pequeñas —— */
+.architect-bar {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  padding: 8px 12px; background: var(--panel2); border-bottom: 1px solid var(--line);
+  position: sticky; top: 0; z-index: 40;
+}
+.arch-mode {
+  background: var(--panel); border: 1px solid var(--line); color: var(--muted);
+  border-radius: 8px; padding: 6px 10px; font-size: 12px; cursor: pointer;
+}
+.arch-mode.on {
+  background: rgba(244,180,0,.15); border-color: var(--gold); color: var(--gold); font-weight: 700;
+}
+.arch-hint { font-size: 11px; color: var(--muted); flex: 1 1 160px; }
+.architect-workspace {
+  max-height: min(52vh, 520px); overflow: auto;
+  border-bottom: 2px solid var(--gold);
+  background: #0c1018;
+  flex: 0 0 auto;
+}
+.architect-workspace.collapsed { max-height: 42px; overflow: hidden; }
+.arch-toolbar {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  padding: 8px 12px; background: #121820; border-bottom: 1px solid var(--line);
+  position: sticky; top: 0; z-index: 2;
+}
+.arch-cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px; padding: 12px;
+}
+.arch-card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+  padding: 12px; display: flex; flex-direction: column; gap: 6px;
+}
+.arch-card.hidden-mode { display: none !important; }
+.arch-card.arch-result {
+  border-color: var(--gold);
+  grid-column: 1 / -1;
+  min-height: 160px;
+}
+.arch-howto { font-size: 12px; color: var(--muted); line-height: 1.4; margin: 0 0 8px; }
+.arch-howto b { color: var(--text); }
+.arch-ta { min-height: 52px; }
+.arch-ta-lg { min-height: 100px; }
+.arch-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.arch-mind-out, .arch-out {
+  background: #0a0e14; border: 1px solid var(--line); border-radius: 10px;
+  padding: 10px; font-size: 12px; white-space: pre-wrap; max-height: 280px;
+  overflow: auto; color: var(--text); margin: 0;
+}
+body.mode-analyze .arch-mode[data-work-mode="analyze"],
+body.mode-ingest .arch-mode[data-work-mode="ingest"],
+body.mode-model .arch-mode[data-work-mode="model"],
+body.mode-implement .arch-mode[data-work-mode="implement"],
+body.mode-audit .arch-mode[data-work-mode="audit"] {
+  box-shadow: 0 0 0 1px var(--gold);
+}
+@media (max-width: 1100px) {
+  .architect-workspace { max-height: min(60vh, 640px); }
+  .arch-cols { grid-template-columns: 1fr; }
+  .top .btn, .top .panel-tog { font-size: 11px; padding: 4px 8px; }
+}
+@media (max-height: 700px) {
+  .architect-workspace { max-height: 45vh; }
+}

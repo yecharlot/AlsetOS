@@ -1046,18 +1046,37 @@ ${body}
     document.querySelectorAll('.arch-mode').forEach(function(b) {
       b.classList.toggle('on', b.getAttribute('data-work-mode') === workMode);
     });
-    document.body.className = (document.body.className || '').replace(/\bmode-\w+/g, '') + ' mode-' + workMode;
-    var hints = {
-      analyze: 'Análisis: entrevista o describe el dominio → roadmap + draft sin UI obligatoria',
-      ingest: 'Ingestión: pega schema/SQL/JSON o usa CLI finance → draft ORGES',
-      model: 'Modelo: reglas y ORGES de dominio (UI opcional)',
-      implement: 'Implementación: surface UI + preview + deploy',
-      audit: 'Auditoría / Tokenizar: políticas, Pulse, fingerprint del manifiesto'
+    document.body.className = (document.body.className || '').replace(/\bmode-\w+/g, '').trim() + ' mode-' + workMode;
+    document.querySelectorAll('.arch-card[data-modes]').forEach(function(card) {
+      var modes = (card.getAttribute('data-modes') || '').split(',');
+      var show = modes.some(function(m) { return m.trim() === workMode; });
+      card.classList.toggle('hidden-mode', !show);
+    });
+    var titles = {
+      analyze: 'Paso 1 · Análisis (sin UI obligatoria)',
+      ingest: 'Paso 2 · Ingestión de datos / esquemas',
+      model: 'Paso 3 · Modelo ORGES (sin pantallas)',
+      implement: 'Paso 4 · Implementación + preview',
+      audit: 'Paso 5 · Auditoría / Tokenizar'
     };
-    var h = document.getElementById('arch-hint');
-    if (h) h.textContent = hints[workMode] || '';
-    archLog('Modo Arquitecto: ' + workMode);
+    var helps = {
+      analyze: 'Rellena la entrevista → Generar informe + ORGES. El resultado aparece en el panel dorado de abajo.',
+      ingest: 'Pega SQL/JSON o usa Finanzas → genera draft de organismos.',
+      model: 'Entrevista o reglas → organismos de dominio. Luego Aplicar flow.',
+      implement: 'Modelo + UI. Usa Preview y Desplegar en el banco de trabajo.',
+      audit: 'Tokeniza el .aos del editor (CID + cadena de evidencia local).'
+    };
+    var t = document.getElementById('arch-step-title');
+    var h = document.getElementById('arch-step-help');
+    if (t) t.textContent = titles[workMode] || workMode;
+    if (h) h.textContent = helps[workMode] || '';
+    var hint = document.getElementById('arch-hint');
+    if (hint) hint.textContent = helps[workMode] || '';
+    if (typeof archLog === 'function') archLog('Modo: ' + (titles[workMode] || workMode) + '\n\n' + (helps[workMode] || ''));
+    var ws = document.getElementById('architect-workspace');
+    if (ws) ws.classList.remove('collapsed');
   }
+
   document.querySelectorAll('.arch-mode').forEach(function(btn) {
     btn.addEventListener('click', function() {
       setWorkMode(btn.getAttribute('data-work-mode'));
@@ -1312,7 +1331,27 @@ ${body}
 
 
 
-  // —— Finanzas → ORGES ——
+  
+  var btnCol = document.getElementById('btn-arch-collapse');
+  if (btnCol) btnCol.onclick = function() {
+    var ws = document.getElementById('architect-workspace');
+    if (!ws) return;
+    ws.classList.toggle('collapsed');
+    btnCol.textContent = ws.classList.contains('collapsed') ? 'Panel Arquitecto ▸' : 'Panel Arquitecto ▾';
+  };
+  var btnScrollEd = document.getElementById('btn-arch-scroll-editor');
+  if (btnScrollEd) btnScrollEd.onclick = function() {
+    var ed = document.getElementById('aos');
+    if (ed) ed.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+  var btnToEd = document.getElementById('btn-arch-to-editor');
+  if (btnToEd) btnToEd.onclick = function() {
+    if (typeof lastBuiltAOS !== 'undefined' && lastBuiltAOS) {
+      if (typeof applyBuiltToEditor === 'function') applyBuiltToEditor(lastBuiltAOS, (typeof val==='function'&&val('iv-empresa'))||'modelo');
+      else { var ta=document.getElementById('aos'); if(ta) ta.value=lastBuiltAOS; }
+    } else if (typeof archLog==='function') archLog('Primero pulsa Generar informe + ORGES.');
+  };
+// —— Finanzas → ORGES ——
   var btnFin = document.getElementById('btn-finance-run');
   var btnFinSample = document.getElementById('btn-finance-sample');
   var financeOut = document.getElementById('finance-out');
@@ -1444,4 +1483,53 @@ ${body}
         archLog('Token creado: ' + JSON.stringify(j.token, null, 2));
       } catch (e) { archLog('Error token: ' + e); }
     });
+  })();
+
+
+  // Override final: entrevista → API architect (único camino claro)
+  (function(){
+    var btnIv = document.getElementById('btn-interview-orges');
+    if (!btnIv) return;
+    btnIv.onclick = async function() {
+      function v(id){ var el=document.getElementById(id); return el ? String(el.value||'').trim() : ''; }
+      var payload = {
+        empresa: v('iv-empresa') || 'negocio',
+        sector: v('iv-sector') || 'servicios',
+        procesos: v('iv-procesos'),
+        funcionales: v('iv-func'),
+        nfuncionales: v('iv-nfunc'),
+        sistemas: v('iv-sistemas'),
+        dolores: v('iv-dolores') || '',
+        work_mode: (typeof workMode !== 'undefined' ? workMode : 'analyze')
+      };
+      if (!payload.procesos && !payload.funcionales) {
+        if (typeof archLog==='function') archLog('Rellena procesos o requisitos funcionales y pulsa de nuevo.');
+        return;
+      }
+      if (typeof archLog==='function') archLog('Generando informe + ORGES…');
+      try {
+        var res = await fetch('/api/architect/interview', {
+          method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
+        });
+        var j = await res.json();
+        var text = (j.title||'Informe')+'\n\n'+(j.summary||'')+
+          '\n\n## Estructura\n- '+(j.structure||[]).join('\n- ')+
+          '\n\n## Mejoras\n- '+(j.improvements||[]).join('\n- ')+
+          '\n\n## Riesgos\n- '+(j.risks||[]).join('\n- ')+
+          '\n\n## Plan ORGES\n- '+(j.orges_plan||[]).join('\n- ')+
+          '\n\n'+(j.commercial||'')+
+          '\n\n>>> Draft .aos enviado al editor del banco de trabajo (desplázate hacia abajo).';
+        if (typeof archLog==='function') archLog(text);
+        window.__lastArchitectAOS = j.draft_aos || '';
+        window.lastBuiltAOS = j.draft_aos || '';
+        if (typeof lastBuiltAOS !== 'undefined') lastBuiltAOS = j.draft_aos || '';
+        if (j.draft_aos) {
+          var ta = document.getElementById('aos');
+          if (ta) ta.value = j.draft_aos;
+          if (typeof applyBuiltToEditor === 'function') applyBuiltToEditor(j.draft_aos, payload.empresa);
+        }
+      } catch(e) {
+        if (typeof archLog==='function') archLog('Error: '+e+'\n¿Studio en http://127.0.0.1:5178 ?');
+      }
+    };
   })();
