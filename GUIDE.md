@@ -168,3 +168,7 @@ Windows: `dist/windows/Iniciar-Alset-Studio.bat` (requiere **W10/W11 x64**; Go y
 ### 2026-10-15c
 - UI **v20261015c**: `layout-v2.css`, pestañas forzadas, banner verde de versión (si no aparece → caché).
 - Assets con `?v=20261015c`. `dist/windows` regenerado.
+
+### 2026-10-16
+- Generador de entrevista: **plantillas por proceso** (ventas, inventario, almacén, recepción, ingresos, gastos, auditoría, utilidades, caja, pedidos, nómina, clientes). Ya no copia stock a todos.
+- Emite **bind** entre orges relacionados (ventas↔inventario, recepción↔inventario, utilidades↔ingresos/gastos).

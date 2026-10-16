@@ -156,33 +156,37 @@ func (a *Agent) buildInterviewAOS(name string, in InterviewInput, procs []string
 	b.WriteString(fmt.Sprintf("      (contexto.sistemas %q)\n", truncStr(in.Sistemas, 120)))
 	b.WriteString(fmt.Sprintf("      (contexto.nfunc %q))\n", truncStr(in.NoFuncionales, 120)))
 	b.WriteString("  )\n\n")
+
 	assemble := []string{"contexto"}
+	kinds := map[string]processKind{}
 	for i, pr := range procs {
-		if i >= 8 {
+		if i >= 10 {
 			break
 		}
 		oid := sanitizeName(pr)
 		if oid == "" {
 			oid = fmt.Sprintf("proc%d", i)
 		}
+		// Evitar colisión con contexto
+		if oid == "contexto" {
+			oid = "proc-contexto"
+		}
 		assemble = append(assemble, oid)
-		b.WriteString(fmt.Sprintf("  (orge %s\n", oid))
-		b.WriteString("    (kind ORGES)\n")
-		b.WriteString(fmt.Sprintf("    (cap \"%s.operar\" \"%s.consultar\")\n", oid, oid))
-		b.WriteString(fmt.Sprintf("    (provides \"%s.entity\" \"1.0\")\n", oid))
-		b.WriteString(fmt.Sprintf("    (state (%s.activo true) (%s.eventos 0))\n", oid, oid))
-		pl := strings.ToLower(pr + " " + in.Funcionales)
-		if strings.Contains(pl, "stock") || strings.Contains(pl, "inventario") {
-			b.WriteString(fmt.Sprintf("    (state (%s.stock 10) (%s.alerta false))\n", oid, oid))
-			b.WriteString(fmt.Sprintf("    (rule alerta-stock (when (lt %s.stock 3)) (then %s.alerta true))\n", oid, oid))
-		}
-		if strings.Contains(pl, "venta") || strings.Contains(pl, "caja") {
-			b.WriteString(fmt.Sprintf("    (state (%s.ventas 0))\n", oid))
-		}
-		b.WriteString("  )\n\n")
+		k := classifyProcess(pr) // SOLO el nombre del proceso
+		kinds[oid] = k
+		writeProcessOrge(&b, oid, k)
 	}
+
+	writeBinds(&b, assemble[1:], kinds) // sin contexto
 	b.WriteString("  (assemble " + strings.Join(assemble, " ") + ")\n")
 	b.WriteString(fmt.Sprintf("  (test ini (eq contexto.empresa %q))\n", in.Empresa))
+	// Test de inventario si existe
+	for oid, k := range kinds {
+		if k == kindInventario {
+			b.WriteString(fmt.Sprintf("  (test stock-inicial (gte %s.unidades 0))\n", oid))
+			break
+		}
+	}
 	b.WriteString(")\n")
 	return b.String()
 }
