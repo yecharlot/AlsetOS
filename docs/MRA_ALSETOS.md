@@ -63,3 +63,16 @@ Esta fase no interpreta automáticamente semántica causal, no concede permisos 
 
 
 **Validación de esta entrega:** GitHub Actions ejecutó correctamente `go test ./...` y todos los escenarios existentes del workflow (organismo declarativo, incierto, persistencia, alset-node, autonomía, kernel y verificación de archivos de estado). La validación corresponde al commit `5aba2f1ef8b390a9ddff55192666332a7f14cdf4`; la rama continúa separada de `main`.
+
+
+## Fase 3 — Contexto relacional en Runtime
+
+El Runtime expone ahora una vista de solo lectura del grafo del ensamblaje:
+- `RelationalContext(oid)` devuelve relaciones salientes y entrantes del organismo.
+- `RelatedOrganisms(oid)` devuelve vecinos directos, ordenados y sin duplicados.
+- `RelationalProfile()` devuelve el perfil descriptivo del grafo.
+- Al cargar el ensamblaje se registra un evento `relation_graph_loaded` con el número de nodos y relaciones.
+
+Estas consultas no escriben estado, no disparan reglas, no cambian capacidades y no se registran como mutaciones. Las relaciones entrantes se obtienen inspeccionando el snapshot del grafo, por lo que el contrato no depende de añadir semántica de recorrido al paquete `relacion`.
+
+**Límite deliberado:** todavía no se infiere qué átomos de estado dependen de una relación. El modelo actual no define un vínculo formal entre rutas de estado y relaciones; inventarlo a partir de nombres o de la mera proximidad entre organismos sería introducir causalidad no declarada. La invalidación reactiva sigue dependiendo exclusivamente de `ReactiveState.RegisterDeps` y las reglas ARL existentes.
