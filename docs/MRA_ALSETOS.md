@@ -193,6 +193,6 @@ Los registros de proveedor Kademlia no son una garantía perpetua: expiran y req
 
 No se implementan en esta fase Bitswap, GossipSub, consenso, replicación automática basada en políticas, reparación de bloques, garbage collection, retención por pinning ni recuperación multi-peer con reconciliación de versiones. Tampoco se afirma que la DHT por sí sola garantice disponibilidad. La próxima fase debe definir el protocolo de replicación y sus garantías antes de automatizarlo.
 
-### Pruebas incorporadas
+### Pruebas incorporadas y validación
 
-Se prueban almacenamiento persistente, idempotencia, rechazo de RootCID incorrecto, detección de corrupción al leer y al arrancar, reinicio del nodo, cacheo de contenido recuperado por DHT y reapertura del datastore Pebble. La validación integral queda condicionada a GitHub Actions para la cabeza de esta fase.
+Se prueban almacenamiento persistente, idempotencia, rechazo de RootCID incorrecto, detección de corrupción al leer y al arrancar, reinicio del nodo, cacheo de contenido recuperado por DHT y reapertura del datastore Pebble. GitHub Actions completó con éxito `go test ./...` y todos los escenarios del workflow (organismo declarativo, incierto, persistente, alset-node, autonomía, arranque del kernel y verificación de estado) para el commit `4e4500aa9ad54042f9f7c319dc0e54e9cd7b7ea9`. Run: https://github.com/yecharlot/AlsetOS/actions/runs/43690329073.
