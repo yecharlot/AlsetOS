@@ -1,6 +1,7 @@
 package mind
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"sort"
@@ -161,10 +162,18 @@ func (Mente) EvaluarFractal(rt *declarativo.Runtime, oid, ruleID string, maxDept
 	if err != nil {
 		return EvaluacionFractal{}, err
 	}
-	return EvaluacionFractal{
+	result := EvaluacionFractal{
 		ReglaID: ruleID, Estado: root.Estado, Raiz: root,
 		ProfundidadMaxima: maxDepth, OrganismosEvaluados: evaluated,
-	}, nil
+	}
+	payload, err := json.Marshal(result)
+	if err != nil {
+		return EvaluacionFractal{}, fmt.Errorf("serializar traza fractal: %w", err)
+	}
+	if err := rt.RecordEvaluation("mind.fractal.v1", oid, ruleID, int(result.Estado), payload); err != nil {
+		return EvaluacionFractal{}, fmt.Errorf("registrar traza fractal: %w", err)
+	}
+	return result, nil
 }
 
 func vecinosFractales(rt *declarativo.Runtime, oid string) ([]string, error) {
