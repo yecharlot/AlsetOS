@@ -58,7 +58,14 @@ func (rt *Runtime) RecordEvaluation(schema, rootOID, ruleID string, state int, p
 	if !json.Valid(payload) {
 		return fmt.Errorf("payload de evaluación no es JSON válido")
 	}
-	copyPayload := append(json.RawMessage(nil), payload...)
+	var decoded interface{}
+	if err := json.Unmarshal(payload, &decoded); err != nil {
+		return fmt.Errorf("decodificar payload de evaluación: %w", err)
+	}
+	copyPayload, err := json.Marshal(decoded)
+	if err != nil {
+		return fmt.Errorf("canonicalizar payload de evaluación: %w", err)
+	}
 	sum := sha256.Sum256(copyPayload)
 	record := EvaluationRecord{
 		Schema: schema, RootOID: rootOID, RuleID: ruleID, State: state,
@@ -170,6 +177,9 @@ func (rt *Runtime) Restore() error {
 		return fmt.Errorf("snapshot rechazado: capacidades distintas a las declaradas")
 	}
 	for _, record := range snapshot.Evaluations {
+		if record.Schema == "" || record.RootOID == "" || record.RuleID == "" || record.State < 0 || record.State > 2 {
+			return fmt.Errorf("snapshot contiene metadatos de evaluación inválidos")
+		}
 		sum := sha256.Sum256(record.Payload)
 		if !json.Valid(record.Payload) || hex.EncodeToString(sum[:]) != record.Digest {
 			return fmt.Errorf("snapshot contiene evaluación corrupta: %s/%s", record.RootOID, record.RuleID)
