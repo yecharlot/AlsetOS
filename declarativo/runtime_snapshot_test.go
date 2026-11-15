@@ -27,6 +27,7 @@ func TestRuntimeSnapshot_RoundTripVersionado(t *testing.T) {
 	rt.State.EvalRule(decl.OID,Rule{ID:"r",When:[]Condition{{Path:"contador",Op:"gte",Value:1}},ThenPath:"resultado",ThenValue:true})
 	rt.State.RegisterDeps("resultado",[]string{"contador"})
 	if err:=rt.RecordEvaluation("mind.fractal.v1",decl.OID,"r",1,[]byte(`{"estado":1,"nivel":0}`));err!=nil{t.Fatal(err)}
+	if _, err := rt.EmitPulse("test",decl.OID,"","payload","nonce-snapshot"); err != nil { t.Fatal(err) }
 	if err:=rt.Persist();err!=nil{t.Fatal(err)}
 
 	encoded,err:=os.ReadFile(filepath.Join(dir,"runtime_state.json"));if err!=nil{t.Fatal(err)}
@@ -42,6 +43,7 @@ func TestRuntimeSnapshot_RoundTripVersionado(t *testing.T) {
 	if len(dirty)!=1||dirty[0]!="resultado"{t.Fatalf("dirty restaurado=%v",dirty)}
 	if len(restored.State.HistoryCopy())!=1{t.Fatalf("historial restaurado=%d",len(restored.State.HistoryCopy()))}
 	if len(restored.EvaluationsCopy())!=1{t.Fatalf("evaluaciones restauradas=%d",len(restored.EvaluationsCopy()))}
+	if _, err := restored.EmitPulse("test",decl.OID,"","payload","nonce-snapshot"); err == nil { t.Fatal("la recuperación debe conservar nonces usados y evitar replay") }
 	if restored.HasCap(decl.OID,"lectura")!=true{t.Fatal("la capacidad declarada no debe perderse al restaurar")}
 	if restored.AuditLen()==0{t.Fatal("se esperaba auditoría restaurada")}
 }
