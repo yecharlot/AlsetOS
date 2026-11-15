@@ -1,6 +1,8 @@
 package declarativo
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -22,9 +24,8 @@ func TestRuntimeSnapshot_RoundTripVersionado(t *testing.T) {
 	rt,err:=NewRuntime(dir); if err!=nil {t.Fatal(err)}
 	if err:=rt.LoadAssembly([]OrgDecl{decl});err!=nil{t.Fatal(err)}
 	rt.SetState("contador",42)
-	rt.State.RegisterDeps("resultado",[]string{"contador"})
-	rt.State.Dirty["resultado"]=true
 	rt.State.EvalRule(decl.OID,Rule{ID:"r",When:[]Condition{{Path:"contador",Op:"gte",Value:1}},ThenPath:"resultado",ThenValue:true})
+	rt.State.RegisterDeps("resultado",[]string{"contador"})
 	if err:=rt.RecordEvaluation("mind.fractal.v1",decl.OID,"r",1,[]byte(`{"estado":1,"nivel":0}`));err!=nil{t.Fatal(err)}
 	if err:=rt.Persist();err!=nil{t.Fatal(err)}
 
