@@ -98,7 +98,7 @@ El nodo conserva políticas locales explícitas en `retenciones.json`. `FijarVer
 
 La política persiste separada del índice de versiones y del almacén de bloques. En esta fase no existe recolección de basura, por lo que liberar una retención no elimina contenido. Esto evita que el pinning se confunda con una operación destructiva.
 
-`RepararRetenciones(ctx)` revisa cada política: valida el bloque local, recupera el contenido ausente o corrupto desde peers conectados o proveedores DHT, verifica RootCID y lo restaura mediante escritura atómica. Después vuelve a ejecutar `AsegurarRedundancia`; una copia remota solo cuenta tras recibo firmado y reciente.
+`RepararRetenciones(ctx)` revisa cada política: valida el bloque local, recupera el contenido ausente o corrupto desde peers conectados o proveedores DHT, verifica RootCID y lo restaura mediante escritura atómica. Después vuelve a ejecutar `AsegurarRedundancia`; una copia remota solo cuenta tras un lease firmado y vigente, aceptado por un proveedor con capacidad y autorización configuradas.
 
 `IniciarMantenimiento(intervalo)` activa, de forma opt-in, un worker periódico (mínimo un minuto, timeout de 30 segundos por ciclo). `Cerrar` cancela y espera el worker. No se inicia automáticamente para evitar tráfico y carga de almacenamiento no solicitados por la configuración de cada despliegue.
 
