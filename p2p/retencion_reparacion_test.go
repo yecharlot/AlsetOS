@@ -22,6 +22,8 @@ func TestRepararRetencionesRestauraReplicaRemotaYBloqueLocal(t *testing.T) {
 	defer nodoB.Cerrar()
 	ctx,cancelar:=context.WithTimeout(context.Background(),25*time.Second);defer cancelar()
 	if err:=nodoA.Host.Connect(ctx,peer.AddrInfo{ID:nodoB.ID(),Addrs:nodoB.Host.Addrs()});err!=nil{t.Fatal(err)}
+	if err:=nodoB.ConfigurarCapacidadRetencion(1<<20);err!=nil{t.Fatal(err)}
+	if err:=nodoB.AutorizarRetencionRemota(nodoA.ID(),1<<20);err!=nil{t.Fatal(err)}
 
 	contenido:=[]byte("contenido fijado con reparación verificable")
 	root:=rootcid.CrearContenido(contenido)
