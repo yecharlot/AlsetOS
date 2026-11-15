@@ -16,7 +16,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/yecharlot/AlsetOS/identidad"
-	"github.com/yecharlot/AlsetOS/rootcid"
 )
 
 const VersionDescriptorSchema = "alset.version.v1"
@@ -163,7 +162,7 @@ func (i *IndiceVersiones) Registrar(d DescriptorVersion) (EstadoLinaje, error) {
 	defer i.mu.Unlock()
 	actual := append([]DescriptorVersion(nil), i.datos[d.OrganismoID]...)
 	for _, existente := range actual {
-		if existente.Revision == d.Revision && existente.RootCID == d.RootCID {
+		if existente.Revision == d.Revision && existente.RootCID == d.RootCID && existente.Anterior == d.Anterior && existente.Firma == d.Firma {
 			return clasificarLinaje(actual), nil
 		}
 	}
@@ -195,10 +194,14 @@ func clasificarLinaje(versiones []DescriptorVersion) EstadoLinaje {
 	if len(versiones) == 0 { return LinajeIncompleto }
 	porRevision := make(map[uint64]map[string]struct{})
 	porAntecesor := make(map[string]map[string]struct{})
+	padresPorVersion := make(map[string]map[string]struct{})
 	presentes := make(map[string]map[uint64]struct{})
 	for _, d := range versiones {
 		if porRevision[d.Revision] == nil { porRevision[d.Revision] = make(map[string]struct{}) }
 		porRevision[d.Revision][d.RootCID] = struct{}{}
+		claveVersion := fmt.Sprintf("%d:%s", d.Revision, d.RootCID)
+		if padresPorVersion[claveVersion] == nil { padresPorVersion[claveVersion] = make(map[string]struct{}) }
+		padresPorVersion[claveVersion][d.Anterior] = struct{}{}
 		if d.Anterior != "" {
 			if porAntecesor[d.Anterior] == nil { porAntecesor[d.Anterior] = make(map[string]struct{}) }
 			porAntecesor[d.Anterior][d.RootCID] = struct{}{}
@@ -208,6 +211,7 @@ func clasificarLinaje(versiones []DescriptorVersion) EstadoLinaje {
 	}
 	for _, raices := range porRevision { if len(raices) > 1 { return LinajeConflicto } }
 	for _, hijos := range porAntecesor { if len(hijos) > 1 { return LinajeConflicto } }
+	for _, padres := range padresPorVersion { if len(padres) > 1 { return LinajeConflicto } }
 	for _, d := range versiones {
 		if d.Revision > 1 {
 			if _, ok := presentes[d.Anterior][d.Revision-1]; !ok { return LinajeIncompleto }
