@@ -38,3 +38,25 @@ La primera entrega introduce un paquete sin dependencias externas. Registra nodo
 
 ## Límites de esta fase
 No implementa clasificación automática de niveles, causalidad, conciencia, inferencia general ni persistencia distribuida del grafo. Esas capacidades requieren contratos y validación propios.
+
+
+## Fase 2 — Relaciones declaradas y ensamblaje (en implementación)
+
+La declaración de un organismo admite ahora una lista opcional `relations`. En LISPAI-AOS se declara dentro del organismo propietario:
+
+```lisp
+(orge inventario
+  (relacion inventario-almacen
+    (destino almacen)
+    (tipo dependencia-operativa)
+    (direccion dirigida)
+    (temporalidad estable)
+    (evidencia documentada)
+    (condiciones "solo durante operación")))
+```
+
+El origen se deriva del OID del organismo que contiene la declaración; no se duplica ni puede apuntar silenciosamente a otro organismo. La resolución registra primero todos los nodos y después valida las relaciones, por lo que una referencia puede apuntar a un organismo declarado más adelante. Un destino inexistente, un ID duplicado o una relación mal formada impiden el ensamblaje.
+
+Las relaciones forman parte del CID canónico de la definición cuando están declaradas. La ausencia de relaciones conserva la representación canónica anterior: `nil` y una lista vacía son equivalentes y no alteran el CID. El grafo resuelto vive en `Assembly.Relations`; no sustituye contratos, bindings, estado reactivo ni capacidades.
+
+Esta fase no interpreta automáticamente semántica causal, no concede permisos y no convierte toda relación en dependencia de ejecución. La evidencia se conserva como metadato explícito.
