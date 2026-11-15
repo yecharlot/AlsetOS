@@ -37,6 +37,7 @@ type runtimeSnapshot struct {
 	Audit               []AuditEntry       `json:"audit"`
 	Caps                map[string]map[string]bool `json:"caps"`
 	Evaluations         []EvaluationRecord `json:"evaluations"`
+	SeenNonces          map[string]bool `json:"seen_nonces"`
 }
 
 type snapshotEnvelope struct {
@@ -108,6 +109,7 @@ func (rt *Runtime) Persist() error {
 		History: state.History, Audit: append([]AuditEntry(nil), rt.Audit...),
 		Caps: copiarCapacidades(rt.Caps),
 		Evaluations: copiarEvaluaciones(rt.Evaluations),
+		SeenNonces: copiarMapaBool(rt.seenNonce),
 	}
 	canonical, err := json.Marshal(payload)
 	if err != nil { return fmt.Errorf("serializar snapshot: %w", err) }
@@ -192,6 +194,7 @@ func (rt *Runtime) Restore() error {
 	rt.State.ImportSnapshot(state)
 	rt.Audit = append([]AuditEntry(nil), snapshot.Audit...)
 	rt.Evaluations = copiarEvaluaciones(snapshot.Evaluations)
+	rt.seenNonce = copiarMapaBool(snapshot.SeenNonces)
 	rt.audit("restore", "", "snapshot validado y recuperado", fmt.Sprintf("version=%d legacy=%t", snapshot.SchemaVersion, legacy))
 	return nil
 }
@@ -242,6 +245,7 @@ func normalizarSnapshot(s runtimeSnapshot) runtimeSnapshot {
 	if s.History == nil { s.History = []InferenceRecord{} }
 	if s.Audit == nil { s.Audit = []AuditEntry{} }
 	if s.Evaluations == nil { s.Evaluations = []EvaluationRecord{} }
+	if s.SeenNonces == nil { s.SeenNonces = map[string]bool{} }
 	return s
 }
 
@@ -291,4 +295,10 @@ func canonicalizarJSON(payload []byte) ([]byte, error) {
 	var decoded interface{}
 	if err := json.Unmarshal(payload, &decoded); err != nil { return nil, err }
 	return json.Marshal(decoded)
+}
+
+func copiarMapaBool(source map[string]bool) map[string]bool {
+	out := make(map[string]bool, len(source))
+	for key, value := range source { out[key] = value }
+	return out
 }
