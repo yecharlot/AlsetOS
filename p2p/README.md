@@ -90,3 +90,16 @@ El protocolo `/alset/content-availability/1.0.0` permite preguntar a un peer si 
 `AsegurarRedundancia(ctx, descriptor, contenido, factor)` cuenta la copia local y replica explícitamente a peers conectados hasta alcanzar el factor solicitado (1..32). Una copia remota solo cuenta después de obtener un recibo firmado y fresco. Si no hay peers suficientes, devuelve el estado parcial y un error; no presenta el objetivo como cumplido. El factor incluye al nodo coordinador.
 
 La replicación es secuencial y limitada a peers ya conectados en esta entrega. No hay selección por reputación, reserva contractual de espacio, pinning persistente, renovación automática de recibos, reparación periódica ni garantía de disponibilidad global. Los forks siguen siendo evidencias separadas: la operación requiere un descriptor concreto y nunca escoge una versión por fecha.
+
+
+## Retención local y reparación de redundancia
+
+El nodo conserva políticas locales explícitas en `retenciones.json`. `FijarVersion(descriptor, factor)` solo acepta un descriptor firmado que ya esté en el índice local y cuyo RootCID esté íntegro en el almacén. El factor (1..32) incluye la copia local. `LiberarVersion(rootCID)` elimina la política; no borra el bloque.
+
+La política persiste separada del índice de versiones y del almacén de bloques. En esta fase no existe recolección de basura, por lo que liberar una retención no elimina contenido. Esto evita que el pinning se confunda con una operación destructiva.
+
+`RepararRetenciones(ctx)` revisa cada política: valida el bloque local, recupera el contenido ausente o corrupto desde peers conectados o proveedores DHT, verifica RootCID y lo restaura mediante escritura atómica. Después vuelve a ejecutar `AsegurarRedundancia`; una copia remota solo cuenta tras recibo firmado y reciente.
+
+`IniciarMantenimiento(intervalo)` activa, de forma opt-in, un worker periódico (mínimo un minuto, timeout de 30 segundos por ciclo). `Cerrar` cancela y espera el worker. No se inicia automáticamente para evitar tráfico y carga de almacenamiento no solicitados por la configuración de cada despliegue.
+
+Límites: no hay reserva contractual de espacio remoto, cuota por peer, penalizaciones, consenso ni garantía de retención futura. La reparación solo puede recuperar datos si existe al menos una copia íntegra accesible. Si todas las copias desaparecen o los proveedores no responden, la política queda registrada y el error se informa; no se inventa ni reconstruye contenido.
