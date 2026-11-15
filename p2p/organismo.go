@@ -43,13 +43,14 @@ func (nodo *Nodo) AnunciarOrganismo(ctx context.Context, rootCID string, manifie
 	if nodo.almacen == nil { return fmt.Errorf("almacén de contenido no inicializado") }
 	if err := nodo.almacen.Guardar(rootCID, manifiesto); err != nil { return fmt.Errorf("guardar bloque verificado: %w", err) }
 
-	nodo.mu.RLock()
+	nodo.mu.Lock()
 	copia := make(map[string][]byte, len(nodo.organismos)+1)
 	for root, contenido := range nodo.organismos { copia[root] = append([]byte(nil), contenido...) }
-	nodo.mu.RUnlock()
 	copia[rootCID] = append([]byte(nil), manifiesto...)
-	if err := guardarOrganismos(nodo.rutaOrganismos, copia); err != nil { return err }
-	nodo.mu.Lock()
+	if err := guardarOrganismos(nodo.rutaOrganismos, copia); err != nil {
+		nodo.mu.Unlock()
+		return err
+	}
 	nodo.organismos = copia
 	nodo.mu.Unlock()
 
