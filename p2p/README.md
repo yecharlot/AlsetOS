@@ -56,7 +56,7 @@ La fase siguiente incorpora GossipSub como canal de anuncios de descriptores. El
 
 El nodo se suscribe al topic `alset/versions/1.0.0` y publica eventos `alset.version-announcement.v1`. Cada evento transporta únicamente el descriptor firmado; no transporta los bytes del bloque.
 
-GossipSub aplica firma y verificación estricta del mensaje libp2p. El validador de topic comprueba además el schema, el tamaño, la estructura y la firma Ed25519 del descriptor. Los eventos válidos se registran idempotentemente en el índice de versiones. Las revisiones incompletas y las bifurcaciones mantienen sus estados; el orden de llegada no selecciona ganadores.
+GossipSub aplica firma y verificación estricta del mensaje libp2p. El topic utiliza `WithFloodPublish` para propagar estos anuncios pequeños a todos los peers suscritos conocidos en esta etapa inicial; habrá que revisar esa estrategia con métricas cuando crezca la red. El validador de topic comprueba además el schema, el tamaño, la estructura y la firma Ed25519 del descriptor. Los eventos válidos se registran idempotentemente en el índice de versiones. Las revisiones incompletas y las bifurcaciones mantienen sus estados; el orden de llegada no selecciona ganadores.
 
 **Separación de responsabilidades:**
 - GossipSub propaga anuncios y pistas de descubrimiento.
