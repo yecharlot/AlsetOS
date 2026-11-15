@@ -93,6 +93,7 @@ func NuevoGestorLeases(ruta string) (*GestorLeases,error) {
 	if err!=nil { return nil,err }
 	if len(b)==0 { return g,nil }
 	if err:=json.Unmarshal(b,&g.leases);err!=nil{return nil,fmt.Errorf("leer leases de retención: %w",err)}
+	if g.leases==nil { g.leases=map[string]LeaseRetencion{} }
 	for id,l:=range g.leases {
 		if id!=l.ID || l.Schema!=EsquemaLeaseRetencion || l.Bytes<=0 || l.Expira.IsZero() || !verificarFirmaLease(l) {
 			return nil,fmt.Errorf("lease persistido inválido: %s",id)
