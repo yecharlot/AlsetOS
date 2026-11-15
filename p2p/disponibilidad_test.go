@@ -30,8 +30,10 @@ func TestDisponibilidadRemotaFirmadaYRedundanciaVerificada(t *testing.T) {
 
 	contenido := []byte("bloque para comprobar redundancia")
 	root := rootcid.CrearContenido(contenido)
-	descriptor, estado, err := nodoA.AnunciarVersion(ctx,"","organismo:disponibilidad",1,root,"",contenido)
-	if err != nil || estado != LinajeCoherente { t.Fatalf("anunciar versión: estado=%s err=%v",estado,err) }
+	descriptor, err := CrearDescriptorVersion(idA,"organismo:disponibilidad",1,root,"")
+	if err != nil { t.Fatal(err) }
+	if err := nodoA.almacen.Guardar(root,contenido); err != nil { t.Fatal(err) }
+	if _, err := nodoA.versiones.Registrar(descriptor); err != nil { t.Fatal(err) }
 
 	// La consulta no debe declarar disponible un bloque que el peer aún no posee.
 	if _, err := nodoA.ConsultarDisponibilidad(ctx,nodoB.ID(),root); err == nil {
