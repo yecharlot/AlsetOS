@@ -13,6 +13,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/yecharlot/AlsetOS/relacion"
 )
 
 // ContractRef es un contrato versionado (oferta o requisito).
@@ -52,6 +54,7 @@ type OrgDecl struct {
 	Goals        []string          `json:"goals,omitempty"`
 	Contracts    []ContractRef     `json:"contracts,omitempty"`
 	Rules        []Rule            `json:"rules,omitempty"`
+	Relations    []relacion.Relacion `json:"relations,omitempty"`
 	InitialState map[string]interface{} `json:"initial_state,omitempty"`
 	// DependsOn atoms listed here are read-only from provider resolution
 	Meta map[string]string `json:"meta,omitempty"`
@@ -75,6 +78,10 @@ func (d OrgDecl) Validate() error {
 		if c.Role != "provides" && c.Role != "requires" {
 			return fmt.Errorf("%s: role de contrato inválido %q", d.OID, c.Role)
 		}
+	}
+	for _, rel := range d.Relations {
+		if err := rel.Validar(); err != nil { return fmt.Errorf("%s: %w", d.OID, err) }
+		if rel.Origen != d.OID { return fmt.Errorf("%s: la relación %s debe declarar como origen al organismo propietario", d.OID, rel.ID) }
 	}
 	for _, r := range d.Rules {
 		if r.ID == "" || r.ThenPath == "" {
@@ -100,15 +107,17 @@ func (d OrgDecl) DefinitionCID() (string, error) {
 		Capabilities, Goals                   []string
 		Contracts                             []ContractRef
 		Rules                                 []Rule
+		Relations                             []relacion.Relacion `json:"relations,omitempty"`
 		InitialState                          map[string]interface{}
 	}{
 		OID: d.OID, Name: d.Name, Version: d.Version, Kind: d.Kind,
 		Description: d.Description, Capabilities: append([]string{}, d.Capabilities...),
 		Goals: append([]string{}, d.Goals...), Contracts: append([]ContractRef{}, d.Contracts...),
-		Rules: append([]Rule{}, d.Rules...), InitialState: d.InitialState,
+		Rules: append([]Rule{}, d.Rules...), Relations: append([]relacion.Relacion{}, d.Relations...), InitialState: d.InitialState,
 	}
 	sort.Strings(canon.Capabilities)
 	sort.Strings(canon.Goals)
+	sort.Slice(canon.Relations, func(i, j int) bool { return canon.Relations[i].ID < canon.Relations[j].ID })
 	b, err := json.Marshal(canon)
 	if err != nil {
 		return "", err
