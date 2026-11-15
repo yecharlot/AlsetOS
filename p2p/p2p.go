@@ -46,6 +46,7 @@ type Nodo struct {
 	colaRecuperacion chan solicitudRecuperacionVersion
 	recuperacionDone chan struct{}
 	ultimoLatido    map[peer.ID]time.Time
+	cancelarNotificaciones func()
 }
 
 type descubrimiento struct{ nodo *Nodo }
@@ -126,6 +127,7 @@ func NuevoConEstado(identidadNodo *identidad.Identidad, escuchar, rutaOrganismos
 	h.SetStreamHandler(ProtocoloPulse, nodo.recibirPulso)
 	h.SetStreamHandler(ProtocoloOrganismo, nodo.recibirOrganismo)
 	h.SetStreamHandler(ProtocoloVersion, nodo.recibirVersion)
+	h.SetStreamHandler(ProtocoloSincronizacionVersiones, nodo.recibirSolicitudSincronizacion)
 
 	servicio := mdns.NewMdnsService(h, "_alset._tcp", &descubrimiento{nodo: nodo})
 	if err := servicio.Start(); err != nil {
@@ -139,6 +141,7 @@ func NuevoConEstado(identidadNodo *identidad.Identidad, escuchar, rutaOrganismos
 		_ = nodo.Cerrar()
 		return nil, err
 	}
+	nodo.iniciarSincronizacionReconexiones()
 
 	return nodo, nil
 }
@@ -289,6 +292,10 @@ func (nodo *Nodo) Direcciones() []string {
 func (nodo *Nodo) Cerrar() error {
  if nodo == nil { return nil }
  var errores []error
+ if nodo.cancelarNotificaciones != nil {
+  nodo.cancelarNotificaciones()
+  nodo.cancelarNotificaciones = nil
+ }
  if nodo.cancelarGossip != nil {
   nodo.cancelarGossip()
   if nodo.suscripcionVersiones != nil { nodo.suscripcionVersiones.Cancel() }
