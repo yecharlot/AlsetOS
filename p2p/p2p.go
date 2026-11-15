@@ -36,6 +36,7 @@ type Nodo struct {
 	organismos      map[string][]byte
 	rutaOrganismos  string
 	almacen         *AlmacenContenido
+	versiones       *IndiceVersiones
 	ultimoLatido    map[peer.ID]time.Time
 }
 
@@ -92,6 +93,10 @@ func NuevoConEstado(identidadNodo *identidad.Identidad, escuchar, rutaOrganismos
 			return nil, fmt.Errorf("validar organismo persistido %s: %w", root, err)
 		}
 	}
+	rutaVersiones := ""
+	if rutaOrganismos != "" { rutaVersiones = filepath.Join(filepath.Dir(rutaOrganismos), "versiones.json") }
+	versiones, err := NuevoIndiceVersiones(rutaVersiones)
+	if err != nil { _ = h.Close(); return nil, err }
 
 	nodo := &Nodo{
 		Host:           h,
@@ -101,11 +106,13 @@ func NuevoConEstado(identidadNodo *identidad.Identidad, escuchar, rutaOrganismos
 		organismos:     organismos,
 		rutaOrganismos: rutaOrganismos,
 		almacen: almacen,
+		versiones: versiones,
 		ultimoLatido:   make(map[peer.ID]time.Time),
 	}
 
 	h.SetStreamHandler(ProtocoloPulse, nodo.recibirPulso)
 	h.SetStreamHandler(ProtocoloOrganismo, nodo.recibirOrganismo)
+	h.SetStreamHandler(ProtocoloVersion, nodo.recibirVersion)
 
 	servicio := mdns.NewMdnsService(h, "_alset._tcp", &descubrimiento{nodo: nodo})
 	if err := servicio.Start(); err != nil {
