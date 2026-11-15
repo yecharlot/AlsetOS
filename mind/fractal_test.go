@@ -24,7 +24,8 @@ func TestEvaluarFractal_IndeterminadoResueltoEnNivelSiguiente(t *testing.T) {
 	rule := reglaFractal()
 	a := declarativo.OrgDecl{OID:"a",Name:"A",Version:"1",Kind:"ORGES",Rules:[]declarativo.Rule{rule},
 		Relations:[]relacion.Relacion{{ID:"a-b",Origen:"a",Destino:"b",Tipo:"contexto"}}}
-	b := declarativo.OrgDecl{OID:"b",Name:"B",Version:"1",Kind:"ORGES",Rules:[]declarativo.Rule{rule}}
+	b := declarativo.OrgDecl{OID:"b",Name:"B",Version:"1",Kind:"ORGES",Rules:[]declarativo.Rule{rule},
+		InitialState:map[string]interface{}{"b.dato":"listo"}}
 	rt := runtimeFractal(t,a,b)
 	beforeAudit, beforeHistory := rt.AuditLen(), len(rt.State.HistoryCopy())
 	got, err := (Mente{}).EvaluarFractal(rt,"a",rule.ID,4)
@@ -39,8 +40,8 @@ func TestEvaluarFractal_ConflictoPermaneceIndeterminado(t *testing.T) {
 	rule:=reglaFractal()
 	a:=declarativo.OrgDecl{OID:"a",Name:"A",Version:"1",Kind:"ORGES",Rules:[]declarativo.Rule{rule},
 		Relations:[]relacion.Relacion{{ID:"a-b",Origen:"a",Destino:"b",Tipo:"contexto"},{ID:"a-c",Origen:"a",Destino:"c",Tipo:"contexto"}}}
-	b:=declarativo.OrgDecl{OID:"b",Name:"B",Version:"1",Kind:"ORGES",Rules:[]declarativo.Rule{rule},InitialState:map[string]interface{}{"dato":"listo"}}
-	c:=declarativo.OrgDecl{OID:"c",Name:"C",Version:"1",Kind:"ORGES",Rules:[]declarativo.Rule{rule},InitialState:map[string]interface{}{"dato":"no"}}
+	b:=declarativo.OrgDecl{OID:"b",Name:"B",Version:"1",Kind:"ORGES",Rules:[]declarativo.Rule{rule},InitialState:map[string]interface{}{"b.dato":"listo"}}
+	c:=declarativo.OrgDecl{OID:"c",Name:"C",Version:"1",Kind:"ORGES",Rules:[]declarativo.Rule{rule},InitialState:map[string]interface{}{"c.dato":"no"}}
 	rt:=runtimeFractal(t,a,b,c)
 	got,err:=(Mente{}).EvaluarFractal(rt,"a",rule.ID,4)
 	if err!=nil{t.Fatal(err)}
