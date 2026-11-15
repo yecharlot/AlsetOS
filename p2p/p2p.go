@@ -128,6 +128,7 @@ func NuevoConEstado(identidadNodo *identidad.Identidad, escuchar, rutaOrganismos
 	h.SetStreamHandler(ProtocoloOrganismo, nodo.recibirOrganismo)
 	h.SetStreamHandler(ProtocoloVersion, nodo.recibirVersion)
 	h.SetStreamHandler(ProtocoloSincronizacionVersiones, nodo.recibirSolicitudSincronizacion)
+	h.SetStreamHandler(ProtocoloDisponibilidad, nodo.recibirConsultaDisponibilidad)
 
 	servicio := mdns.NewMdnsService(h, "_alset._tcp", &descubrimiento{nodo: nodo})
 	if err := servicio.Start(); err != nil {
