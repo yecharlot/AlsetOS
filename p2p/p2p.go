@@ -37,6 +37,9 @@ type Nodo struct {
 	organismos      map[string][]byte
 	rutaOrganismos  string
 	almacen         *AlmacenContenido
+	retenciones     *GestorRetencion
+	cancelarMantenimiento context.CancelFunc
+	mantenimientoDone chan struct{}
 	versiones       *IndiceVersiones
 	gossip          *pubsub.PubSub
 	topicVersiones  *pubsub.Topic
@@ -106,6 +109,10 @@ func NuevoConEstado(identidadNodo *identidad.Identidad, escuchar, rutaOrganismos
 	if rutaOrganismos != "" { rutaVersiones = filepath.Join(filepath.Dir(rutaOrganismos), "versiones.json") }
 	versiones, err := NuevoIndiceVersiones(rutaVersiones)
 	if err != nil { _ = h.Close(); return nil, err }
+	rutaRetenciones := ""
+	if rutaOrganismos != "" { rutaRetenciones = filepath.Join(filepath.Dir(rutaOrganismos), "retenciones.json") }
+	retenciones, err := NuevoGestorRetencion(rutaRetenciones)
+	if err != nil { _ = h.Close(); return nil, err }
 
 	nodo := &Nodo{
 		Host:           h,
@@ -115,6 +122,7 @@ func NuevoConEstado(identidadNodo *identidad.Identidad, escuchar, rutaOrganismos
 		organismos:     organismos,
 		rutaOrganismos: rutaOrganismos,
 		almacen: almacen,
+		retenciones: retenciones,
 		versiones: versiones,
 		ultimoLatido:   make(map[peer.ID]time.Time),
 	}
@@ -296,6 +304,11 @@ func (nodo *Nodo) Cerrar() error {
  if nodo.cancelarNotificaciones != nil {
   nodo.cancelarNotificaciones()
   nodo.cancelarNotificaciones = nil
+ }
+ if nodo.cancelarMantenimiento != nil {
+  nodo.cancelarMantenimiento()
+  if nodo.mantenimientoDone != nil { <-nodo.mantenimientoDone }
+  nodo.cancelarMantenimiento = nil
  }
  if nodo.cancelarGossip != nil {
   nodo.cancelarGossip()
