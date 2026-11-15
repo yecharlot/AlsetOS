@@ -214,8 +214,8 @@ func (n *Nodo) enviarSolicitudLease(ctx context.Context,destino peer.ID,s solici
 	if err:=json.NewDecoder(bufio.NewReader(lim)).Decode(&r);err!=nil{return LeaseRetencion{},err}
 	if lim.N<=0{return LeaseRetencion{},fmt.Errorf("respuesta de lease excede límite")}
 	if !r.Aceptada{return LeaseRetencion{},fmt.Errorf("lease rechazado: %s",r.Motivo)}
-	if s.Accion=="liberar" { return r.Lease,nil }
-	if r.Lease.ID!=s.Lease.ID||r.Lease.RootCID!=s.Lease.RootCID||r.Lease.Solicitante!=n.ID().String()||r.Lease.Proveedor!=destino.String()||!r.Lease.Expira.After(time.Now().UTC())||!verificarFirmaLease(r.Lease){return LeaseRetencion{},fmt.Errorf("compromiso remoto inválido")}
+	if s.Accion=="liberar" { if r.Lease.ID!=s.Lease.ID||r.Lease.RootCID!=s.Lease.RootCID||r.Lease.Proveedor!=destino.String()||r.Lease.Solicitante!=n.ID().String()||!verificarFirmaLease(r.Lease){return LeaseRetencion{},fmt.Errorf("confirmación de liberación no verificable")};return r.Lease,nil }
+	if (s.Accion!="aceptar"&&r.Lease.ID!=s.Lease.ID)||r.Lease.RootCID!=s.Lease.RootCID||r.Lease.Solicitante!=n.ID().String()||r.Lease.Proveedor!=destino.String()||!r.Lease.Expira.After(time.Now().UTC())||!verificarFirmaLease(r.Lease){return LeaseRetencion{},fmt.Errorf("compromiso remoto inválido")}
 	return r.Lease,nil
 }
 func (n *Nodo) recibirSolicitudLease(stream network.Stream) {
@@ -249,8 +249,19 @@ func (n *Nodo) recibirSolicitudLease(stream network.Stream) {
 	cuota,ok:=n.leases.permitidos[remoto.String()]
 	if !ok{n.leases.mu.Unlock();_ = json.NewEncoder(stream).Encode(respuestaLease{Motivo:"peer no autorizado para solicitar retención"});return}
 	prev,existe:=n.leases.leases[l.ID]
+	if s.Accion=="aceptar" {
+		// Una nueva solicitud para el mismo compromiso reutiliza su lease: no
+		// acumula cuotas ni reserva varias veces el mismo bloque.
+		for id,actual:=range n.leases.leases {
+			if actual.Solicitante==l.Solicitante&&actual.Proveedor==l.Proveedor&&actual.RootCID==l.RootCID&&actual.OrganismoID==l.OrganismoID {
+				l.ID=id;prev=actual;existe=true;break
+			}
+		}
+		if existe && (prev.RootCID!=l.RootCID||prev.OrganismoID!=l.OrganismoID||prev.Solicitante!=l.Solicitante||prev.Proveedor!=l.Proveedor) {
+			n.leases.mu.Unlock();_ = json.NewEncoder(stream).Encode(respuestaLease{Motivo:"colisión de ID de lease"});return
+		}
+	}
 	if s.Accion=="renovar"&&!existe{n.leases.mu.Unlock();_ = json.NewEncoder(stream).Encode(respuestaLease{Motivo:"lease desconocido"});return}
-	if s.Accion=="aceptar"&&existe{n.leases.mu.Unlock();_ = json.NewEncoder(stream).Encode(respuestaLease{Motivo:"ID de lease ya existente"});return}
 	if s.Accion=="renovar"&&(l.RootCID!=prev.RootCID||l.OrganismoID!=prev.OrganismoID||l.Solicitante!=prev.Solicitante||l.Proveedor!=prev.Proveedor){n.leases.mu.Unlock();_ = json.NewEncoder(stream).Encode(respuestaLease{Motivo:"la renovación altera la identidad del compromiso"});return}
 	var usadosPeer int64
 	for id,x:=range n.leases.leases{if id!=l.ID&&x.Solicitante==remoto.String()&&x.Expira.After(time.Now().UTC()){usadosPeer+=x.Bytes}}
