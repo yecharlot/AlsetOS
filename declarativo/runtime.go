@@ -6,12 +6,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 	"path/filepath"
 	"sync"
 	"time"
 
 	"github.com/yecharlot/AlsetOS/identidad"
 	"github.com/yecharlot/AlsetOS/organismo"
+	"github.com/yecharlot/AlsetOS/relacion"
 )
 
 // AuditEntry registro de interacciones y transiciones.
@@ -120,7 +122,75 @@ func (rt *Runtime) LoadAssembly(decls []OrgDecl) error {
 	for _, b := range asm.Bindings {
 		rt.audit("bind", b.ConsumerOID, b.Reason, b.ProviderOID+"|"+b.Contract)
 	}
+	// El grafo se incorpora como contexto consultable; no activa operaciones ni permisos.
+	perfil := asm.Relations.Perfil()
+	rt.audit("relation_graph_loaded", "", fmt.Sprintf("nodos=%d relaciones=%d", perfil.Nodos, perfil.Relaciones), "")
 	return nil
+}
+
+
+
+// ContextoRelacional es una vista de solo lectura de las relaciones incidentes
+// de un organismo dentro del ensamblaje actual.
+type ContextoRelacional struct {
+	OID       string               `json:"oid"`
+	Salientes []relacion.Relacion  `json:"salientes"`
+	Entrantes []relacion.Relacion  `json:"entrantes"`
+}
+
+// RelationalContext devuelve relaciones entrantes y salientes de un organismo.
+// No infiere causalidad ni activa reglas: entrega hechos declarados y validados.
+func (rt *Runtime) RelationalContext(oid string) (ContextoRelacional, error) {
+	rt.mu.Lock()
+	defer rt.mu.Unlock()
+	if rt.Assembly == nil || rt.Assembly.Relations == nil {
+		return ContextoRelacional{}, fmt.Errorf("sin ensamblaje relacional")
+	}
+	if _, ok := rt.Assembly.Orgs[oid]; !ok {
+		return ContextoRelacional{}, fmt.Errorf("organismo desconocido: %s", oid)
+	}
+	_, all := rt.Assembly.Relations.Copia()
+	ctx := ContextoRelacional{OID: oid, Salientes: []relacion.Relacion{}, Entrantes: []relacion.Relacion{}}
+	for _, rel := range all {
+		rel = copiarRelacion(rel)
+		if rel.Origen == oid { ctx.Salientes = append(ctx.Salientes, rel) }
+		if rel.Destino == oid { ctx.Entrantes = append(ctx.Entrantes, rel) }
+	}
+	return ctx, nil
+}
+
+// RelatedOrganisms devuelve los OID vecinos directos, sin atribuirles
+// dependencia causal, prioridad ni autoridad.
+func (rt *Runtime) RelatedOrganisms(oid string) ([]string, error) {
+	ctx, err := rt.RelationalContext(oid)
+	if err != nil { return nil, err }
+	set := map[string]bool{}
+	for _, rel := range ctx.Salientes { set[rel.Destino] = true }
+	for _, rel := range ctx.Entrantes { set[rel.Origen] = true }
+	out := make([]string, 0, len(set))
+	for id := range set { out = append(out, id) }
+	sort.Strings(out)
+	return out, nil
+}
+
+// RelationalProfile devuelve un perfil descriptivo del grafo cargado.
+func (rt *Runtime) RelationalProfile() (relacion.Perfil, error) {
+	rt.mu.Lock()
+	defer rt.mu.Unlock()
+	if rt.Assembly == nil || rt.Assembly.Relations == nil {
+		return relacion.Perfil{}, fmt.Errorf("sin ensamblaje relacional")
+	}
+	return rt.Assembly.Relations.Perfil(), nil
+}
+
+func copiarRelacion(r relacion.Relacion) relacion.Relacion {
+	out := r
+	out.Condiciones = append([]string(nil), r.Condiciones...)
+	if r.Meta != nil {
+		out.Meta = make(map[string]string, len(r.Meta))
+		for k, v := range r.Meta { out.Meta[k] = v }
+	}
+	return out
 }
 
 // HasCap verificación de capacidad (identidad ≠ autoridad).
