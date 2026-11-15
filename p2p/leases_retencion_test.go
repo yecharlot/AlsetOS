@@ -27,8 +27,12 @@ func TestLeaseRetencionDeniegaPorDefectoYAceptaCompromiso(t *testing.T) {
 	if _,err:=a.versiones.Registrar(d);err!=nil{t.Fatal(err)}
 	if _,err:=a.ReplicarDescriptor(ctx,b.ID(),d,data);err!=nil{t.Fatal(err)}
 	if _,err:=a.SolicitarRetencionRemota(ctx,b.ID(),d,time.Hour);err==nil{t.Fatal("el nodo receptor aceptó una solicitud sin autorización")}
+	if err:=b.ConfigurarCapacidadRetencion(1);err!=nil{t.Fatal(err)}
+	if err:=b.AutorizarRetencionRemota(a.ID(),1<<20);err!=nil{t.Fatal(err)}
+	if _,err:=a.SolicitarRetencionRemota(ctx,b.ID(),d,time.Hour);err==nil{t.Fatal("el nodo receptor aceptó sin capacidad global suficiente")}
 	if err:=b.ConfigurarCapacidadRetencion(1<<20);err!=nil{t.Fatal(err)}
-	if _,err:=a.SolicitarRetencionRemota(ctx,b.ID(),d,time.Hour);err==nil{t.Fatal("el nodo receptor aceptó sin autorización explícita")}
+	if err:=b.AutorizarRetencionRemota(a.ID(),1);err!=nil{t.Fatal(err)}
+	if _,err:=a.SolicitarRetencionRemota(ctx,b.ID(),d,time.Hour);err==nil{t.Fatal("el nodo receptor aceptó superando la cuota del peer")}
 	if err:=b.AutorizarRetencionRemota(a.ID(),1<<20);err!=nil{t.Fatal(err)}
 	lease,err:=a.SolicitarRetencionRemota(ctx,b.ID(),d,time.Hour);if err!=nil{t.Fatal(err)}
 	if lease.Bytes!=int64(len(data))||lease.Proveedor!=b.ID().String()||!verificarFirmaLease(lease){t.Fatalf("lease devuelto no verificable: %+v",lease)}
