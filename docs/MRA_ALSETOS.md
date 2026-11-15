@@ -297,4 +297,4 @@ Esta fase **no** implementa todavía:
 
 ### Pruebas previstas para esta entrega
 
-La suite añade escenarios de propagación entre tres nodos, rechazo de anuncios malformados y firmas alteradas, recepción fuera de orden, deduplicación idempotente y conservación de bifurcaciones. La aprobación de esta fase depende de que GitHub Actions compile y ejecute la suite completa con la versión de libp2p y GossipSub declarada en `go.mod`.
+La suite añade escenarios de propagación entre tres nodos, rechazo de anuncios malformados y firmas alteradas, recepción fuera de orden, deduplicación idempotente y conservación de bifurcaciones. Las pruebas de malla usan hosts libp2p aislados para no depender del descubrimiento mDNS ni del DHT en esta validación. Se comprueba además que recibir un anuncio no hace aparecer el bloque en el almacén local.\n\nGitHub Actions completó con éxito el commit de implementación `7a4daae14b1190d6215789df884c897dbf72f8cf`, incluyendo `go test ./...`, escenarios de integración, autonomía, arranque del kernel y verificación de estado: https://github.com/yecharlot/AlsetOS/actions/runs/43695107823. La rama sigue sin fusionarse.
