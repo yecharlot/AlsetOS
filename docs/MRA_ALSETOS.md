@@ -298,3 +298,22 @@ Esta fase **no** implementa todavía:
 ### Pruebas previstas para esta entrega
 
 La suite añade escenarios de propagación entre tres nodos, rechazo de anuncios malformados y firmas alteradas, recepción fuera de orden, deduplicación idempotente y conservación de bifurcaciones. Las pruebas de malla usan hosts libp2p aislados para no depender del descubrimiento mDNS ni del DHT en esta validación. Se comprueba además que recibir un anuncio no hace aparecer el bloque en el almacén local.\n\nGitHub Actions completó con éxito el commit de implementación `7a4daae14b1190d6215789df884c897dbf72f8cf`, incluyendo `go test ./...`, escenarios de integración, autonomía, arranque del kernel y verificación de estado: https://github.com/yecharlot/AlsetOS/actions/runs/43695107823. La rama sigue sin fusionarse.
+
+
+## Fase 9 — Recuperación verificable desencadenada por anuncios
+
+La recepción de un anuncio GossipSub válido ya no se limita a registrar el descriptor. El nodo incorpora una cola acotada de recuperación asíncrona:
+1. Registra el descriptor firmado en el índice durable.
+2. Comprueba si el bloque RootCID ya está disponible localmente.
+3. Si falta, intenta obtenerlo del peer que entregó el anuncio. Ese peer es solo un primer candidato y puede ser un relay sin el contenido.
+4. Si no lo tiene, consulta proveedores Kademlia mediante los mecanismos existentes.
+5. Verifica nuevamente RootCID antes de almacenar el bloque.
+6. Si la DHT está disponible, anuncia el nodo como proveedor después de guardar el contenido verificado.
+
+La cola tiene capacidad limitada y cada recuperación dispone de un timeout. Si se llena, el anuncio permanece registrado pero la recuperación se descarta y se informa; puede reintentarse mediante una nueva sincronización o una operación explícita. El bloque no se ejecuta ni concede capacidades por el hecho de haberse recuperado.
+
+La publicación de una versión local registra el proveedor Kademlia después de guardar el bloque y antes de publicar el anuncio GossipSub. La replicación entrante también intenta publicar el bloque verificado como proveedor. La firma del descriptor sigue siendo procedencia, no autorización.
+
+**Límites:** no se garantiza que exista un proveedor disponible; no hay sincronización histórica para eventos perdidos, factor de redundancia, retención/pinning, reparación, selección de confianza ni recuperación paralela multi-peer. La recuperación automática está limitada por tamaño, cola y tiempo, pero aún requiere una política de confianza y cuotas más completa para redes abiertas.
+
+**Pruebas:** la prueba de malla de tres nodos verifica que un anuncio firmado provoca recuperación real del bloque y que el bloque almacenado supera el RootCID esperado. La suite conserva pruebas de rechazo de anuncios malformados, firmas alteradas, deduplicación, orden fuera de secuencia y forks.
