@@ -271,6 +271,7 @@ Esta fase incorpora un topic GossipSub para propagar anuncios de versiones firma
 - El cuerpo contiene el `DescriptorVersion` firmado; no contiene los bytes del organismo.
 - El tamaño máximo del evento de aplicación es 64 KiB.
 - GossipSub exige firma de mensaje y verificación estricta de la identidad libp2p que publica el evento.
+- El topic activa `WithFloodPublish` para que los anuncios pequeños lleguen a todos los peers suscritos conocidos, incluso en redes iniciales pequeñas. Es una decisión de difusión para esta etapa; debe revisarse con métricas al crecer la red porque el coste aumenta con el número de peers.
 - Un validador síncrono comprueba estructura, schema, tamaño y firma Ed25519 del descriptor antes de aceptar y reenviar el anuncio.
 - Se rechazan mensajes malformados, campos desconocidos, datos JSON adicionales, schema no soportado y firmas inválidas.
 
