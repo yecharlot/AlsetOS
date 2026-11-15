@@ -100,12 +100,9 @@ func validarCamposDescriptor(d DescriptorVersion) error {
 	if d.Schema != VersionDescriptorSchema || d.OrganismoID == "" || len(d.OrganismoID) > 256 || d.Revision == 0 {
 		return fmt.Errorf("%w: schema, organismo o revisión inválidos", ErrVersionDescriptorInvalido)
 	}
-	if err := rootcid.Verificar([]byte{}, ""); err == nil { return fmt.Errorf("%w: verificación inesperada", ErrVersionDescriptorInvalido) }
-	if !strings.HasPrefix(d.RootCID, "rootcid:") || len(strings.TrimPrefix(d.RootCID, "rootcid:")) != 64 {
-		return fmt.Errorf("%w: RootCID mal formado", ErrVersionDescriptorInvalido)
-	}
+	if _, err := CIDRoot(d.RootCID); err != nil { return fmt.Errorf("%w: RootCID mal formado: %v", ErrVersionDescriptorInvalido, err) }
 	if d.Revision == 1 && d.Anterior != "" { return fmt.Errorf("%w: revisión inicial no admite antecesor", ErrVersionDescriptorInvalido) }
-	if d.Revision > 1 && (d.Anterior == "" || len(strings.TrimPrefix(d.Anterior, "rootcid:")) != 64 || !strings.HasPrefix(d.Anterior, "rootcid:")) {
+	if d.Revision > 1 && (d.Anterior == "" || func() bool { _, err := CIDRoot(d.Anterior); return err != nil }()) {
 		return fmt.Errorf("%w: revisión posterior requiere RootCID antecesor", ErrVersionDescriptorInvalido)
 	}
 	if d.Fecha.IsZero() || d.AutorNodeID == "" || d.AutorPeerID == "" || d.ClavePublica == "" || d.Firma == "" {
