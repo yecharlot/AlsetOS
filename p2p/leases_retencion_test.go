@@ -35,6 +35,8 @@ func TestLeaseRetencionDeniegaPorDefectoYAceptaCompromiso(t *testing.T) {
 	if len(b.LeasesRetencion())!=1{t.Fatalf("lease no persistido en proveedor: %+v",b.LeasesRetencion())}
 	renovado,err:=a.RenovarLeaseRemoto(ctx,lease,2*time.Hour);if err!=nil{t.Fatal(err)}
 	if !renovado.Expira.After(lease.Expira){t.Fatalf("la renovación no extendió el compromiso: anterior=%s nuevo=%s",lease.Expira,renovado.Expira)}
+	if err:=a.LiberarLeaseRemoto(ctx,renovado);err!=nil{t.Fatalf("liberar lease: %v",err)}
+	if len(b.LeasesRetencion())!=0{t.Fatalf("la liberación no retiró el compromiso: %+v",b.LeasesRetencion())}
 	alterado:=renovado;alterado.RootCID=rootcid.CrearContenido([]byte("otro contenido"))
 	if verificarFirmaLease(alterado){t.Fatal("se aceptó un lease alterado")}
 }
