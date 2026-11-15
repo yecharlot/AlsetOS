@@ -180,6 +180,22 @@ func (i *IndiceVersiones) Registrar(d DescriptorVersion) (EstadoLinaje, error) {
 	return clasificarLinaje(nuevo), nil
 }
 
+// Todas devuelve una instantánea determinista del inventario local.
+// Los descriptores siguen siendo evidencia firmada; el inventario no otorga confianza.
+func (i *IndiceVersiones) Todas() []DescriptorVersion {
+	if i == nil { return nil }
+	i.mu.RLock()
+	defer i.mu.RUnlock()
+	organismos := make([]string, 0, len(i.datos))
+	for organismo := range i.datos { organismos = append(organismos, organismo) }
+	sort.Strings(organismos)
+	resultado := make([]DescriptorVersion, 0)
+	for _, organismo := range organismos {
+		resultado = append(resultado, i.datos[organismo]...)
+	}
+	return resultado
+}
+
 func (i *IndiceVersiones) Versiones(organismoID string) []DescriptorVersion {
 	if i == nil { return nil }
 	i.mu.RLock(); defer i.mu.RUnlock()
