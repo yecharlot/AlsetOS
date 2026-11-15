@@ -76,3 +76,6 @@ El Runtime expone ahora una vista de solo lectura del grafo del ensamblaje:
 Estas consultas no escriben estado, no disparan reglas, no cambian capacidades y no se registran como mutaciones. Las relaciones entrantes se obtienen inspeccionando el snapshot del grafo, por lo que el contrato no depende de añadir semántica de recorrido al paquete `relacion`.
 
 **Límite deliberado:** todavía no se infiere qué átomos de estado dependen de una relación. El modelo actual no define un vínculo formal entre rutas de estado y relaciones; inventarlo a partir de nombres o de la mera proximidad entre organismos sería introducir causalidad no declarada. La invalidación reactiva sigue dependiendo exclusivamente de `ReactiveState.RegisterDeps` y las reglas ARL existentes.
+
+
+**Validación de Fase 3:** GitHub Actions completó con éxito `go test ./...` y el workflow de escenarios existentes en el commit `a795ee328847c53e060c389b1ac47859760d1fc6`. La suite incluye pruebas nuevas para contexto entrante/saliente, vecinos ordenados, organismo sin relaciones, organismo desconocido y ausencia de concesión de capacidades por el mero hecho de estar relacionado. El workflow terminó con conclusión `success`.
