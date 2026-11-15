@@ -253,3 +253,8 @@ No se introduce consenso distribuido ni CRDT: el contrato de versiones no los ne
 ### Pruebas incorporadas
 
 Se prueban firma y derivación de NodeID/PeerID, alteración de descriptor, idempotencia, revisión sin antecesor, llegada posterior del antecesor, fork de una revisión, persistencia del conflicto tras reinicio y replicación entre dos nodos con conservación de ambas versiones.
+
+
+### Validación CI de la Fase 7
+
+GitHub Actions completó con éxito para el commit `2ea50ea49e45aa7121c254ed96a3ab861ff3776e`: `go test ./...` y todos los escenarios de integración del workflow, incluidos los escenarios de organismo, autonomía y kernel. Ejecución: https://github.com/yecharlot/AlsetOS/actions/runs/43693664517.
