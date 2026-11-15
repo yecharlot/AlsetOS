@@ -445,11 +445,11 @@ Las autorizaciones y la capacidad son configuración operativa en memoria: despu
 - `ExpirarLeases`: elimina compromisos vencidos del registro.
 - El worker opt-in de mantenimiento ejecuta la expiración periódica junto con la reparación de contenido.
 
-La liberación y la expiración no borran los bytes. No se introduce garbage collection ni se interpreta la liberación como autorización para borrar un bloque que pudiera estar referenciado por otras versiones.
+Las solicitudes repetidas para el mismo solicitante, proveedor, OrganismoID y RootCID reutilizan el lease existente y actualizan su vencimiento; no acumulan compromisos ni consumen cuota dos veces. La liberación y la expiración no borran los bytes. No se introduce garbage collection ni se interpreta la liberación como autorización para borrar un bloque que pudiera estar referenciado por otras versiones.
 
 ### Redundancia contractual
 
-Se modifica `AsegurarRedundancia`: cuenta la copia local y solo leases remotos aceptados, firmados y vigentes. La replicación exitosa o un recibo de disponibilidad puntual no son suficientes. La operación automática solicita leases de 24 horas; el protocolo admite duraciones explícitas de hasta 30 días.
+Se modifica `AsegurarRedundancia`: cuenta la copia local y solo leases remotos aceptados, firmados y vigentes. La replicación exitosa o un recibo de disponibilidad puntual no son suficientes. La operación automática solicita leases de 24 horas; el protocolo admite duraciones explícitas de hasta 30 días. Renovación y liberación decodifican el PeerID textual antes de abrir el stream y validan la firma del compromiso devuelto.
 
 ### Límites y garantías
 
