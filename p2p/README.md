@@ -113,7 +113,7 @@ El protocolo `/alset/retention-lease/1.0.0` permite solicitar un compromiso temp
 
 La política es de denegación por defecto. El operador del proveedor debe configurar explícitamente `AutorizarRetencionRemota(peerID, cuotaBytes)` y `ConfigurarCapacidadRetencion(bytes)`. La firma de un descriptor, una conexión P2P o una identidad válida nunca conceden permiso por sí solas.
 
-El proveedor rechaza solicitudes si:
+Las solicitudes repetidas para el mismo solicitante, proveedor, OrganismoID y RootCID reutilizan el lease existente y actualizan su vencimiento; no acumulan compromisos ni consumen cuota dos veces. El proveedor rechaza solicitudes si:
 - el solicitante no está autorizado;
 - el bloque no está presente o no supera la verificación de RootCID;
 - no existe capacidad global configurada;
@@ -126,7 +126,7 @@ La autorización por peer y la capacidad configurada son parámetros operativos 
 
 `SolicitarRetencionRemota` obtiene un compromiso firmado y vigente; `RenovarLeaseRemoto` extiende un lease existente sin permitir cambiar su identidad ni su RootCID; `LiberarLeaseRemoto` termina el compromiso; `ExpirarLeases` elimina del registro los leases vencidos. El mantenimiento opt-in también ejecuta la expiración. La expiración y liberación no borran el bloque físico ni activan garbage collection.
 
-`AsegurarRedundancia` cuenta la copia local y los leases remotos firmados que estén vigentes. Una transferencia de bytes o un recibo de disponibilidad puntual no bastan para contar una réplica como comprometida. La duración usada por la operación automática es de 24 horas; el llamador puede solicitar y renovar leases con duraciones explícitas de hasta 30 días.
+`AsegurarRedundancia` cuenta la copia local y los leases remotos firmados que estén vigentes. Una transferencia de bytes o un recibo de disponibilidad puntual no bastan para contar una réplica como comprometida. La duración usada por la operación automática es de 24 horas; el llamador puede solicitar y renovar leases con duraciones explícitas de hasta 30 días. Las renovaciones y liberaciones decodifican el PeerID textual antes de abrir el stream y validan la firma del compromiso devuelto.
 
 ### Límites
 
