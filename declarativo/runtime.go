@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"sort"
-	"path/filepath"
 	"sync"
 	"time"
 
@@ -46,6 +45,7 @@ type Runtime struct {
 	Caps      map[string]map[string]bool      // OID → cap set (copia autorizada)
 	RootCIDs  map[string]string
 	Audit     []AuditEntry
+	Evaluations []EvaluationRecord
 	seenNonce map[string]bool
 	nodeID    *identidad.Identidad
 	DataDir   string
@@ -308,57 +308,6 @@ func (rt *Runtime) SetState(path string, v interface{}) {
 
 func (rt *Runtime) GetState(path string) (interface{}, bool) {
 	return rt.State.Get(path)
-}
-
-// Persist guarda snapshot + audit + bindings.
-func (rt *Runtime) Persist() error {
-	rt.mu.Lock()
-	defer rt.mu.Unlock()
-	if rt.DataDir == "" {
-		return fmt.Errorf("DataDir vacío")
-	}
-	doc := map[string]interface{}{
-		"atoms":     rt.State.Snapshot(),
-		"root_cids": rt.RootCIDs,
-		"bindings":  rt.Assembly.Bindings,
-		"audit":     rt.Audit,
-		"history":   rt.State.HistoryCopy(),
-		"caps":      rt.Caps,
-	}
-	b, err := json.MarshalIndent(doc, "", "  ")
-	if err != nil {
-		return err
-	}
-	path := filepath.Join(rt.DataDir, "runtime_state.json")
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, b, 0o600); err != nil {
-		return err
-	}
-	return os.Rename(tmp, path)
-}
-
-// Restore carga estado persistido (átomos y audit); requiere LoadAssembly previo o concurrente.
-func (rt *Runtime) Restore() error {
-	rt.mu.Lock()
-	defer rt.mu.Unlock()
-	path := filepath.Join(rt.DataDir, "runtime_state.json")
-	b, err := os.ReadFile(path)
-	if err != nil {
-		return err
-	}
-	var doc struct {
-		Atoms map[string]interface{} `json:"atoms"`
-		Audit []AuditEntry           `json:"audit"`
-	}
-	if err := json.Unmarshal(b, &doc); err != nil {
-		return err
-	}
-	for k, v := range doc.Atoms {
-		rt.State.Atoms[k] = v
-	}
-	rt.Audit = append(rt.Audit, doc.Audit...)
-	rt.audit("restore", "", "estado recuperado", path)
-	return nil
 }
 
 // ProviderOID devuelve el provider resuelto para un contrato del consumer.
