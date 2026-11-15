@@ -58,14 +58,8 @@ func (rt *Runtime) RecordEvaluation(schema, rootOID, ruleID string, state int, p
 	if !json.Valid(payload) {
 		return fmt.Errorf("payload de evaluación no es JSON válido")
 	}
-	var decoded interface{}
-	if err := json.Unmarshal(payload, &decoded); err != nil {
-		return fmt.Errorf("decodificar payload de evaluación: %w", err)
-	}
-	copyPayload, err := json.Marshal(decoded)
-	if err != nil {
-		return fmt.Errorf("canonicalizar payload de evaluación: %w", err)
-	}
+	copyPayload, err := canonicalizarJSON(payload)
+	if err != nil { return fmt.Errorf("canonicalizar payload de evaluación: %w", err) }
 	sum := sha256.Sum256(copyPayload)
 	record := EvaluationRecord{
 		Schema: schema, RootOID: rootOID, RuleID: ruleID, State: state,
@@ -180,8 +174,10 @@ func (rt *Runtime) Restore() error {
 		if record.Schema == "" || record.RootOID == "" || record.RuleID == "" || record.State < 0 || record.State > 2 {
 			return fmt.Errorf("snapshot contiene metadatos de evaluación inválidos")
 		}
-		sum := sha256.Sum256(record.Payload)
-		if !json.Valid(record.Payload) || hex.EncodeToString(sum[:]) != record.Digest {
+		canonical, canonicalErr := canonicalizarJSON(record.Payload)
+		if canonicalErr != nil { return fmt.Errorf("snapshot contiene evaluación inválida: %s/%s", record.RootOID, record.RuleID) }
+		sum := sha256.Sum256(canonical)
+		if hex.EncodeToString(sum[:]) != record.Digest {
 			return fmt.Errorf("snapshot contiene evaluación corrupta: %s/%s", record.RootOID, record.RuleID)
 		}
 		if _, ok := rt.Assembly.Orgs[record.RootOID]; !ok {
@@ -289,4 +285,10 @@ func jsonIgual(a, b interface{}) bool {
 	left, err1 := json.Marshal(a)
 	right, err2 := json.Marshal(b)
 	return err1 == nil && err2 == nil && string(left) == string(right)
+}
+
+func canonicalizarJSON(payload []byte) ([]byte, error) {
+	var decoded interface{}
+	if err := json.Unmarshal(payload, &decoded); err != nil { return nil, err }
+	return json.Marshal(decoded)
 }
