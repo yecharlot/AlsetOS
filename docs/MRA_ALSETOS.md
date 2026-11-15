@@ -196,3 +196,60 @@ No se implementan en esta fase Bitswap, GossipSub, consenso, replicación autom�
 ### Pruebas incorporadas y validación
 
 Se prueban almacenamiento persistente, idempotencia, rechazo de RootCID incorrecto, detección de corrupción al leer y al arrancar, reinicio del nodo, cacheo de contenido recuperado por DHT y reapertura del datastore Pebble. GitHub Actions completó con éxito `go test ./...` y todos los escenarios del workflow (organismo declarativo, incierto, persistente, alset-node, autonomía, arranque del kernel y verificación de estado) para el commit `4e4500aa9ad54042f9f7c319dc0e54e9cd7b7ea9`. Run: https://github.com/yecharlot/AlsetOS/actions/runs/43690329073.
+
+
+## Fase 7 — Replicación versionada y reconciliación de linajes
+
+La fase 7 añade una primera replicación explícita entre peers conectados y un contrato verificable para describir versiones de un mismo organismo lógico. No se interpreta el RootCID como identificador lógico estable: cada versión tiene su propio RootCID y el campo `OrganismoID` identifica el linaje.
+
+### Descriptor firmado de versión
+
+`p2p.DescriptorVersion` contiene:
+- Schema del descriptor.
+- `OrganismoID` estable definido por el dominio.
+- Número de revisión.
+- RootCID del contenido inmutable.
+- RootCID de la revisión antecesora.
+- NodeID y PeerID del autor.
+- Clave pública, fecha y firma Ed25519.
+
+La firma cubre todos los campos del descriptor. La verificación comprueba que NodeID y PeerID derivan de la misma clave pública y que la firma es válida. Esto acredita integridad y autoría criptográfica; **no** acredita que el autor esté autorizado, sea confiable o pueda ejecutar el organismo.
+
+### Replicación explícita
+
+El protocolo `/alset/version/1.0.0` transporta el descriptor y los bytes del bloque:
+1. El emisor verifica descriptor y RootCID.
+2. El receptor vuelve a verificar firma, identidad declarada y RootCID.
+3. El bloque se almacena de forma inmutable.
+4. El descriptor se registra en el índice versionado.
+5. El receptor confirma RootCID y estado del linaje.
+
+Se añade `ReplicarVersionAConocidos` para realizar fan-out explícito a los peers que ya están conectados. Los resultados se devuelven individualmente por peer. No se descubre una topología nueva ni se declara retención futura a partir de una confirmación.
+
+### Reconciliación sin sobrescritura
+
+El índice `versiones.json` conserva descriptores firmados y se escribe de forma atómica. Las clasificaciones posibles son:
+- `coherente`: antecesores disponibles y sin bifurcaciones observadas.
+- `incompleto`: falta el antecesor de una revisión.
+- `conflicto`: dos RootCID distintos para una misma revisión, ramas divergentes desde un mismo antecesor o declaraciones incompatibles del antecesor.
+
+Los conflictos no se resuelven por fecha, orden de llegada ni last-write-wins. Se conservan ambas evidencias. La llegada posterior de una revisión no borra un conflicto anterior. El sistema no elige un ganador ni concede autorización.
+
+La recepción de una revisión fuera de orden puede almacenar su bloque y descriptor, pero el linaje queda incompleto hasta recuperar su antecesor. La recepción de una bifurcación conserva las dos ramas y marca conflicto.
+
+### Límites de esta fase
+
+Esta implementación utiliza un protocolo libp2p de petición/respuesta y fan-out explícito a peers conectados. **No es GossipSub** ni un mecanismo epidémico automático de eventos. Quedan pendientes:
+- GossipSub y sus políticas de validación de mensajes.
+- Descubrimiento y membresía de topics.
+- Replicación automática por factor de redundancia y política de retención.
+- Recuperación de bloques desde múltiples proveedores en paralelo.
+- Reparación, pinning, garbage collection y pruebas de retención.
+- Política de confianza/autorización para autores y validadores.
+- Resolución humana o mediante reglas explícitas de conflictos; nunca LWW implícito.
+
+No se introduce consenso distribuido ni CRDT: el contrato de versiones no los necesita para detectar y preservar bifurcaciones.
+
+### Pruebas incorporadas
+
+Se prueban firma y derivación de NodeID/PeerID, alteración de descriptor, idempotencia, revisión sin antecesor, llegada posterior del antecesor, fork de una revisión, persistencia del conflicto tras reinicio y replicación entre dos nodos con conservación de ambas versiones.
