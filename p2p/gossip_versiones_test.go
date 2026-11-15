@@ -3,32 +3,15 @@ package p2p
 import (
 	"context"
 	"errors"
-	"fmt"
 	"testing"
 	"time"
 
+	libp2p "github.com/libp2p/go-libp2p"
+	libp2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/yecharlot/AlsetOS/identidad"
 	"github.com/yecharlot/AlsetOS/rootcid"
 )
-
-func conectarConReintentos(ctx context.Context, origen *Nodo, destino *Nodo) error {
-	info := peer.AddrInfo{ID: destino.ID(), Addrs: destino.Host.Addrs()}
-	for {
-		err := origen.Host.Connect(ctx, info)
-		if err == nil || origen.Host.Network().Connectedness(destino.ID()) == network.Connected {
-			return nil
-		}
-		timer := time.NewTimer(250 * time.Millisecond)
-		select {
-		case <-ctx.Done():
-			timer.Stop()
-			return fmt.Errorf("conectar peer %s: %w (último error: %v)", destino.ID(), ctx.Err(), err)
-		case <-timer.C:
-		}
-	}
-}
 
 func crearTrioGossip(t *testing.T) ([]*Nodo, context.Context, context.CancelFunc) {
 	t.Helper()
@@ -38,11 +21,27 @@ func crearTrioGossip(t *testing.T) ([]*Nodo, context.Context, context.CancelFunc
 		if err != nil {
 			t.Fatal(err)
 		}
-		nodo, err := Nuevo(id, "/ip4/127.0.0.1/tcp/0")
+		clave, err := libp2pcrypto.UnmarshalEd25519PrivateKey(id.ClavePrivada)
 		if err != nil {
-			for _, creado := range nodos {
-				_ = creado.Cerrar()
-			}
+			t.Fatal(err)
+		}
+		h, err := libp2p.New(libp2p.Identity(clave), libp2p.ListenAddrStrings("/ip4/127.0.0.1/tcp/0"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		almacen, err := NuevoAlmacenContenido("")
+		if err != nil {
+			_ = h.Close()
+			t.Fatal(err)
+		}
+		indice, err := NuevoIndiceVersiones("")
+		if err != nil {
+			_ = h.Close()
+			t.Fatal(err)
+		}
+		nodo := &Nodo{Host: h, Identidad: id, almacen: almacen, versiones: indice}
+		if err := nodo.iniciarGossipVersiones(); err != nil {
+			_ = h.Close()
 			t.Fatal(err)
 		}
 		nodos = append(nodos, nodo)
@@ -56,7 +55,7 @@ func crearTrioGossip(t *testing.T) ([]*Nodo, context.Context, context.CancelFunc
 	t.Cleanup(cancel)
 	for i := range nodos {
 		for j := i + 1; j < len(nodos); j++ {
-			if err := conectarConReintentos(ctx, nodos[i], nodos[j]); err != nil {
+			if err := nodos[i].Host.Connect(ctx, peer.AddrInfo{ID: nodos[j].ID(), Addrs: nodos[j].Host.Addrs()}); err != nil {
 				t.Fatalf("conectar nodos %d y %d: %v", i, j, err)
 			}
 		}
