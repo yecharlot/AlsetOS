@@ -32,6 +32,8 @@ func normalizarRootCID(valor string) string {
 }
 
 func (nodo *Nodo) AnunciarOrganismo(ctx context.Context, rootCID string, manifiesto []byte) error {
+	if nodo == nil { return fmt.Errorf("nodo nulo") }
+	if nodo.DHT == nil { return fmt.Errorf("DHT no inicializada") }
 	rootCID = normalizarRootCID(rootCID)
 	if rootCID == "" {
 		return fmt.Errorf("RootCID vacío")
