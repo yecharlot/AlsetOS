@@ -34,6 +34,8 @@ func TestEvaluarFractal_IndeterminadoResueltoEnNivelSiguiente(t *testing.T) {
 	if len(got.Raiz.Hijos)!=1 || got.Raiz.Hijos[0].Estado!=zyrion.Si { t.Fatalf("traza: %+v",got.Raiz) }
 	if rt.AuditLen()!=beforeAudit || len(rt.State.HistoryCopy())!=beforeHistory { t.Fatal("la evaluación fractal debe ser de solo lectura") }
 	if rt.HasCap("a","gene.ejecutar") { t.Fatal("la inferencia no debe conceder capacidades") }
+	records := rt.EvaluationsCopy()
+	if len(records) != 1 || records[0].Schema != "mind.fractal.v1" || records[0].State != int(zyrion.Si) { t.Fatalf("registro fractal no conservado: %+v", records) }
 }
 
 func TestEvaluarFractal_ConflictoPermaneceIndeterminado(t *testing.T) {
