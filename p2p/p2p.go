@@ -2,6 +2,7 @@ package p2p
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"sync"
@@ -266,11 +267,18 @@ func (nodo *Nodo) Direcciones() []string {
 }
 
 func (nodo *Nodo) Cerrar() error {
+ if nodo == nil { return nil }
+ var errores []error
  if nodo.DHT != nil {
-  if err := nodo.DHT.Close(); err != nil { return err }
+  if err := nodo.DHT.Close(); err != nil { errores = append(errores, fmt.Errorf("cerrar DHT: %w", err)) }
+  nodo.DHT = nil
  }
  if nodo.datastore != nil {
-  if err := nodo.datastore.Close(); err != nil { return err }
+  if err := nodo.datastore.Close(); err != nil { errores = append(errores, fmt.Errorf("cerrar datastore: %w", err)) }
+  nodo.datastore = nil
  }
- return nodo.Host.Close()
+ if nodo.Host != nil {
+  if err := nodo.Host.Close(); err != nil { errores = append(errores, fmt.Errorf("cerrar host: %w", err)) }
+ }
+ return errors.Join(errores...)
 }
