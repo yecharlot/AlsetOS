@@ -225,6 +225,8 @@ func (n *Nodo) recibirSolicitudLease(stream network.Stream) {
 	if !ok{n.leases.mu.Unlock();_ = json.NewEncoder(stream).Encode(respuestaLease{Motivo:"peer no autorizado para solicitar retención"});return}
 	prev,existe:=n.leases.leases[l.ID]
 	if s.Accion=="renovar"&&!existe{n.leases.mu.Unlock();_ = json.NewEncoder(stream).Encode(respuestaLease{Motivo:"lease desconocido"});return}
+	if s.Accion=="aceptar"&&existe{n.leases.mu.Unlock();_ = json.NewEncoder(stream).Encode(respuestaLease{Motivo:"ID de lease ya existente"});return}
+	if s.Accion=="renovar"&&(l.RootCID!=prev.RootCID||l.OrganismoID!=prev.OrganismoID||l.Solicitante!=prev.Solicitante||l.Proveedor!=prev.Proveedor){n.leases.mu.Unlock();_ = json.NewEncoder(stream).Encode(respuestaLease{Motivo:"la renovación altera la identidad del compromiso"});return}
 	var usadosPeer int64
 	for id,x:=range n.leases.leases{if id!=l.ID&&x.Solicitante==remoto.String()&&x.Expira.After(time.Now().UTC()){usadosPeer+=x.Bytes}}
 	if l.Bytes>cuota-usadosPeer{n.leases.mu.Unlock();_ = json.NewEncoder(stream).Encode(respuestaLease{Motivo:"cuota del solicitante insuficiente"});return}
