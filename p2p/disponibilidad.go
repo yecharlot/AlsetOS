@@ -154,12 +154,11 @@ type EstadoRedundancia struct {
 	Resultados []ResultadoReplicaVerificada `json:"resultados"`
 }
 
-// AsegurarRedundancia cuenta la copia local y obtiene confirmaciones recientes
-// de peers conectados. Replica de forma explícita; nunca selecciona una versión
-// por fecha ni resuelve conflictos. Factor incluye la copia local.
+// AsegurarRedundancia cuenta la copia local y únicamente leases remotos
+// aceptados, firmados y vigentes. La réplica de bytes por sí sola no cuenta.
 func (nodo *Nodo) AsegurarRedundancia(ctx context.Context, descriptor DescriptorVersion, contenido []byte, factor int) (EstadoRedundancia, error) {
 	estado := EstadoRedundancia{RootCID:descriptor.RootCID,FactorSolicitado:factor,Resultados:[]ResultadoReplicaVerificada{}}
-	if nodo == nil || nodo.Host == nil || nodo.almacen == nil { return estado,fmt.Errorf("servicios de contenido no inicializados") }
+	if nodo == nil || nodo.Host == nil || nodo.almacen == nil || nodo.leases == nil { return estado,fmt.Errorf("servicios de contenido/leases no inicializados") }
 	if factor < 1 || factor > 32 { return estado,fmt.Errorf("factor de redundancia fuera del rango 1..32") }
 	if err := VerificarDescriptor(descriptor); err != nil { return estado,err }
 	if err := rootcid.Verificar(contenido,descriptor.RootCID); err != nil { return estado,err }
@@ -171,23 +170,26 @@ func (nodo *Nodo) AsegurarRedundancia(ctx context.Context, descriptor Descriptor
 	sort.Slice(peers,func(i,j int) bool { return peers[i].String() < peers[j].String() })
 	for _, remoto := range peers {
 		if estado.FactorVerificado >= factor { break }
-		// Una respuesta de replicación puede informar linaje incompleto/conflicto
-		// aunque el bloque se haya guardado. Solo el recibo fresco cuenta como copia.
-		_, replicaErr := nodo.ReplicarDescriptor(ctx,remoto,descriptor,contenido)
-		_, reciboErr := nodo.ConsultarDisponibilidad(ctx,remoto,descriptor.RootCID)
 		resultado := ResultadoReplicaVerificada{PeerID:remoto.String()}
-		if reciboErr == nil {
+		_, replicaErr := nodo.ReplicarDescriptor(ctx,remoto,descriptor,contenido)
+		if replicaErr != nil {
+			// El receptor puede haber persistido el bloque aunque el linaje remoto
+			// esté incompleto o en conflicto; la solicitud de lease lo comprobará.
+			resultado.Error = "replicación: "+replicaErr.Error()
+		}
+		lease, leaseErr := nodo.SolicitarRetencionRemota(ctx,remoto,descriptor,24*time.Hour)
+		if leaseErr == nil {
 			resultado.Confirmada = true
 			estado.FactorVerificado++
-		} else if replicaErr != nil {
-			resultado.Error = replicaErr.Error()+"; verificación: "+reciboErr.Error()
+		} else if resultado.Error == "" {
+			resultado.Error = leaseErr.Error()
 		} else {
-			resultado.Error = reciboErr.Error()
+			resultado.Error += "; lease: "+leaseErr.Error()
 		}
 		estado.Resultados = append(estado.Resultados,resultado)
 	}
 	if estado.FactorVerificado < factor {
-		return estado,fmt.Errorf("redundancia insuficiente: verificadas %d de %d copias solicitadas",estado.FactorVerificado,factor)
+		return estado,fmt.Errorf("redundancia contractual insuficiente: %d leases vigentes de %d copias solicitadas",estado.FactorVerificado,factor)
 	}
 	return estado,nil
 }
