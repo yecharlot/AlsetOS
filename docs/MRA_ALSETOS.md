@@ -383,3 +383,41 @@ La transferencia puede registrar el descriptor aunque el linaje remoto quede inc
 ### Pruebas
 
 Se prueba que un peer sin bloque no puede emitir un recibo válido, que la replicación eleva el factor solo tras confirmación firmada, y que se rechazan recibos caducados o ligados a otro desafío. La CI debe ejecutar estas pruebas junto con la suite completa y los escenarios de integración existentes.
+
+
+## Fase 12 — Retención persistente, pinning y reparación
+
+### Política de retención
+
+Se incorpora `GestorRetencion`, con persistencia atómica en `retenciones.json`. Cada registro conserva schema, descriptor firmado, RootCID, factor solicitado y marcas temporales. La política es local al nodo; no se interpreta como una orden remota ni como una concesión de confianza.
+
+`Nodo.FijarVersion(descriptor, factor)` exige:
+- Descriptor Ed25519 válido.
+- Descriptor previamente registrado en el índice local de versiones.
+- Bloque presente y verificable localmente.
+- Factor entre 1 y 32, incluyendo la copia local.
+
+`LiberarVersion(rootCID)` elimina la política, no el contenido. El almacén no tiene recolección de basura en esta fase; por tanto, liberar un pin no elimina datos ni invalida descriptores.
+
+### Reparación verificable
+
+`RepararRetenciones(ctx)` recorre las políticas persistidas. Si el bloque local falta o está corrupto, solicita bytes a peers conectados y después a proveedores Kademlia. Cada respuesta se valida contra el RootCID antes de usar `AlmacenContenido.Reparar`, que reemplaza solo contenido ausente o corrupto mediante temporal, fsync y rename; un bloque ya íntegro nunca se sobrescribe.
+
+Una vez restaurada la copia local, se llama a `AsegurarRedundancia` para recuperar el factor solicitado. Los peers se verifican con recibos firmados y frescos. Las bifurcaciones no se resuelven: la reparación usa el descriptor explícito fijado por la política.
+
+### Mantenimiento periódico
+
+`IniciarMantenimiento(intervalo)` permite activar un worker periódico de manera explícita. El intervalo mínimo es un minuto y cada ciclo tiene timeout de 30 segundos. El worker no se inicia automáticamente: cada despliegue decide cuándo asumir consumo de red, CPU y disco. `Cerrar` cancela y espera el worker antes de cerrar los servicios P2P.
+
+### Límites y recuperación
+
+- La retención es una política local; no reserva espacio ni obliga a peers remotos a conservar bloques.
+- La liberación del pin no borra datos.
+- La reparación necesita al menos una fuente íntegra accesible; si no existe, informa fallo y conserva la política para futuros intentos.
+- No hay cuotas, reputación, penalización, consenso ni resolución de forks.
+- No se promete disponibilidad futura por haber recibido un recibo.
+- La reparación de una copia corrupta solo ocurre después de verificar el RootCID del contenido sustituto.
+
+### Pruebas
+
+Se añaden pruebas de persistencia/liberación de políticas, reparación de bloque corrupto, recuperación de réplica remota desaparecida, recuperación de copia local corrupta desde otro peer y control del intervalo/duplicación del worker periódico.
