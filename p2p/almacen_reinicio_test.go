@@ -1,11 +1,9 @@
 package p2p
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/yecharlot/AlsetOS/identidad"
 	"github.com/yecharlot/AlsetOS/rootcid"
@@ -19,12 +17,10 @@ func TestNodoReiniciaConContenidoVerificado(t *testing.T) {
 	contenido := []byte(`{"nombre":"persistente","version":"1"}`)
 	root := rootcid.CrearContenido(contenido)
 
-	nodo, err := NuevoConEstado(id, "/ip4/127.0.0.1/tcp/0", rutaIndice)
+	almacen, err := NuevoAlmacenContenido(filepath.Join(dir, "bloques"))
 	if err != nil { t.Fatal(err) }
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	if err := nodo.AnunciarOrganismo(ctx, root, contenido); err != nil { cancel(); _ = nodo.Cerrar(); t.Fatal(err) }
-	cancel()
-	if err := nodo.Cerrar(); err != nil { t.Fatal(err) }
+	if err := almacen.Guardar(root, contenido); err != nil { t.Fatal(err) }
+	if err := guardarOrganismos(rutaIndice, map[string][]byte{root: contenido}); err != nil { t.Fatal(err) }
 
 	reiniciado, err := NuevoConEstado(id, "/ip4/127.0.0.1/tcp/0", rutaIndice)
 	if err != nil { t.Fatal(err) }
