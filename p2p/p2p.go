@@ -43,6 +43,8 @@ type Nodo struct {
 	suscripcionVersiones *pubsub.Subscription
 	cancelarGossip  context.CancelFunc
 	gossipDone      chan struct{}
+	colaRecuperacion chan solicitudRecuperacionVersion
+	recuperacionDone chan struct{}
 	ultimoLatido    map[peer.ID]time.Time
 }
 
@@ -291,6 +293,7 @@ func (nodo *Nodo) Cerrar() error {
   nodo.cancelarGossip()
   if nodo.suscripcionVersiones != nil { nodo.suscripcionVersiones.Cancel() }
   if nodo.gossipDone != nil { <-nodo.gossipDone }
+  if nodo.recuperacionDone != nil { <-nodo.recuperacionDone }
   nodo.cancelarGossip = nil
  }
  if nodo.DHT != nil {
