@@ -38,6 +38,7 @@ type Nodo struct {
 	rutaOrganismos  string
 	almacen         *AlmacenContenido
 	retenciones     *GestorRetencion
+	leases          *GestorLeases
 	cancelarMantenimiento context.CancelFunc
 	mantenimientoDone chan struct{}
 	versiones       *IndiceVersiones
@@ -113,6 +114,10 @@ func NuevoConEstado(identidadNodo *identidad.Identidad, escuchar, rutaOrganismos
 	if rutaOrganismos != "" { rutaRetenciones = filepath.Join(filepath.Dir(rutaOrganismos), "retenciones.json") }
 	retenciones, err := NuevoGestorRetencion(rutaRetenciones)
 	if err != nil { _ = h.Close(); return nil, err }
+	rutaLeases := ""
+	if rutaOrganismos != "" { rutaLeases = filepath.Join(filepath.Dir(rutaOrganismos), "leases-retencion.json") }
+	leases, err := NuevoGestorLeases(rutaLeases)
+	if err != nil { _ = h.Close(); return nil, err }
 
 	nodo := &Nodo{
 		Host:           h,
@@ -123,6 +128,7 @@ func NuevoConEstado(identidadNodo *identidad.Identidad, escuchar, rutaOrganismos
 		rutaOrganismos: rutaOrganismos,
 		almacen: almacen,
 		retenciones: retenciones,
+		leases: leases,
 		versiones: versiones,
 		ultimoLatido:   make(map[peer.ID]time.Time),
 	}
@@ -137,6 +143,7 @@ func NuevoConEstado(identidadNodo *identidad.Identidad, escuchar, rutaOrganismos
 	h.SetStreamHandler(ProtocoloVersion, nodo.recibirVersion)
 	h.SetStreamHandler(ProtocoloSincronizacionVersiones, nodo.recibirSolicitudSincronizacion)
 	h.SetStreamHandler(ProtocoloDisponibilidad, nodo.recibirConsultaDisponibilidad)
+	h.SetStreamHandler(ProtocoloLeaseRetencion, nodo.recibirSolicitudLease)
 
 	servicio := mdns.NewMdnsService(h, "_alset._tcp", &descubrimiento{nodo: nodo})
 	if err := servicio.Start(); err != nil {
