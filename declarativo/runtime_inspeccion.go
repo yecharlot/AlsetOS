@@ -27,8 +27,9 @@ func (rt *Runtime) RulesFor(oid string) ([]Rule, error) {
 }
 
 // EvaluateRuleReadOnly evalúa una regla sin escribir átomos, dependencias,
-// historial ni auditoría. Es la lectura segura que Mind usa para explorar
-// niveles relacionales. No ejecuta ThenPath ni concede capacidades.
+// historial ni auditoría. En el contexto MRA busca primero el átomo local
+// "<oid>.<path>" y, si no existe, utiliza el path global legado.
+// No ejecuta ThenPath ni concede capacidades.
 func (rt *Runtime) EvaluateRuleReadOnly(oid, ruleID string) (InferenceRecord, Rule, error) {
 	rules, err := rt.RulesFor(oid)
 	if err != nil {
@@ -51,7 +52,14 @@ func (rt *Runtime) EvaluateRuleReadOnly(oid, ruleID string) (InferenceRecord, Ru
 	evidence := make([]string, 0, len(rule.When))
 	overall := zyrion.Si
 	for _, condition := range rule.When {
-		state, detail := evalCondition(rt.State, condition)
+		local := condition
+		local.Path = oid + "." + condition.Path
+		if _, exists := rt.State.Get(local.Path); !exists {
+			if _, globalExists := rt.State.Get(condition.Path); globalExists {
+				local = condition
+			}
+		}
+		state, detail := evalCondition(rt.State, local)
 		evidence = append(evidence, detail+" → "+state.Texto())
 		if state == zyrion.No {
 			overall = zyrion.No
