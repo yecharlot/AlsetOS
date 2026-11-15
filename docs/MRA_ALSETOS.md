@@ -421,3 +421,45 @@ Una vez restaurada la copia local, se llama a `AsegurarRedundancia` para recuper
 ### Pruebas
 
 Se añaden pruebas de persistencia/liberación de políticas, reparación de bloque corrupto, recuperación de réplica remota desaparecida, recuperación de copia local corrupta desde otro peer y control del intervalo/duplicación del worker periódico.
+
+
+## Fase 13 — Compromisos distribuidos de retención
+
+### Contrato del lease
+
+Se incorpora el protocolo `/alset/retention-lease/1.0.0`. Un solicitante que ya replicó el contenido puede pedir a un proveedor un compromiso temporal. La petición se firma con la identidad del solicitante y el proveedor comprueba que la clave pública corresponde al PeerID de la conexión. El proveedor vuelve a leer el bloque y verifica su RootCID antes de aceptar. La respuesta contiene un lease firmado por el proveedor, vinculado a RootCID, OrganismoID, solicitante, proveedor, tamaño, emisión y expiración.
+
+La firma del descriptor demuestra procedencia; no autoriza almacenamiento remoto. La conexión y la identidad del peer tampoco autorizan por sí solas la solicitud.
+
+### Política de aceptación
+
+El proveedor opera en denegación por defecto. La aceptación exige configuración local explícita mediante `AutorizarRetencionRemota(peerID, cuotaBytes)` y `ConfigurarCapacidadRetencion(bytes)`. Se contabilizan los leases vigentes para aplicar la cuota individual y el límite global. Si falta configuración, la solicitud se rechaza.
+
+Las autorizaciones y la capacidad son configuración operativa en memoria: después de un reinicio el proveedor vuelve a denegar solicitudes hasta que el operador las configure. Los leases aceptados se guardan de forma persistente y atómica en `leases-retencion.json`.
+
+### Renovación, liberación y expiración
+
+- `SolicitarRetencionRemota`: solicita un lease temporal después de que el bloque ya se haya replicado.
+- `RenovarLeaseRemoto`: renueva un compromiso conocido sin permitir alterar solicitante, proveedor, OrganismoID o RootCID.
+- `LiberarLeaseRemoto`: libera el compromiso de forma explícita.
+- `ExpirarLeases`: elimina compromisos vencidos del registro.
+- El worker opt-in de mantenimiento ejecuta la expiración periódica junto con la reparación de contenido.
+
+La liberación y la expiración no borran los bytes. No se introduce garbage collection ni se interpreta la liberación como autorización para borrar un bloque que pudiera estar referenciado por otras versiones.
+
+### Redundancia contractual
+
+Se modifica `AsegurarRedundancia`: cuenta la copia local y solo leases remotos aceptados, firmados y vigentes. La replicación exitosa o un recibo de disponibilidad puntual no son suficientes. La operación automática solicita leases de 24 horas; el protocolo admite duraciones explícitas de hasta 30 días.
+
+### Límites y garantías
+
+- Un lease firmado acredita que el proveedor asumió un compromiso temporal verificable; no garantiza que el hardware no falle, que el proceso siga activo o que el proveedor no incumpla.
+- La capacidad es declarada por el operador; todavía no se mide automáticamente el espacio libre del sistema de archivos.
+- No hay reputación, pago, penalización, consenso ni resolución de disputas.
+- Las autorizaciones/cuotas no se infieren de la firma del descriptor ni se restauran automáticamente tras reinicio.
+- No se borra contenido al liberar o expirar un lease.
+- La firma acredita compromiso y procedencia, no confianza absoluta ni autorización para ejecutar organismos.
+
+### Pruebas
+
+Se incorporan pruebas de denegación por defecto, aceptación tras autorización explícita, validación de firma, persistencia, cuota/capacidad, renovación, liberación, expiración y contabilización de redundancia mediante leases vigentes. La suite de CI debe verificar también los escenarios previos de persistencia, reparación y replicación P2P.
