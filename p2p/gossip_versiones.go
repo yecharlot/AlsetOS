@@ -130,8 +130,7 @@ func (nodo *Nodo) consumirRecuperacionesVersion(ctx context.Context) {
 				continue
 			}
 			recuperacionCtx, cancelar := context.WithTimeout(ctx, 25*time.Second)
-			_, err := nodo.recuperarBloqueVersion(recu
-peracionCtx, solicitud.origen, d.RootCID)
+			_, err := nodo.recuperarBloqueVersion(recuperacionCtx, solicitud.origen, d.RootCID)
 			cancelar()
 			if err != nil {
 				fmt.Printf("[GOSSIP-RECOVERY-ERROR] organismo=%s root=%s: %v\\n", d.OrganismoID, d.RootCID, err)
