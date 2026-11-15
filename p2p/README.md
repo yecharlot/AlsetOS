@@ -41,3 +41,12 @@ La persistencia del datastore no convierte los anuncios de proveedor en disponib
 **Límite de interoperabilidad:** este cambio implementa almacenamiento local de bloques raw con CID compatible y localización de proveedores mediante Kademlia. No incorpora todavía un nodo IPFS completo, Bitswap, GossipSub, consenso, replicación automática por política ni garantía de retención entre peers.
 
 El CID de localización no vuelve a hashear el manifiesto: se construye a partir del mismo digest SHA-256 contenido en el `RootCID`. Así, la clave Kademlia representa directamente la identidad de contenido del organismo.
+
+
+## Replicación versionada
+
+El protocolo `/alset/version/1.0.0` replica un bloque junto con un `DescriptorVersion` firmado por la identidad Ed25519 del autor. El descriptor vincula OrganismoID lógico, revisión, RootCID, antecesor, NodeID, PeerID, clave pública y fecha. La firma acredita autoría criptográfica, no autorización.
+
+`ReplicarVersionAConocidos` realiza fan-out explícito a peers ya conectados. El índice durable `versiones.json` conserva revisiones y clasifica el linaje como `coherente`, `incompleto` o `conflicto`. Las bifurcaciones se conservan; no hay last-write-wins.
+
+Esta fase todavía **no implementa GossipSub**, replicación automática, política de retención ni recuperación multi-peer paralela. El protocolo de versiones es petición/respuesta directa, no un bus de eventos.
