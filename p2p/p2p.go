@@ -9,6 +9,7 @@ import (
 	"time"
 
 	libp2p "github.com/libp2p/go-libp2p"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	libp2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
@@ -37,6 +38,11 @@ type Nodo struct {
 	rutaOrganismos  string
 	almacen         *AlmacenContenido
 	versiones       *IndiceVersiones
+	gossip          *pubsub.PubSub
+	topicVersiones  *pubsub.Topic
+	suscripcionVersiones *pubsub.Subscription
+	cancelarGossip  context.CancelFunc
+	gossipDone      chan struct{}
 	ultimoLatido    map[peer.ID]time.Time
 }
 
@@ -108,6 +114,11 @@ func NuevoConEstado(identidadNodo *identidad.Identidad, escuchar, rutaOrganismos
 		almacen: almacen,
 		versiones: versiones,
 		ultimoLatido:   make(map[peer.ID]time.Time),
+	}
+
+	if err := nodo.iniciarGossipVersiones(); err != nil {
+		_ = nodo.Cerrar()
+		return nil, err
 	}
 
 	h.SetStreamHandler(ProtocoloPulse, nodo.recibirPulso)
@@ -276,6 +287,12 @@ func (nodo *Nodo) Direcciones() []string {
 func (nodo *Nodo) Cerrar() error {
  if nodo == nil { return nil }
  var errores []error
+ if nodo.cancelarGossip != nil {
+  nodo.cancelarGossip()
+  if nodo.suscripcionVersiones != nil { nodo.suscripcionVersiones.Cancel() }
+  if nodo.gossipDone != nil { <-nodo.gossipDone }
+  nodo.cancelarGossip = nil
+ }
  if nodo.DHT != nil {
   if err := nodo.DHT.Close(); err != nil { errores = append(errores, fmt.Errorf("cerrar DHT: %w", err)) }
   nodo.DHT = nil
