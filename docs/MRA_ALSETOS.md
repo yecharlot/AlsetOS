@@ -116,7 +116,8 @@ La persistencia del Runtime deja de ser un volcado JSON sin contrato explícito.
 - Algoritmo de integridad (`sha256`) y checksum del payload canónico.
 - Huella determinista del ensamblaje y mapa de RootCID por OID.
 - Átomos, dependencias reactivas, invalidaciones pendientes e historial ARL.
-- Auditoría, bindings y capacidades declaradas.
+- Auditoría, bindings y capacidades declaradas (estas últimas solo se verifican; nunca se restauran como autoridad).
+- Nonces Pulse ya utilizados, para conservar la protección anti-replay después de un reinicio.
 - Registros de evaluaciones fractales, con esquema, organismo raíz, regla, estado, payload y digest propio.
 
 ### Recuperación y compatibilidad
@@ -128,7 +129,7 @@ La persistencia del Runtime deja de ser un volcado JSON sin contrato explícito.
 4. La igualdad de bindings y capacidades frente al ensamblaje activo.
 5. La integridad y pertenencia de los registros de evaluación.
 
-La recuperación reemplaza átomos, dependencias, invalidaciones e historial con el snapshot validado; no mezcla el snapshot con datos residuales de una ejecución anterior. La auditoría recuperada recibe un nuevo evento `restore`.
+La recuperación reemplaza átomos, dependencias, invalidaciones e historial con el snapshot validado y restaura los nonces ya consumidos para evitar replay; no mezcla el snapshot con datos residuales de una ejecución anterior. La auditoría recuperada recibe un nuevo evento `restore`.
 
 Las capacidades y RootCID **no se restauran desde el archivo**: la autoridad procede de las declaraciones que se cargaron en el Runtime. El snapshot solo permite comprobar que no han cambiado. Por ello un archivo manipulado no puede otorgar permisos.
 
