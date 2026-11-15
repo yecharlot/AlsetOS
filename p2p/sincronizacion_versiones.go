@@ -54,7 +54,7 @@ func (nodo *Nodo) recibirSolicitudSincronizacion(stream network.Stream) {
 		_ = json.NewEncoder(stream).Encode(respuestaSincronizacionVersiones{Error:"inventario supera el límite de transferencia"})
 		return
 	}
-	_, _ = stream.Write(append(bytes, '\\n'))
+	_, _ = stream.Write(append(bytes, '\n'))
 }
 
 // SincronizarVersiones solicita el inventario firmado del peer conectado,
