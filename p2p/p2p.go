@@ -146,10 +146,11 @@ func (nodo *Nodo) ReanunciarOrganismos(ctx context.Context) error {
 	nodo.mu.RUnlock()
 
 	for root := range copia {
-		clave, err := CIDRoot(root)
-		if err != nil {
-			return err
+		if _, err := nodo.almacen.Obtener(root); err != nil {
+			return fmt.Errorf("no se puede reanunciar contenido no disponible o corrupto %s: %w", root, err)
 		}
+		clave, err := CIDRoot(root)
+		if err != nil { return err }
 		if err := nodo.DHT.Provide(ctx, clave, true); err != nil {
 			return fmt.Errorf("reanunciar %s: %w", root, err)
 		}
