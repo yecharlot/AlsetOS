@@ -204,6 +204,7 @@ func (n *Nodo) IniciarMantenimiento(intervalo time.Duration) error {
 			select{
 			case <-ctx.Done():return
 			case <-t.C:
+				if err:=n.ExpirarLeases(time.Now().UTC());err!=nil{fmt.Printf("[RETENTION-LEASE-EXPIRY-DEFERRED] %v\\n",err)}
 				limite,cancel:=context.WithTimeout(ctx,30*time.Second)
 				if _,err:=n.RepararRetenciones(limite);err!=nil{fmt.Printf("[RETENTION-REPAIR-DEFERRED] %v\n",err)}
 				cancel()
