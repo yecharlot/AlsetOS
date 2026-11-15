@@ -107,3 +107,44 @@ Se implementa la primera integración de Mind con el grafo relacional:
 La inspección es de solo lectura. No aplica `ThenPath`, no ejecuta genes, no cambia capacidades y no convierte conclusiones en autorizaciones. La ejecución continúa bajo los mecanismos existentes de capacidad y política.
 
 **Alcance:** esta fase no modifica el comportamiento de `EvalRule` ni la estrategia heredada `Mente.Decidir`. La integración fractal es una API explícita que puede probarse antes de conectarla a flujos automáticos. La semántica de convergencia es una política inicial conservadora y debe permanecer visible y versionada.
+
+
+## Fase 5 — Persistencia versionada y recuperación verificable
+
+La persistencia del Runtime deja de ser un volcado JSON sin contrato explícito. El archivo `runtime_state.json` adopta una envoltura versionada con:
+- Versión de esquema (`version=1`).
+- Algoritmo de integridad (`sha256`) y checksum del payload canónico.
+- Huella determinista del ensamblaje y mapa de RootCID por OID.
+- Átomos, dependencias reactivas, invalidaciones pendientes e historial ARL.
+- Auditoría, bindings y capacidades declaradas.
+- Registros de evaluaciones fractales, con esquema, organismo raíz, regla, estado, payload y digest propio.
+
+### Recuperación y compatibilidad
+
+`Restore` requiere que `LoadAssembly` haya cargado previamente el ensamblaje. Antes de modificar el Runtime valida:
+1. La versión y el algoritmo de checksum.
+2. La integridad del payload.
+3. La coincidencia exacta de los RootCID de definición y de la huella del ensamblaje.
+4. La igualdad de bindings y capacidades frente al ensamblaje activo.
+5. La integridad y pertenencia de los registros de evaluación.
+
+La recuperación reemplaza átomos, dependencias, invalidaciones e historial con el snapshot validado; no mezcla el snapshot con datos residuales de una ejecución anterior. La auditoría recuperada recibe un nuevo evento `restore`.
+
+Las capacidades y RootCID **no se restauran desde el archivo**: la autoridad procede de las declaraciones que se cargaron en el Runtime. El snapshot solo permite comprobar que no han cambiado. Por ello un archivo manipulado no puede otorgar permisos.
+
+Se admite migración controlada del formato JSON anterior sin envoltura, pero únicamente si incluye RootCID que coinciden exactamente con el ensamblaje cargado. Los snapshots antiguos sin RootCID se rechazan: no existe evidencia suficiente para asociar sus datos a una definición concreta. Tras recuperar un formato legado, el siguiente `Persist` lo escribe en el formato versionado actual.
+
+### Evaluaciones fractales
+
+`Mente.EvaluarFractal` registra una traza de evidencia `mind.fractal.v1` en el Runtime. Este registro es metadato de evaluación: no modifica átomos de dominio, historial ARL, auditoría, capacidades ni ejecuta genes. El registro conserva el payload completo y un digest SHA-256, y viaja dentro del snapshot para permitir inspección posterior.
+
+### Límites explícitos
+
+- El checksum detecta corrupción accidental o alteración no coordinada del payload; **no es una firma de autoría ni protege frente a un atacante capaz de reemplazar simultáneamente el contenido y su checksum**.
+- Esta fase no implementa replicación distribuida, consenso, disponibilidad de bloques IPFS ni recuperación entre peers.
+- RootCID identifica la definición canónica del organismo; no identifica una instancia viva, un nodo/peer ni garantiza que el contenido esté disponible.
+- La identidad criptográfica del nodo y la disponibilidad del contenido continúan siendo contratos separados.
+
+### Pruebas añadidas
+
+Se cubren round-trip, versión y checksum, corrupción sin restauración parcial, incompatibilidad de RootCID, migración del formato legado, rechazo de capacidades manipuladas y conservación de trazas fractales. La validación integral queda condicionada al resultado de GitHub Actions de este commit.
