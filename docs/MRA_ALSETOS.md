@@ -258,3 +258,42 @@ Se prueban firma y derivación de NodeID/PeerID, alteración de descriptor, idem
 ### Validación CI de la Fase 7
 
 GitHub Actions completó con éxito para el commit `2ea50ea49e45aa7121c254ed96a3ab861ff3776e`: `go test ./...` y todos los escenarios de integración del workflow, incluidos los escenarios de organismo, autonomía y kernel. Ejecución: https://github.com/yecharlot/AlsetOS/actions/runs/43693664517.
+
+
+## Fase 8 — Anuncios de versiones mediante GossipSub
+
+Esta fase incorpora un topic GossipSub para propagar anuncios de versiones firmadas. El protocolo de transferencia de bloques de la fase 7 se mantiene separado.
+
+### Contrato del evento
+
+- Topic: `alset/versions/1.0.0`.
+- Schema del evento: `alset.version-announcement.v1`.
+- El cuerpo contiene el `DescriptorVersion` firmado; no contiene los bytes del organismo.
+- El tamaño máximo del evento de aplicación es 64 KiB.
+- GossipSub exige firma de mensaje y verificación estricta de la identidad libp2p que publica el evento.
+- Un validador síncrono comprueba estructura, schema, tamaño y firma Ed25519 del descriptor antes de aceptar y reenviar el anuncio.
+- Se rechazan mensajes malformados, campos desconocidos, datos JSON adicionales, schema no soportado y firmas inválidas.
+
+La firma del mensaje GossipSub acredita qué identidad libp2p publicó el anuncio. La firma interna del descriptor acredita la autoría de la versión. Son comprobaciones distintas. La retransmisión de un anuncio no transforma al relay en autor ni en autoridad de confianza.
+
+### Recepción y reconciliación
+
+Los nodos suscritos consumen los eventos aceptados y registran el descriptor en `versiones.json`. El registro es idempotente. La recepción fuera de orden conserva el estado `incompleto`; la recepción de ramas incompatibles conserva `conflicto`. Ningún evento selecciona una rama ganadora ni concede capacidades.
+
+El anuncio es una pista de descubrimiento y sincronización, no una prueba de disponibilidad. El evento no transporta el bloque ni afirma que el emisor lo conserve. Para obtener el contenido, el consumidor debe recuperarlo por su RootCID mediante los mecanismos de almacenamiento y recuperación existentes y verificarlo antes de usarlo. La propagación GossipSub tampoco garantiza que un nodo desconectado reciba eventos publicados durante su ausencia.
+
+### Ciclo de vida y límites
+
+Cada nodo inicia el servicio GossipSub, valida y se suscribe al topic de versiones. Al cerrar el nodo se cancela el contexto de GossipSub y se detiene el consumidor de eventos. Los errores de persistencia del índice se reportan en el log local; no se presenta un evento como reconciliado si no pudo registrarse.
+
+Esta fase **no** implementa todavía:
+- Recuperación automática de bloques al recibir un anuncio.
+- Sincronización histórica completa de descriptores para peers que estuvieron desconectados.
+- Factor de redundancia, selección de réplicas o política de retención/pinning.
+- Reparación automática, garbage collection ni disponibilidad garantizada.
+- Autorización o confianza basada únicamente en la firma.
+- Resolución automática de forks, consenso o CRDT.
+
+### Pruebas previstas para esta entrega
+
+La suite añade escenarios de propagación entre tres nodos, rechazo de anuncios malformados y firmas alteradas, recepción fuera de orden, deduplicación idempotente y conservación de bifurcaciones. La aprobación de esta fase depende de que GitHub Actions compile y ejecute la suite completa con la versión de libp2p y GossipSub declarada en `go.mod`.
