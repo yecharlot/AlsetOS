@@ -115,6 +115,7 @@ func (nodo *Nodo) iniciarGossipVersiones() error {
 		nodo.Host,
 		pubsub.WithMessageSigning(true),
 		pubsub.WithStrictSignatureVerification(true),
+		pubsub.WithFloodPublish(true),
 		pubsub.WithMaxMessageSize(maxAnuncioVersion + 4096),
 	)
 	if err != nil {
