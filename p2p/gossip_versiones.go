@@ -134,7 +134,7 @@ func (nodo *Nodo) iniciarGossipVersiones() error {
 		_ = topic.Close()
 		return fmt.Errorf("suscribirse al topic de versiones: %w", err)
 	}
-	nodo.pubsub = ps
+	nodo.gossip = ps
 	nodo.topicVersiones = topic
 	nodo.suscripcionVersiones = sub
 	nodo.cancelarGossip = cancelar
