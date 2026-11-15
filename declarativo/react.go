@@ -1,6 +1,7 @@
 package declarativo
 
 import (
+	"encoding/json"
 	"fmt"
 	"sort"
 	"sync"
@@ -86,6 +87,45 @@ func (s *ReactiveState) HistoryCopy() []InferenceRecord {
 	out := make([]InferenceRecord, len(s.History))
 	copy(out, s.History)
 	return out
+}
+
+// ReactiveSnapshot contiene una instantánea coherente de átomos, dependencias,
+// invalidaciones e historial. Los valores se clonan mediante JSON para evitar
+// compartir mapas o slices mutables con el Runtime.
+type ReactiveSnapshot struct {
+	Atoms   map[string]interface{} `json:"atoms"`
+	Deps    map[string][]string    `json:"deps"`
+	Dirty   map[string]bool        `json:"dirty"`
+	History []InferenceRecord      `json:"history"`
+}
+
+func (s *ReactiveState) ExportSnapshot() (ReactiveSnapshot, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	raw, err := json.Marshal(ReactiveSnapshot{Atoms:s.Atoms, Deps:s.Deps, Dirty:s.Dirty, History:s.History})
+	if err != nil { return ReactiveSnapshot{}, fmt.Errorf("serializar estado reactivo: %w", err) }
+	var snapshot ReactiveSnapshot
+	if err := json.Unmarshal(raw, &snapshot); err != nil { return ReactiveSnapshot{}, fmt.Errorf("clonar estado reactivo: %w", err) }
+	if snapshot.Atoms == nil { snapshot.Atoms = map[string]interface{}{} }
+	if snapshot.Deps == nil { snapshot.Deps = map[string][]string{} }
+	if snapshot.Dirty == nil { snapshot.Dirty = map[string]bool{} }
+	if snapshot.History == nil { snapshot.History = []InferenceRecord{} }
+	return snapshot, nil
+}
+
+// ImportSnapshot reemplaza de forma atómica el estado reactivo por una instantánea
+// ya validada y decodificada. No mezcla átomos antiguos con el snapshot.
+func (s *ReactiveState) ImportSnapshot(snapshot ReactiveSnapshot) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.Atoms = snapshot.Atoms
+	if s.Atoms == nil { s.Atoms = map[string]interface{}{} }
+	s.Deps = snapshot.Deps
+	if s.Deps == nil { s.Deps = map[string][]string{} }
+	s.Dirty = snapshot.Dirty
+	if s.Dirty == nil { s.Dirty = map[string]bool{} }
+	s.History = snapshot.History
+	if s.History == nil { s.History = []InferenceRecord{} }
 }
 
 func asFloat(v interface{}) (float64, bool) {
