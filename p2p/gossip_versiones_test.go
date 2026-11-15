@@ -93,6 +93,12 @@ func TestGossipSubPropagaAnuncioFirmadoATresNodos(t *testing.T) {
 		if len(versiones) != 1 || versiones[0].RootCID != descriptor.RootCID {
 			t.Fatalf("nodo %d no registró exactamente el descriptor anunciado: %+v", i, versiones)
 		}
+		if i > 0 {
+			disponible, err := nodo.almacen.Disponible(root)
+			if err != nil || disponible {
+				t.Fatalf("nodo %d confundió anuncio con disponibilidad del bloque: disponible=%v err=%v", i, disponible, err)
+			}
+		}
 	}
 }
 
