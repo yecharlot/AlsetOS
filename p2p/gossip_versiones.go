@@ -99,7 +99,9 @@ func (nodo *Nodo) consumirAnunciosVersion(ctx context.Context) {
 		}
 		// La validación del topic ya comprobó la firma antes de entregar el
 		// mensaje. Registrar es idempotente y conserva forks e incompletitud.
-		_, _ = nodo.versiones.Registrar(anuncio.Descriptor)
+		if _, err := nodo.versiones.Registrar(anuncio.Descriptor); err != nil {
+			fmt.Printf("[GOSSIP-VERSION-ERROR] organismo=%s root=%s: %v\\n", anuncio.Descriptor.OrganismoID, anuncio.Descriptor.RootCID, err)
+		}
 	}
 }
 
@@ -113,7 +115,7 @@ func (nodo *Nodo) iniciarGossipVersiones() error {
 		nodo.Host,
 		pubsub.WithMessageSigning(true),
 		pubsub.WithStrictSignatureVerification(true),
-		pubsub.WithMaxMessageSize(maxAnuncioVersion),
+		pubsub.WithMaxMessageSize(maxAnuncioVersion + 4096),
 	)
 	if err != nil {
 		cancelar()
