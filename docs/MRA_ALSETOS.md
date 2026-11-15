@@ -317,3 +317,34 @@ La publicación de una versión local registra el proveedor Kademlia después de
 **Límites:** no se garantiza que exista un proveedor disponible; no hay sincronización histórica para eventos perdidos, factor de redundancia, retención/pinning, reparación, selección de confianza ni recuperación paralela multi-peer. La recuperación automática está limitada por tamaño, cola y tiempo, pero aún requiere una política de confianza y cuotas más completa para redes abiertas.
 
 **Pruebas:** la prueba de malla de tres nodos verifica que un anuncio firmado provoca recuperación real del bloque y que el bloque almacenado supera el RootCID esperado. La suite conserva pruebas de rechazo de anuncios malformados, firmas alteradas, deduplicación, orden fuera de secuencia y forks.
+
+
+## Fase 10 — Sincronización de versiones al reconectar y recuperación por RootCID
+
+La Fase 10 cierra la brecha entre los anuncios efímeros GossipSub y los nodos que estuvieron desconectados. Al establecerse una conexión libp2p, cada nodo solicita al peer remoto una instantánea de su inventario de descriptores mediante `/alset/version-sync/1.0.0`.
+
+### Intercambio de inventarios
+
+- El inventario contiene descriptores de versión firmados, no los bytes de los organismos.
+- La respuesta está limitada a 10 000 descriptores y 8 MiB.
+- Cada descriptor se verifica criptográficamente antes de registrarse.
+- El registro conserva idempotencia, linajes incompletos y bifurcaciones.
+- Una sincronización puede repetirse; no altera el significado ni la autoridad de una versión ya registrada.
+- El protocolo de inventario es independiente de GossipSub: los anuncios aceleran el descubrimiento en línea; el inventario al reconectar recupera el historial que el nodo pudo perder.
+
+### Recuperación de contenido
+
+Después de registrar cada descriptor válido, el nodo encola su RootCID en el trabajador de recuperación existente. Este consulta primero al peer del inventario y verifica los bytes contra RootCID antes de almacenarlos. Si el peer no conserva el bloque, el mecanismo intenta los proveedores Kademlia conocidos. Un bloque recuperado se puede anunciar como proveedor, pero la publicación DHT es de mejor esfuerzo y no invalida el contenido local si la tabla de encaminamiento aún no está lista.
+
+### Límites y semántica
+
+- La sincronización no implementa consenso, CRDT ni resolución automática de forks.
+- No hay política de confianza o autorización: firma válida significa procedencia verificable, no permiso.
+- Un descriptor no prueba disponibilidad; un inventario completo no garantiza que todos sus bloques sigan existiendo.
+- La cola de recuperación tiene capacidad 64; si se llena, se registra el descarte de esa solicitud. La sincronización puede repetirse para reencolar bloques pendientes.
+- La respuesta de inventario es una instantánea completa acotada, no paginada. El límite impide crecimiento ilimitado; si se supera, el peer debe usar una futura estrategia de paginación.
+- No se introduce retención, pinning, factor de redundancia, reparación ni descarga paralela multi-peer.
+
+### Pruebas
+
+Se incorpora una prueba de reconexión: un nodo publica una versión mientras el otro está desconectado; al reconectar, el segundo obtiene el descriptor desde el inventario y recupera los bytes por RootCID, comprobando integridad y estado de linaje. También se prueba la sincronización idempotente y la conservación de forks. La suite debe validar que no se ejecuta el organismo por el mero hecho de sincronizar o recuperar su contenido.
