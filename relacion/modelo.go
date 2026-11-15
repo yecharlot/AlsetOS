@@ -19,21 +19,21 @@ const (
 )
 
 type Nodo struct {
- OID string
- Tipo string
- Meta map[string]string
+ OID string `json:"oid"`
+ Tipo string `json:"tipo,omitempty"`
+ Meta map[string]string `json:"meta,omitempty"`
 }
 
 type Relacion struct {
- ID string
- Origen string
- Destino string
- Tipo string
- Direccion string
- Temporalidad string
- Evidencia Evidencia
- Condiciones []string
- Meta map[string]string
+ ID string `json:"id"`
+ Origen string `json:"origen"`
+ Destino string `json:"destino"`
+ Tipo string `json:"tipo"`
+ Direccion string `json:"direccion,omitempty"`
+ Temporalidad string `json:"temporalidad,omitempty"`
+ Evidencia Evidencia `json:"evidencia,omitempty"`
+ Condiciones []string `json:"condiciones,omitempty"`
+ Meta map[string]string `json:"meta,omitempty"`
 }
 
 func (r Relacion) Validar() error {
