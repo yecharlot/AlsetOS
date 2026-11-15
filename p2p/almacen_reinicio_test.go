@@ -1,6 +1,7 @@
 package p2p
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
