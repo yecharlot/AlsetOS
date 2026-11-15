@@ -46,4 +46,8 @@ func TestDHTEncuentraYRecuperaOrganismo(t *testing.T) {
 	if string(recuperado) != string(manifiesto) {
 		t.Fatalf("manifiesto distinto: %s", recuperado)
 	}
+	disponible, err := nodoB.DisponibleLocal(root)
+	if err != nil || !disponible { t.Fatalf("el nodo consumidor debe cachear el bloque verificado: disponible=%v err=%v", disponible, err) }
+	otraVez, err := nodoB.RecuperarOrganismo(ctx, root)
+	if err != nil || string(otraVez) != string(manifiesto) { t.Fatalf("recuperación desde caché local: %v", err) }
 }
