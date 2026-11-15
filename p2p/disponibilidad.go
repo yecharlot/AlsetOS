@@ -132,7 +132,7 @@ func (nodo *Nodo) ConsultarDisponibilidad(ctx context.Context, remoto peer.ID, r
 	stream, err := nodo.Host.NewStream(ctx, remoto, ProtocoloDisponibilidad)
 	if err != nil { return ReciboDisponibilidad{}, fmt.Errorf("consultar disponibilidad en %s: %w", remoto, err) }
 	defer stream.Close()
-	if err := json.NewEncoder(stream).Encode(consultaDisponibilidad{Schema:schemaSolicitudDisponibilidad,RootCID:root,Nonce:nonceTexto}); err != nil { return ReciboDisponibilidad{}, err }
+	if err := json.NewEncoder(stream).Encode(consultaDisponibilidad{Schema:schemaConsultaDisponibilidad,RootCID:root,Nonce:nonceTexto}); err != nil { return ReciboDisponibilidad{}, err }
 	limitado := &io.LimitedReader{R:stream,N:16<<10}
 	var recibo ReciboDisponibilidad
 	if err := json.NewDecoder(bufio.NewReader(limitado)).Decode(&recibo); err != nil { return ReciboDisponibilidad{}, fmt.Errorf("leer recibo de disponibilidad: %w", err) }
