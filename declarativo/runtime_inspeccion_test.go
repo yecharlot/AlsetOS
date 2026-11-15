@@ -19,7 +19,7 @@ func TestEvaluateRuleReadOnly_NoMutaRuntime(t *testing.T) {
 }
 
 func TestRulesFor_ReturnsCopy(t *testing.T) {
-	rule:=Rule{ID:"r",When:[]Condition{{Path:"x",Op:"exists"}}}
+	rule:=Rule{ID:"r",When:[]Condition{{Path:"x",Op:"exists"}},ThenPath:"salida"}
 	rt,err:=NewRuntime("")
 	if err!=nil{t.Fatal(err)}
 	if err:=rt.LoadAssembly([]OrgDecl{{OID:"a",Name:"A",Version:"1",Kind:"ORGES",Rules:[]Rule{rule}}});err!=nil{t.Fatal(err)}
