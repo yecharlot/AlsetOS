@@ -64,7 +64,7 @@ GossipSub aplica firma y verificación estricta del mensaje libp2p. El topic uti
 - RootCID permite recuperar/verificar el bloque; recibir un anuncio no prueba que el bloque esté disponible.
 - La firma acredita procedencia, no autorización ni confianza.
 
-GossipSub no conserva mensajes para nodos desconectados. La sincronización histórica de descriptores, la recuperación automática de bloques, las políticas de retención, la reparación y el factor de redundancia siguen pendientes.
+GossipSub no conserva mensajes para nodos desconectados. La sincronización histórica, la recuperación, la retención local y la reparación se implementan en fases posteriores descritas en este documento.
 
 
 ## Recuperación automática de versiones anunciadas
@@ -87,7 +87,7 @@ El protocolo `/alset/content-availability/1.0.0` permite preguntar a un peer si 
 
 `ConsultarDisponibilidad` valida firma, derivación del PeerID, desafío y caducidad. El recibo demuestra que el peer pudo entregar evidencia de disponibilidad local en ese instante; no garantiza retención futura, honestidad general ni autorización.
 
-`AsegurarRedundancia(ctx, descriptor, contenido, factor)` cuenta la copia local y replica explícitamente a peers conectados hasta alcanzar el factor solicitado (1..32). Una copia remota solo cuenta después de obtener un recibo firmado y fresco. Si no hay peers suficientes, devuelve el estado parcial y un error; no presenta el objetivo como cumplido. El factor incluye al nodo coordinador.
+`AsegurarRedundancia(ctx, descriptor, contenido, factor)` cuenta la copia local y replica explícitamente a peers conectados hasta alcanzar el factor solicitado (1..32). Una copia remota solo cuenta después de obtener un lease de retención aceptado, firmado y vigente. El recibo de disponibilidad sigue siendo una prueba puntual, pero ya no basta para elevar el factor contractual. Si no hay peers autorizados y capacidad suficiente, devuelve el estado parcial y un error; no presenta el objetivo como cumplido. El factor incluye al nodo coordinador.
 
 La replicación es secuencial y limitada a peers ya conectados en esta entrega. No hay selección por reputación, reserva contractual de espacio, pinning persistente, renovación automática de recibos, reparación periódica ni garantía de disponibilidad global. Los forks siguen siendo evidencias separadas: la operación requiere un descriptor concreto y nunca escoge una versión por fecha.
 
@@ -103,3 +103,35 @@ La política persiste separada del índice de versiones y del almacén de bloque
 `IniciarMantenimiento(intervalo)` activa, de forma opt-in, un worker periódico (mínimo un minuto, timeout de 30 segundos por ciclo). `Cerrar` cancela y espera el worker. No se inicia automáticamente para evitar tráfico y carga de almacenamiento no solicitados por la configuración de cada despliegue.
 
 Límites: no hay reserva contractual de espacio remoto, cuota por peer, penalizaciones, consenso ni garantía de retención futura. La reparación solo puede recuperar datos si existe al menos una copia íntegra accesible. Si todas las copias desaparecen o los proveedores no responden, la política queda registrada y el error se informa; no se inventa ni reconstruye contenido.
+
+
+## Fase 13 — Compromisos distribuidos de retención
+
+El protocolo `/alset/retention-lease/1.0.0` permite solicitar un compromiso temporal de conservación a un peer que ya recibió y verificó el bloque. El solicitante firma la petición; el proveedor verifica que la identidad criptográfica corresponde al peer conectado, valida el descriptor/RootCID y emite un lease firmado por su propia identidad. El lease identifica RootCID, OrganismoID, solicitante, proveedor, tamaño, emisión y expiración.
+
+### Autorización y capacidad
+
+La política es de denegación por defecto. El operador del proveedor debe configurar explícitamente `AutorizarRetencionRemota(peerID, cuotaBytes)` y `ConfigurarCapacidadRetencion(bytes)`. La firma de un descriptor, una conexión P2P o una identidad válida nunca conceden permiso por sí solas.
+
+El proveedor rechaza solicitudes si:
+- el solicitante no está autorizado;
+- el bloque no está presente o no supera la verificación de RootCID;
+- no existe capacidad global configurada;
+- la cuota del solicitante o la capacidad global se superarían;
+- la solicitud, el descriptor o la firma no son válidos.
+
+La autorización por peer y la capacidad configurada son parámetros operativos locales en memoria. Tras reiniciar, el nodo vuelve a denegar solicitudes hasta que el operador configure de nuevo esos límites. Los leases aceptados sí se persisten en `leases-retencion.json` mediante escritura atómica y modo restrictivo.
+
+### Ciclo de vida y factor de redundancia
+
+`SolicitarRetencionRemota` obtiene un compromiso firmado y vigente; `RenovarLeaseRemoto` extiende un lease existente sin permitir cambiar su identidad ni su RootCID; `LiberarLeaseRemoto` termina el compromiso; `ExpirarLeases` elimina del registro los leases vencidos. El mantenimiento opt-in también ejecuta la expiración. La expiración y liberación no borran el bloque físico ni activan garbage collection.
+
+`AsegurarRedundancia` cuenta la copia local y los leases remotos firmados que estén vigentes. Una transferencia de bytes o un recibo de disponibilidad puntual no bastan para contar una réplica como comprometida. La duración usada por la operación automática es de 24 horas; el llamador puede solicitar y renovar leases con duraciones explícitas de hasta 30 días.
+
+### Límites
+
+- El lease firmado acredita un compromiso verificable del nodo proveedor durante una ventana temporal; no garantiza que el hardware, proceso o almacenamiento no fallen ni que el nodo no incumpla.
+- No hay pago, penalización, reputación, consenso ni adjudicación de disputas.
+- No hay reserva remota independiente del nodo que firma el lease ni medición automática del espacio libre del sistema operativo; la capacidad es configurada por el operador.
+- Las cuotas y autorizaciones no se infieren de la firma del autor y no se restauran automáticamente tras reinicio.
+- Liberar o expirar un lease no elimina el bloque; la recolección de basura queda fuera de esta fase.
