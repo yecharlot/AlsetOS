@@ -112,3 +112,47 @@ func (a *AlmacenContenido) Disponible(root string) (bool, error) {
 	if err != nil { return false, err }
 	return true, nil
 }
+
+
+// Reparar restaura un bloque ausente o corrupto solo cuando los bytes nuevos
+// verifican el RootCID esperado. Un bloque ya íntegro nunca se sobrescribe.
+func (a *AlmacenContenido) Reparar(root string, contenido []byte) error {
+	if a == nil { return fmt.Errorf("almacén de contenido nulo") }
+	if err := rootcid.Verificar(contenido, root); err != nil { return err }
+	digest, err := rutaBloque(root)
+	if err != nil { return err }
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.dir == "" {
+		if actual, ok := a.memoria[root]; ok {
+			if err := rootcid.Verificar(actual, root); err == nil {
+				if !bytes.Equal(actual, contenido) { return fmt.Errorf("colisión de contenido para %s", root) }
+				return nil
+			}
+		}
+		a.memoria[root] = append([]byte(nil), contenido...)
+		return nil
+	}
+	dir := filepath.Join(a.dir, digest[:2])
+	if err := os.MkdirAll(dir, 0700); err != nil { return err }
+	destino := filepath.Join(dir, digest)
+	actual, leerErr := os.ReadFile(destino)
+	if leerErr == nil && rootcid.Verificar(actual, root) == nil {
+		if !bytes.Equal(actual, contenido) { return fmt.Errorf("colisión de contenido para %s", root) }
+		return nil
+	}
+	if leerErr != nil && !os.IsNotExist(leerErr) { return fmt.Errorf("leer bloque para reparar: %w", leerErr) }
+	tmp, err := os.CreateTemp(dir, ".repair-*")
+	if err != nil { return err }
+	nombre := tmp.Name()
+	ok := false
+	defer func(){ if !ok { _ = os.Remove(nombre) } }()
+	if err := tmp.Chmod(0600); err != nil { _ = tmp.Close(); return err }
+	if _, err := tmp.Write(contenido); err != nil { _ = tmp.Close(); return err }
+	if err := tmp.Sync(); err != nil { _ = tmp.Close(); return err }
+	if err := tmp.Close(); err != nil { return err }
+	if err := os.Rename(nombre, destino); err != nil { return err }
+	if d, err := os.Open(dir); err == nil { _ = d.Sync(); _ = d.Close() }
+	ok = true
+	return nil
+}
