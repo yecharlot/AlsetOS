@@ -3,41 +3,47 @@ package mind
 import (
 	"fmt"
 	"reflect"
+	"sort"
 
 	"github.com/yecharlot/AlsetOS/declarativo"
+	"github.com/yecharlot/AlsetOS/relacion"
 	"github.com/yecharlot/AlsetOS/zyrion"
 )
 
 const (
+	// TipoRelacionFractal habilita explícitamente una arista para expandir
+	// una evaluación indeterminada al siguiente nivel.
+	TipoRelacionFractal              = "contexto-fractal"
 	profundidadFractalPredeterminada = 8
 	maxOrganismosFractal             = 256
 )
 
 // NivelEvaluacion conserva el resultado y la procedencia de un nivel.
 // Hijos contiene las evaluaciones del mismo contrato de regla en organismos
-// relacionalmente adyacentes.
+// conectados mediante relaciones explícitamente fractales.
 type NivelEvaluacion struct {
-	OID        string             `json:"oid"`
-	Profundidad int                `json:"profundidad"`
-	Estado     zyrion.Valor       `json:"estado"`
-	Evidencias []string           `json:"evidencias,omitempty"`
-	Motivo     string             `json:"motivo,omitempty"`
-	Hijos      []NivelEvaluacion  `json:"hijos,omitempty"`
+	OID         string            `json:"oid"`
+	Profundidad int               `json:"profundidad"`
+	Estado      zyrion.Valor      `json:"estado"`
+	Evidencias  []string          `json:"evidencias,omitempty"`
+	Motivo      string            `json:"motivo,omitempty"`
+	Hijos       []NivelEvaluacion `json:"hijos,omitempty"`
 }
 
 // EvaluacionFractal es una traza completa. No es una autorización ni ejecuta
 // acciones: representa exclusivamente el resultado lógico y su procedencia.
 type EvaluacionFractal struct {
-	ReglaID             string           `json:"regla_id"`
-	Estado              zyrion.Valor     `json:"estado"`
-	Raiz                NivelEvaluacion  `json:"raiz"`
-	ProfundidadMaxima   int              `json:"profundidad_maxima"`
-	OrganismosEvaluados int              `json:"organismos_evaluados"`
+	ReglaID             string          `json:"regla_id"`
+	Estado              zyrion.Valor    `json:"estado"`
+	Raiz                NivelEvaluacion `json:"raiz"`
+	ProfundidadMaxima   int             `json:"profundidad_maxima"`
+	OrganismosEvaluados int             `json:"organismos_evaluados"`
 }
 
 // EvaluarFractal aplica una misma regla declarada a través de niveles de
 // organismos relacionados cuando Zyrion devuelve 2 (indeterminado).
 //
+// Solo las relaciones cuyo Tipo es TipoRelacionFractal habilitan la expansión.
 // Política de resolución: un nivel solo se resuelve si todos sus hijos
 // aplicables terminan en el mismo estado determinado (0 o 1). Si hay
 // desacuerdo, incertidumbre, ciclo o límite alcanzado, permanece en 2.
@@ -71,7 +77,6 @@ func (Mente) EvaluarFractal(rt *declarativo.Runtime, oid, ruleID string, maxDept
 		return EvaluacionFractal{}, fmt.Errorf("regla %q no declarada en %s", ruleID, oid)
 	}
 
-	visited := map[string]bool{}
 	evaluated := 0
 	var walk func(string, int, map[string]bool) (NivelEvaluacion, error)
 	walk = func(current string, depth int, path map[string]bool) (NivelEvaluacion, error) {
@@ -79,7 +84,6 @@ func (Mente) EvaluarFractal(rt *declarativo.Runtime, oid, ruleID string, maxDept
 			return NivelEvaluacion{OID: current, Profundidad: depth, Estado: zyrion.Incierto, Motivo: "límite de organismos alcanzado"}, nil
 		}
 		evaluated++
-		visited[current] = true
 		record, rule, err := rt.EvaluateRuleReadOnly(current, ruleID)
 		if err != nil {
 			return NivelEvaluacion{}, err
@@ -101,7 +105,7 @@ func (Mente) EvaluarFractal(rt *declarativo.Runtime, oid, ruleID string, maxDept
 			node.Motivo = "estado 2: límite de profundidad alcanzado"
 			return node, nil
 		}
-		neighbors, err := rt.RelatedOrganisms(current)
+		neighbors, err := vecinosFractales(rt, current)
 		if err != nil {
 			return NivelEvaluacion{}, err
 		}
@@ -146,7 +150,7 @@ func (Mente) EvaluarFractal(rt *declarativo.Runtime, oid, ruleID string, maxDept
 			node.Motivo = "todos los niveles hijos aplicables convergen en False"
 		default:
 			if len(node.Hijos) == 0 {
-				node.Motivo = "estado 2: no existe un nivel relacionado con la misma regla"
+				node.Motivo = "estado 2: no existe un nivel fractal relacionado con la misma regla"
 			} else {
 				node.Motivo = "estado 2: los niveles hijos no alcanzan un consenso determinado"
 			}
@@ -162,6 +166,30 @@ func (Mente) EvaluarFractal(rt *declarativo.Runtime, oid, ruleID string, maxDept
 		ReglaID: ruleID, Estado: root.Estado, Raiz: root,
 		ProfundidadMaxima: maxDepth, OrganismosEvaluados: evaluated,
 	}, nil
+}
+
+func vecinosFractales(rt *declarativo.Runtime, oid string) ([]string, error) {
+	context, err := rt.RelationalContext(oid)
+	if err != nil {
+		return nil, err
+	}
+	set := map[string]bool{}
+	for _, edge := range context.Salientes {
+		if edge.Tipo == TipoRelacionFractal {
+			set[edge.Destino] = true
+		}
+	}
+	for _, edge := range context.Entrantes {
+		if edge.Tipo == TipoRelacionFractal {
+			set[edge.Origen] = true
+		}
+	}
+	out := make([]string, 0, len(set))
+	for neighbor := range set {
+		out = append(out, neighbor)
+	}
+	sort.Strings(out)
+	return out, nil
 }
 
 func estadoDesdeTexto(value string) zyrion.Valor {
