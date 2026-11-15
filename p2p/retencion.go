@@ -118,7 +118,8 @@ func (n *Nodo) FijarVersion(d DescriptorVersion,factor int) error {
 	for _,v:=range n.versiones.Versiones(d.OrganismoID){if v.RootCID==d.RootCID&&v.Firma==d.Firma{conocida=true;break}}
 	if !conocida{return fmt.Errorf("el descriptor no está registrado en el índice local")}
 	disponible,err:=n.almacen.Disponible(d.RootCID)
-	if err!=nil||!disponible{return fmt.Errorf("no se puede fijar contenido ausente o corrupto: %w",err)}
+	if err!=nil{return fmt.Errorf("no se puede fijar contenido corrupto: %w",err)}
+	if !disponible{return fmt.Errorf("no se puede fijar contenido ausente: %s",d.RootCID)}
 	return n.retenciones.FijarVersion(d,factor,time.Now().UTC())
 }
 
@@ -175,7 +176,7 @@ func (n *Nodo) leerBloquePeer(ctx context.Context,p peer.ID,root string)([]byte,
 	stream,err:=n.Host.NewStream(ctx,p,ProtocoloOrganismo);if err!=nil{return nil,err}
 	defer stream.Close()
 	if err:=json.NewEncoder(stream).Encode(solicitudOrganismo{Operacion:"obtener",RootCID:root});err!=nil{return nil,err}
-	limitado:=io.LimitedReader{R:stream,N:maxContenidoVersion+(1<<20)}
+	limitado:=io.LimitedReader{R:stream,N:maxSolicitudVersion}
 	var respuesta respuestaOrganismo
 	if err:=json.NewDecoder(&limitado).Decode(&respuesta);err!=nil{return nil,err}
 	if respuesta.Error!=""||respuesta.RootCID!=root||limitado.N<=0{return nil,fmt.Errorf("peer no entregó el RootCID solicitado")}
