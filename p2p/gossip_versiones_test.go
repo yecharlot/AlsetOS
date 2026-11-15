@@ -3,13 +3,32 @@ package p2p
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/yecharlot/AlsetOS/identidad"
 	"github.com/yecharlot/AlsetOS/rootcid"
 )
+
+func conectarConReintentos(ctx context.Context, origen *Nodo, destino *Nodo) error {
+	info := peer.AddrInfo{ID: destino.ID(), Addrs: destino.Host.Addrs()}
+	for {
+		err := origen.Host.Connect(ctx, info)
+		if err == nil || origen.Host.Network().Connectedness(destino.ID()) == network.Connected {
+			return nil
+		}
+		timer := time.NewTimer(250 * time.Millisecond)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return fmt.Errorf("conectar peer %s: %w (último error: %v)", destino.ID(), ctx.Err(), err)
+		case <-timer.C:
+		}
+	}
+}
 
 func crearTrioGossip(t *testing.T) ([]*Nodo, context.Context, context.CancelFunc) {
 	t.Helper()
@@ -37,7 +56,7 @@ func crearTrioGossip(t *testing.T) ([]*Nodo, context.Context, context.CancelFunc
 	t.Cleanup(cancel)
 	for i := range nodos {
 		for j := i + 1; j < len(nodos); j++ {
-			if err := nodos[i].Host.Connect(ctx, peer.AddrInfo{ID: nodos[j].ID(), Addrs: nodos[j].Host.Addrs()}); err != nil {
+			if err := conectarConReintentos(ctx, nodos[i], nodos[j]); err != nil {
 				t.Fatalf("conectar nodos %d y %d: %v", i, j, err)
 			}
 		}
