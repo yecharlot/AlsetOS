@@ -121,7 +121,7 @@ func (nodo *Nodo) iniciarGossipVersiones() error {
 		cancelar()
 		return fmt.Errorf("crear GossipSub: %w", err)
 	}
-	if err := ps.RegisterTopicValidator(TopicAnunciosVersion, pubsub.ValidatorEx(validarMensajeAnuncioVersion), pubsub.WithValidatorInline(true)); err != nil {
+	if err := ps.RegisterTopicValidator(TopicAnunciosVersion, pubsub.Validator(validarMensajeAnuncioVersion), pubsub.WithValidatorInline(true)); err != nil {
 		cancelar()
 		return fmt.Errorf("registrar validador de anuncios: %w", err)
 	}
