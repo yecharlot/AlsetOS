@@ -79,3 +79,14 @@ La recuperación no ejecuta organismos ni concede capacidades. Un anuncio no gar
 Al establecerse una conexión libp2p, el nodo solicita al peer una instantánea acotada de sus descriptores firmados mediante `/alset/version-sync/1.0.0`. Cada descriptor se verifica y se registra de forma idempotente; después se encola la recuperación de su RootCID por el canal de contenido ya existente. La sincronización intercambia inventarios, no bloques. Los bloques se obtienen del peer que aporta el inventario y, si no está disponible, de proveedores Kademlia.
 
 La sincronización conserva revisiones fuera de orden y forks. No hay selección de ganador, consenso ni autorización implícita. Los límites actuales son 10 000 descriptores y 8 MiB por inventario; la cola de recuperación sigue siendo acotada. Una cola llena se informa y puede corregirse ejecutando de nuevo `SincronizarVersiones`. La conexión no demuestra que todos los datos estén disponibles.
+
+
+## Disponibilidad verificable y redundancia
+
+El protocolo `/alset/content-availability/1.0.0` permite preguntar a un peer si conserva localmente un RootCID. El solicitante envía un desafío aleatorio; el receptor solo emite un recibo si el almacén vuelve a leer y verificar los bytes. El recibo liga RootCID, PeerID, clave pública, desafío y ventana temporal, y queda firmado con la identidad Ed25519 del nodo.
+
+`ConsultarDisponibilidad` valida firma, derivación del PeerID, desafío y caducidad. El recibo demuestra que el peer pudo entregar evidencia de disponibilidad local en ese instante; no garantiza retención futura, honestidad general ni autorización.
+
+`AsegurarRedundancia(ctx, descriptor, contenido, factor)` cuenta la copia local y replica explícitamente a peers conectados hasta alcanzar el factor solicitado (1..32). Una copia remota solo cuenta después de obtener un recibo firmado y fresco. Si no hay peers suficientes, devuelve el estado parcial y un error; no presenta el objetivo como cumplido. El factor incluye al nodo coordinador.
+
+La replicación es secuencial y limitada a peers ya conectados en esta entrega. No hay selección por reputación, reserva contractual de espacio, pinning persistente, renovación automática de recibos, reparación periódica ni garantía de disponibilidad global. Los forks siguen siendo evidencias separadas: la operación requiere un descriptor concreto y nunca escoge una versión por fecha.
