@@ -20,7 +20,7 @@ func TestLeaseRetencionDeniegaPorDefectoYAceptaCompromiso(t *testing.T) {
 	a,err:=Nuevo(idA,"/ip4/127.0.0.1/tcp/0");if err!=nil{t.Fatal(err)};defer a.Cerrar()
 	b,err:=Nuevo(idB,"/ip4/127.0.0.1/tcp/0");if err!=nil{t.Fatal(err)};defer b.Cerrar()
 	ctx,cancel:=context.WithTimeout(context.Background(),15*time.Second);defer cancel()
-	if err:=a.Host.Connect(ctx,peer.AddrInfo{ID:b.ID(),Addrs:b.Host.Addrs()});err!=nil{t.Fatal(err)}
+	if err:=a.Host.Connect(ctx,peer.AddrInfo{ID:b.ID(),Addrs:b.Host.Network().ListenAddresses()});err!=nil{t.Fatal(err)}
 	reconectar:=func(){if err:=a.Host.Connect(ctx,peer.AddrInfo{ID:b.ID(),Addrs:b.Host.Addrs()});err!=nil{t.Fatal(err)}}
 	data:=[]byte("contenido que debe quedar retenido")
 	root:=rootcid.CrearContenido(data)
