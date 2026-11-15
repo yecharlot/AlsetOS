@@ -348,3 +348,38 @@ Después de registrar cada descriptor válido, el nodo encola su RootCID en el t
 ### Pruebas
 
 Se incorpora una prueba de reconexión: un nodo publica una versión mientras el otro está desconectado; al reconectar, el segundo obtiene el descriptor desde el inventario y recupera los bytes por RootCID, comprobando integridad y estado de linaje. También se prueba la sincronización idempotente y la conservación de forks. La suite debe validar que no se ejecuta el organismo por el mero hecho de sincronizar o recuperar su contenido.
+
+
+## Fase 11 — Prueba de disponibilidad y redundancia verificable
+
+Esta fase añade una primera medición operativa de disponibilidad que no confunde anuncios DHT, inventarios o descriptores firmados con posesión real del contenido.
+
+### Recibo de disponibilidad
+
+El protocolo `/alset/content-availability/1.0.0` usa un desafío aleatorio del solicitante. El peer remoto responde únicamente si `AlmacenContenido.Disponible` puede leer y verificar el RootCID. El recibo incluye schema, RootCID, PeerID, clave pública, nonce, emisión, expiración y firma Ed25519. El solicitante verifica que:
+- el recibo corresponde al RootCID y al desafío recién enviado;
+- el PeerID deriva de la clave pública incluida;
+- la firma cubre todos los campos;
+- la ventana temporal no está vencida ni excede el máximo permitido.
+
+El desafío evita reutilizar una respuesta antigua como prueba de una consulta nueva. El recibo es evidencia temporal de disponibilidad local, no promesa de retención, reputación, confianza o autorización.
+
+### Factor de redundancia
+
+`AsegurarRedundancia(ctx, descriptor, contenido, factor)` recibe una versión explícita, verifica su firma y RootCID, exige que el coordinador conserve su propia copia y replica a peers conectados de forma determinista. El factor permitido es 1..32 e incluye la copia local. Cada copia remota solo se contabiliza después de una consulta de disponibilidad con recibo válido y fresco. La operación devuelve el número de copias verificadas y resultados individuales; si no alcanza el objetivo, informa redundancia insuficiente sin ocultar el progreso parcial.
+
+La transferencia puede registrar el descriptor aunque el linaje remoto quede incompleto o en conflicto; eso no invalida por sí solo la copia del bloque. Por ello la disponibilidad se comprueba mediante el protocolo independiente y no se deduce del estado del linaje.
+
+### Límites deliberados
+
+- Solo se consideran peers conectados en el momento de la operación.
+- La replicación es secuencial; no se añade todavía descarga/subida paralela.
+- No hay retención/pinning persistente, reserva de almacenamiento, renovación de recibos ni reparación automática tras una caída.
+- Un recibo firmado no impide que el peer borre el bloque inmediatamente después.
+- No hay política de confianza o autorización; firma válida acredita procedencia criptográfica.
+- No se introduce consenso, CRDT ni resolución automática de forks.
+- La disponibilidad de una versión concreta no implica que esa versión sea la autorizada para ejecutar.
+
+### Pruebas
+
+Se prueba que un peer sin bloque no puede emitir un recibo válido, que la replicación eleva el factor solo tras confirmación firmada, y que se rechazan recibos caducados o ligados a otro desafío. La CI debe ejecutar estas pruebas junto con la suite completa y los escenarios de integración existentes.
