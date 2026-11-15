@@ -194,7 +194,9 @@ func (n *Nodo) RenovarLeaseRemoto(ctx context.Context, lease LeaseRetencion, dur
 	lease.Emitido=time.Now().UTC();lease.Expira=lease.Emitido.Add(duracion);lease.Firma=""
 	s:=solicitudLease{Accion:"renovar",Lease:lease,ClavePublica:base64.StdEncoding.EncodeToString(n.Identidad.ClavePublica)}
 	payload,_:=json.Marshal(solicitudLeaseFirmable{s.Accion,s.Lease,DescriptorVersion{},s.ClavePublica});s.Firma=base64.StdEncoding.EncodeToString(n.Identidad.Firmar(payload))
-	return n.enviarSolicitudLease(ctx,peer.ID(lease.Proveedor),s)
+	destino,err:=peer.Decode(lease.Proveedor)
+	if err!=nil{return LeaseRetencion{},fmt.Errorf("PeerID del proveedor inválido: %w",err)}
+	return n.enviarSolicitudLease(ctx,destino,s)
 }
 // LiberarLeaseRemoto termina el compromiso contractual sin borrar el bloque.
 func (n *Nodo) LiberarLeaseRemoto(ctx context.Context, lease LeaseRetencion) error {
@@ -203,7 +205,9 @@ func (n *Nodo) LiberarLeaseRemoto(ctx context.Context, lease LeaseRetencion) err
 	s:=solicitudLease{Accion:"liberar",Lease:lease,ClavePublica:base64.StdEncoding.EncodeToString(n.Identidad.ClavePublica)}
 	payload,_:=json.Marshal(solicitudLeaseFirmable{s.Accion,s.Lease,DescriptorVersion{},s.ClavePublica})
 	s.Firma=base64.StdEncoding.EncodeToString(n.Identidad.Firmar(payload))
-	_,err:=n.enviarSolicitudLease(ctx,peer.ID(lease.Proveedor),s)
+	destino,err:=peer.Decode(lease.Proveedor)
+	if err!=nil{return fmt.Errorf("PeerID del proveedor inválido: %w",err)}
+	_,err=n.enviarSolicitudLease(ctx,destino,s)
 	return err
 }
 
