@@ -3,6 +3,7 @@ package p2p
 import (
 	"context"
 	"path/filepath"
+	"strings"
 	"encoding/json"
 	"encoding/base64"
 	"testing"
@@ -20,28 +21,29 @@ func TestLeaseRetencionDeniegaPorDefectoYAceptaCompromiso(t *testing.T) {
 	b,err:=Nuevo(idB,"/ip4/127.0.0.1/tcp/0");if err!=nil{t.Fatal(err)};defer b.Cerrar()
 	ctx,cancel:=context.WithTimeout(context.Background(),15*time.Second);defer cancel()
 	if err:=a.Host.Connect(ctx,peer.AddrInfo{ID:b.ID(),Addrs:b.Host.Addrs()});err!=nil{t.Fatal(err)}
+	reconectar:=func(){if err:=a.Host.Connect(ctx,peer.AddrInfo{ID:b.ID(),Addrs:b.Host.Addrs()});err!=nil{t.Fatal(err)}}
 	data:=[]byte("contenido que debe quedar retenido")
 	root:=rootcid.CrearContenido(data)
 	d,err:=CrearDescriptorVersion(idA,"organismo:lease",1,root,"");if err!=nil{t.Fatal(err)}
 	if err:=a.almacen.Guardar(root,data);err!=nil{t.Fatal(err)}
 	if _,err:=a.versiones.Registrar(d);err!=nil{t.Fatal(err)}
 	if _,err:=a.ReplicarDescriptor(ctx,b.ID(),d,data);err!=nil{t.Fatal(err)}
-	if _,err:=a.SolicitarRetencionRemota(ctx,b.ID(),d,time.Hour);err==nil{t.Fatal("el nodo receptor aceptó una solicitud sin autorización")}
+	reconectar();if _,err:=a.SolicitarRetencionRemota(ctx,b.ID(),d,time.Hour);err==nil||!strings.Contains(err.Error(),"no autorizado"){t.Fatalf("rechazo por defecto incorrecto: %v",err)}
 	if err:=b.ConfigurarCapacidadRetencion(1);err!=nil{t.Fatal(err)}
 	if err:=b.AutorizarRetencionRemota(a.ID(),1<<20);err!=nil{t.Fatal(err)}
-	if _,err:=a.SolicitarRetencionRemota(ctx,b.ID(),d,time.Hour);err==nil{t.Fatal("el nodo receptor aceptó sin capacidad global suficiente")}
+	reconectar();if _,err:=a.SolicitarRetencionRemota(ctx,b.ID(),d,time.Hour);err==nil||!strings.Contains(err.Error(),"capacidad"){t.Fatalf("rechazo por capacidad incorrecto: %v",err)}
 	if err:=b.ConfigurarCapacidadRetencion(1<<20);err!=nil{t.Fatal(err)}
 	if err:=b.AutorizarRetencionRemota(a.ID(),1);err!=nil{t.Fatal(err)}
-	if _,err:=a.SolicitarRetencionRemota(ctx,b.ID(),d,time.Hour);err==nil{t.Fatal("el nodo receptor aceptó superando la cuota del peer")}
+	reconectar();if _,err:=a.SolicitarRetencionRemota(ctx,b.ID(),d,time.Hour);err==nil||!strings.Contains(err.Error(),"cuota"){t.Fatalf("rechazo por cuota incorrecto: %v",err)}
 	if err:=b.AutorizarRetencionRemota(a.ID(),1<<20);err!=nil{t.Fatal(err)}
-	lease,err:=a.SolicitarRetencionRemota(ctx,b.ID(),d,time.Hour);if err!=nil{t.Fatal(err)}
+	reconectar();lease,err:=a.SolicitarRetencionRemota(ctx,b.ID(),d,time.Hour);if err!=nil{t.Fatal(err)}
 	if lease.Bytes!=int64(len(data))||lease.Proveedor!=b.ID().String()||!verificarFirmaLease(lease){t.Fatalf("lease devuelto no verificable: %+v",lease)}
 	if len(b.LeasesRetencion())!=1{t.Fatalf("lease no persistido en proveedor: %+v",b.LeasesRetencion())}
-	repetido,err:=a.SolicitarRetencionRemota(ctx,b.ID(),d,time.Hour);if err!=nil{t.Fatalf("repetir solicitud idempotente: %v",err)}
+	reconectar();repetido,err:=a.SolicitarRetencionRemota(ctx,b.ID(),d,time.Hour);if err!=nil{t.Fatalf("repetir solicitud idempotente: %v",err)}
 	if repetido.ID!=lease.ID||len(b.LeasesRetencion())!=1{t.Fatalf("la solicitud repetida duplicó el compromiso: primero=%s segundo=%s leases=%+v",lease.ID,repetido.ID,b.LeasesRetencion())}
-	renovado,err:=a.RenovarLeaseRemoto(ctx,lease,2*time.Hour);if err!=nil{t.Fatal(err)}
+	reconectar();renovado,err:=a.RenovarLeaseRemoto(ctx,lease,2*time.Hour);if err!=nil{t.Fatal(err)}
 	if !renovado.Expira.After(lease.Expira){t.Fatalf("la renovación no extendió el compromiso: anterior=%s nuevo=%s",lease.Expira,renovado.Expira)}
-	if err:=a.LiberarLeaseRemoto(ctx,renovado);err!=nil{t.Fatalf("liberar lease: %v",err)}
+	reconectar();if err:=a.LiberarLeaseRemoto(ctx,renovado);err!=nil{t.Fatalf("liberar lease: %v",err)}
 	if len(b.LeasesRetencion())!=0{t.Fatalf("la liberación no retiró el compromiso: %+v",b.LeasesRetencion())}
 	alterado:=renovado;alterado.RootCID=rootcid.CrearContenido([]byte("otro contenido"))
 	if verificarFirmaLease(alterado){t.Fatal("se aceptó un lease alterado")}
