@@ -195,6 +195,17 @@ func (n *Nodo) RenovarLeaseRemoto(ctx context.Context, lease LeaseRetencion, dur
 	payload,_:=json.Marshal(solicitudLeaseFirmable{s.Accion,s.Lease,DescriptorVersion{},s.ClavePublica});s.Firma=base64.StdEncoding.EncodeToString(n.Identidad.Firmar(payload))
 	return n.enviarSolicitudLease(ctx,peer.ID(lease.Proveedor),s)
 }
+// LiberarLeaseRemoto termina el compromiso contractual sin borrar el bloque.
+func (n *Nodo) LiberarLeaseRemoto(ctx context.Context, lease LeaseRetencion) error {
+	if n==nil||n.Identidad==nil{return fmt.Errorf("nodo no inicializado")}
+	lease.Firma=""
+	s:=solicitudLease{Accion:"liberar",Lease:lease,ClavePublica:base64.StdEncoding.EncodeToString(n.Identidad.ClavePublica)}
+	payload,_:=json.Marshal(solicitudLeaseFirmable{s.Accion,s.Lease,DescriptorVersion{},s.ClavePublica})
+	s.Firma=base64.StdEncoding.EncodeToString(n.Identidad.Firmar(payload))
+	_,err:=n.enviarSolicitudLease(ctx,peer.ID(lease.Proveedor),s)
+	return err
+}
+
 func (n *Nodo) enviarSolicitudLease(ctx context.Context,destino peer.ID,s solicitudLease)(LeaseRetencion,error){
 	stream,err:=n.Host.NewStream(ctx,destino,ProtocoloLeaseRetencion);if err!=nil{return LeaseRetencion{},err};defer stream.Close()
 	if err:=json.NewEncoder(stream).Encode(s);err!=nil{return LeaseRetencion{},err}
@@ -212,11 +223,23 @@ func (n *Nodo) recibirSolicitudLease(stream network.Stream) {
 	if err:=json.NewDecoder(bufio.NewReader(lim)).Decode(&s);err!=nil||lim.N<=0{_ = json.NewEncoder(stream).Encode(respuestaLease{Motivo:"solicitud inválida"});return}
 	remoto:=stream.Conn().RemotePeer()
 	if err:=verificarSolicitudLease(s,remoto);err!=nil{_ = json.NewEncoder(stream).Encode(respuestaLease{Motivo:err.Error()});return}
-	if s.Accion!="aceptar"&&s.Accion!="renovar"{_ = json.NewEncoder(stream).Encode(respuestaLease{Motivo:"acción no soportada"});return}
+	if s.Accion!="aceptar"&&s.Accion!="renovar"&&s.Accion!="liberar"{_ = json.NewEncoder(stream).Encode(respuestaLease{Motivo:"acción no soportada"});return}
 	l:=s.Lease
 	if l.Schema!=EsquemaLeaseRetencion||l.Solicitante!=remoto.String()||l.Proveedor!=n.ID().String()||l.ID==""||l.Expira.After(time.Now().UTC().Add(maxDuracionLease))||!l.Expira.After(time.Now().UTC()){_ = json.NewEncoder(stream).Encode(respuestaLease{Motivo:"parámetros de lease inválidos"});return}
 	if s.Accion=="aceptar" {
 		if err:=VerificarDescriptor(s.Descriptor);err!=nil||s.Descriptor.RootCID!=l.RootCID||s.Descriptor.OrganismoID!=l.OrganismoID{_ = json.NewEncoder(stream).Encode(respuestaLease{Motivo:"descriptor no corresponde al lease"});return}
+	}
+	if s.Accion=="liberar" {
+		n.leases.mu.Lock()
+		prev,ok:=n.leases.leases[l.ID]
+		if !ok || prev.Solicitante!=remoto.String() || prev.Proveedor!=n.ID().String() || prev.RootCID!=l.RootCID {
+			n.leases.mu.Unlock();_ = json.NewEncoder(stream).Encode(respuestaLease{Motivo:"lease desconocido o no corresponde al solicitante"});return
+		}
+		delete(n.leases.leases,l.ID)
+		if err:=n.leases.persistirLocked();err!=nil{n.leases.leases[l.ID]=prev;n.leases.mu.Unlock();_ = json.NewEncoder(stream).Encode(respuestaLease{Motivo:"no se pudo persistir la liberación"});return}
+		n.leases.mu.Unlock()
+		_ = json.NewEncoder(stream).Encode(respuestaLease{Aceptada:true,Lease:prev})
+		return
 	}
 	bytes,err:=n.almacen.Obtener(l.RootCID);if err!=nil{_ = json.NewEncoder(stream).Encode(respuestaLease{Motivo:"bloque ausente o corrupto"});return}
 	l.Bytes=int64(len(bytes));l.Emitido=time.Now().UTC()
