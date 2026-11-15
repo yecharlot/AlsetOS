@@ -104,7 +104,7 @@ func validarCamposDescriptor(d DescriptorVersion) error {
 	if d.Revision > 1 && (d.Anterior == "" || func() bool { _, err := CIDRoot(d.Anterior); return err != nil }()) {
 		return fmt.Errorf("%w: revisión posterior requiere RootCID antecesor", ErrVersionDescriptorInvalido)
 	}
-	if d.Fecha.IsZero() || d.AutorNodeID == "" || d.AutorPeerID == "" || d.ClavePublica == "" || d.Firma == "" {
+	if d.Fecha.IsZero() || d.AutorNodeID == "" || d.AutorPeerID == "" || d.ClavePublica == "" {
 		return fmt.Errorf("%w: faltan datos de autoría", ErrVersionDescriptorInvalido)
 	}
 	return nil
