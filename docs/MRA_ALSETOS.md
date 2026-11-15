@@ -99,9 +99,9 @@ Se implementa la primera integración de Mind con el grafo relacional:
 - `Runtime.RulesFor` devuelve copias de las reglas de un organismo.
 - `Runtime.EvaluateRuleReadOnly` inspecciona una regla sin escribir átomos, dependencias, historial ni auditoría.
 - Para esta inspección contextual, primero se busca el átomo local `<oid>.<path>`; si no existe, se consulta el path global legado. Las reglas ARL normales no cambian su resolución de paths.
-- `Mente.EvaluarFractal` evalúa una regla en el organismo raíz. Si Zyrion devuelve `2`, explora organismos directamente relacionados que declaren exactamente la misma regla y repite el proceso.
+- `Mente.EvaluarFractal` evalúa una regla en el organismo raíz. Si Zyrion devuelve `2`, explora únicamente relaciones declaradas con el tipo explícito `contexto-fractal`; el organismo relacionado debe declarar exactamente la misma regla para participar.
 - La traza conserva OID, profundidad, estado, evidencias, motivo e hijos.
-- La convergencia solo acepta unanimidad de resultados determinados. Desacuerdo, incertidumbre, ciclos, ausencia de reglas equivalentes o límites conservan el estado `2`.
+- La convergencia solo acepta unanimidad de resultados determinados. Las relaciones comunes (por ejemplo, colaboración o asociación) no activan recursividad. Desacuerdo, incertidumbre, ciclos, ausencia de reglas equivalentes o límites conservan el estado `2`.
 - Se aplican límites predeterminados de profundidad y cantidad de organismos para impedir expansión ilimitada.
 
 La inspección es de solo lectura. No aplica `ThenPath`, no ejecuta genes, no cambia capacidades y no convierte conclusiones en autorizaciones. La ejecución continúa bajo los mecanismos existentes de capacidad y política.
