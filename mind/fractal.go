@@ -1,0 +1,194 @@
+package mind
+
+import (
+	"fmt"
+	"reflect"
+
+	"github.com/yecharlot/AlsetOS/declarativo"
+	"github.com/yecharlot/AlsetOS/zyrion"
+)
+
+const (
+	profundidadFractalPredeterminada = 8
+	maxOrganismosFractal             = 256
+)
+
+// NivelEvaluacion conserva el resultado y la procedencia de un nivel.
+// Hijos contiene las evaluaciones del mismo contrato de regla en organismos
+// relacionalmente adyacentes.
+type NivelEvaluacion struct {
+	OID        string             `json:"oid"`
+	Profundidad int                `json:"profundidad"`
+	Estado     zyrion.Valor       `json:"estado"`
+	Evidencias []string           `json:"evidencias,omitempty"`
+	Motivo     string             `json:"motivo,omitempty"`
+	Hijos      []NivelEvaluacion  `json:"hijos,omitempty"`
+}
+
+// EvaluacionFractal es una traza completa. No es una autorización ni ejecuta
+// acciones: representa exclusivamente el resultado lógico y su procedencia.
+type EvaluacionFractal struct {
+	ReglaID             string           `json:"regla_id"`
+	Estado              zyrion.Valor     `json:"estado"`
+	Raiz                NivelEvaluacion  `json:"raiz"`
+	ProfundidadMaxima   int              `json:"profundidad_maxima"`
+	OrganismosEvaluados int              `json:"organismos_evaluados"`
+}
+
+// EvaluarFractal aplica una misma regla declarada a través de niveles de
+// organismos relacionados cuando Zyrion devuelve 2 (indeterminado).
+//
+// Política de resolución: un nivel solo se resuelve si todos sus hijos
+// aplicables terminan en el mismo estado determinado (0 o 1). Si hay
+// desacuerdo, incertidumbre, ciclo o límite alcanzado, permanece en 2.
+// Las reglas se comparan estructuralmente: no se sustituye una regla por
+// otra distinta solo porque comparta un ID.
+func (Mente) EvaluarFractal(rt *declarativo.Runtime, oid, ruleID string, maxDepth int) (EvaluacionFractal, error) {
+	if rt == nil {
+		return EvaluacionFractal{}, fmt.Errorf("runtime nulo")
+	}
+	if oid == "" || ruleID == "" {
+		return EvaluacionFractal{}, fmt.Errorf("oid y ruleID son obligatorios")
+	}
+	if maxDepth <= 0 {
+		maxDepth = profundidadFractalPredeterminada
+	}
+	rootRules, err := rt.RulesFor(oid)
+	if err != nil {
+		return EvaluacionFractal{}, err
+	}
+	var rootRule *declarativo.Rule
+	for i := range rootRules {
+		if rootRules[i].ID == ruleID {
+			if rootRule != nil {
+				return EvaluacionFractal{}, fmt.Errorf("regla duplicada %q en %s", ruleID, oid)
+			}
+			r := rootRules[i]
+			rootRule = &r
+		}
+	}
+	if rootRule == nil {
+		return EvaluacionFractal{}, fmt.Errorf("regla %q no declarada en %s", ruleID, oid)
+	}
+
+	visited := map[string]bool{}
+	evaluated := 0
+	var walk func(string, int, map[string]bool) (NivelEvaluacion, error)
+	walk = func(current string, depth int, path map[string]bool) (NivelEvaluacion, error) {
+		if evaluated >= maxOrganismosFractal {
+			return NivelEvaluacion{OID: current, Profundidad: depth, Estado: zyrion.Incierto, Motivo: "límite de organismos alcanzado"}, nil
+		}
+		evaluated++
+		visited[current] = true
+		record, rule, err := rt.EvaluateRuleReadOnly(current, ruleID)
+		if err != nil {
+			return NivelEvaluacion{}, err
+		}
+		if !reflect.DeepEqual(rule, *rootRule) {
+			return NivelEvaluacion{}, fmt.Errorf("la regla %q en %s no conserva la misma definición", ruleID, current)
+		}
+		node := NivelEvaluacion{
+			OID: current, Profundidad: depth,
+			Estado: estadoDesdeTexto(record.Zyrion),
+			Evidencias: append([]string(nil), record.Evidence...),
+			Motivo: record.Reason,
+		}
+		if node.Estado != zyrion.Incierto {
+			node.Motivo = "resultado determinado en este nivel"
+			return node, nil
+		}
+		if depth >= maxDepth {
+			node.Motivo = "estado 2: límite de profundidad alcanzado"
+			return node, nil
+		}
+		neighbors, err := rt.RelatedOrganisms(current)
+		if err != nil {
+			return NivelEvaluacion{}, err
+		}
+		for _, neighbor := range neighbors {
+			if path[neighbor] {
+				node.Hijos = append(node.Hijos, NivelEvaluacion{
+					OID: neighbor, Profundidad: depth + 1,
+					Estado: zyrion.Incierto, Motivo: "ciclo relacional detectado; rama no reevaluada",
+				})
+				continue
+			}
+			childRules, err := rt.RulesFor(neighbor)
+			if err != nil {
+				return NivelEvaluacion{}, err
+			}
+			matching := false
+			for _, candidate := range childRules {
+				if candidate.ID == ruleID && reflect.DeepEqual(candidate, *rootRule) {
+					matching = true
+					break
+				}
+			}
+			if !matching {
+				continue
+			}
+			nextPath := make(map[string]bool, len(path)+1)
+			for id, inPath := range path {
+				nextPath[id] = inPath
+			}
+			nextPath[current] = true
+			child, err := walk(neighbor, depth+1, nextPath)
+			if err != nil {
+				return NivelEvaluacion{}, err
+			}
+			node.Hijos = append(node.Hijos, child)
+		}
+		node.Estado = consensoHijos(node.Hijos)
+		switch node.Estado {
+		case zyrion.Si:
+			node.Motivo = "todos los niveles hijos aplicables convergen en True"
+		case zyrion.No:
+			node.Motivo = "todos los niveles hijos aplicables convergen en False"
+		default:
+			if len(node.Hijos) == 0 {
+				node.Motivo = "estado 2: no existe un nivel relacionado con la misma regla"
+			} else {
+				node.Motivo = "estado 2: los niveles hijos no alcanzan un consenso determinado"
+			}
+		}
+		return node, nil
+	}
+
+	root, err := walk(oid, 0, map[string]bool{})
+	if err != nil {
+		return EvaluacionFractal{}, err
+	}
+	return EvaluacionFractal{
+		ReglaID: ruleID, Estado: root.Estado, Raiz: root,
+		ProfundidadMaxima: maxDepth, OrganismosEvaluados: evaluated,
+	}, nil
+}
+
+func estadoDesdeTexto(value string) zyrion.Valor {
+	switch value {
+	case "si":
+		return zyrion.Si
+	case "no":
+		return zyrion.No
+	default:
+		return zyrion.Incierto
+	}
+}
+
+// consensoHijos solo resuelve cuando hay al menos un hijo y todos los hijos
+// son determinados y coinciden. No convierte ausencia o conflicto en True/False.
+func consensoHijos(children []NivelEvaluacion) zyrion.Valor {
+	if len(children) == 0 {
+		return zyrion.Incierto
+	}
+	result := children[0].Estado
+	if result == zyrion.Incierto {
+		return zyrion.Incierto
+	}
+	for _, child := range children[1:] {
+		if child.Estado != result {
+			return zyrion.Incierto
+		}
+	}
+	return result
+}
