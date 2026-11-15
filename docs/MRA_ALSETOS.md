@@ -149,3 +149,50 @@ Se admite migración controlada del formato JSON anterior sin envoltura, pero ú
 ### Pruebas añadidas
 
 Se cubren round-trip, versión y checksum, corrupción sin restauración parcial, incompatibilidad de RootCID, migración del formato legado, rechazo de capacidades manipuladas y conservación de trazas fractales. La validación integral queda condicionada al resultado de GitHub Actions de este commit.
+
+
+## Fase 6 — Bloques verificables y persistencia P2P local
+
+Esta fase conecta el RootCID con almacenamiento direccionado por contenido y con el transporte P2P existente, sin cambiar el contrato semántico de los organismos.
+
+### Bloques raw direccionados por contenido
+
+Se añade `p2p.AlmacenContenido`:
+- Acepta un bloque solo si `rootcid.Verificar(bytes, rootCID)` confirma su digest.
+- Usa el digest hexadecimal validado como nombre de almacenamiento; nunca una ruta suministrada libremente.
+- Los bloques son inmutables: repetir el mismo contenido es idempotente y una colisión/sobrescritura se rechaza.
+- Publica escrituras mediante archivo temporal, sincronización y rename atómico.
+- Verifica de nuevo el contenido en cada lectura.
+- Devuelve `ErrContenidoNoDisponible` cuando el bloque no existe; un archivo presente pero corrupto no cuenta como disponible.
+
+`CIDRoot` representa el digest RootCID como CIDv1, codec `raw`, multihash SHA2-256. Por ello los bloques son compatibles con la identificación de contenido raw de IPFS. El almacén implementado es local y basado en archivos; no debe confundirse con un nodo IPFS completo ni con Bitswap.
+
+### Integración con el nodo P2P
+
+- `NuevoConEstado` inicializa el almacén de bloques y verifica las entradas históricas del índice `organismos.json`. Un índice que referencia contenido corrupto impide el arranque.
+- `AnunciarOrganismo` valida y persiste primero el bloque, después actualiza el índice durable y finalmente anuncia el proveedor en Kademlia.
+- `RecuperarOrganismo` consulta primero el bloque local; si no está disponible, busca proveedores, verifica la respuesta y la cachea localmente.
+- `recibirOrganismo` solo sirve bytes que el almacén vuelve a verificar.
+- `ReanunciarOrganismos` comprueba la disponibilidad e integridad local antes de publicar cada proveedor.
+- `DisponibleLocal` expresa exclusivamente disponibilidad local verificada; no es una afirmación sobre la red.
+
+### Persistencia Kademlia
+
+El ejecutable `cmd/alset-p2p` activa Pebble por defecto en `estado/dht`, configurable con `-dht`. El datastore temporal se cierra al cambiar a Pebble y el cierre del nodo intenta cerrar DHT, datastore y Host aun cuando una de esas operaciones falle.
+
+Los registros de proveedor Kademlia no son una garantía perpetua: expiran y requieren renovación. El nodo reanuncia organismos verificados después de conectarse al peer indicado para bootstrap. La persistencia del datastore no equivale a disponibilidad global.
+
+### Contratos de identidad y estado
+
+- RootCID sigue identificando contenido de definición; no identifica instancia ni peer.
+- NodeID/PeerID siguen identificando el nodo de transporte mediante su identidad persistente.
+- La disponibilidad es un hecho verificable y separado de ambos.
+- Se conserva el contrato Zyrion: `1=True`, `0=False`, `2=Indeterminado`. El estado `2` activa el siguiente nivel fractal con las mismas reglas, sujeto a límites explícitos; no se altera la semántica ternaria en esta fase.
+
+### Límites que permanecen abiertos
+
+No se implementan en esta fase Bitswap, GossipSub, consenso, replicación automática basada en políticas, reparación de bloques, garbage collection, retención por pinning ni recuperación multi-peer con reconciliación de versiones. Tampoco se afirma que la DHT por sí sola garantice disponibilidad. La próxima fase debe definir el protocolo de replicación y sus garantías antes de automatizarlo.
+
+### Pruebas incorporadas
+
+Se prueban almacenamiento persistente, idempotencia, rechazo de RootCID incorrecto, detección de corrupción al leer y al arrancar, reinicio del nodo, cacheo de contenido recuperado por DHT y reapertura del datastore Pebble. La validación integral queda condicionada a GitHub Actions para la cabeza de esta fase.
