@@ -1,12 +1,13 @@
 package zyrion
 
-// Z = {V, F, I} — ATS-001 Parte III
+// Z = {F, V, I} — ATS-001 Parte III.
+// Contrato numérico canónico: 0=False, 1=True, 2=Indeterminado.
 type Z int
 
 const (
-	V Z = iota
-	F
-	I
+	F Z = 0
+	V Z = 1
+	I Z = 2
 )
 
 func (z Z) String() string {
