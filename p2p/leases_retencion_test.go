@@ -20,8 +20,11 @@ func TestLeaseRetencionDeniegaPorDefectoYAceptaCompromiso(t *testing.T) {
 	a,err:=Nuevo(idA,"/ip4/127.0.0.1/tcp/0");if err!=nil{t.Fatal(err)};defer a.Cerrar()
 	b,err:=Nuevo(idB,"/ip4/127.0.0.1/tcp/0");if err!=nil{t.Fatal(err)};defer b.Cerrar()
 	ctx,cancel:=context.WithTimeout(context.Background(),15*time.Second);defer cancel()
-	if err:=a.Host.Connect(ctx,peer.AddrInfo{ID:b.ID(),Addrs:b.Host.Network().ListenAddresses()});err!=nil{t.Fatal(err)}
-	reconectar:=func(){if err:=a.Host.Connect(ctx,peer.AddrInfo{ID:b.ID(),Addrs:b.Host.Addrs()});err!=nil{t.Fatal(err)}}
+	direcciones:=b.Host.Addrs()
+	if len(direcciones)==0 { direcciones=b.Host.Network().ListenAddresses() }
+	if len(direcciones)==0 { t.Fatal("el nodo proveedor no expone direcciones de escucha") }
+	if err:=a.Host.Connect(ctx,peer.AddrInfo{ID:b.ID(),Addrs:direcciones});err!=nil{t.Fatal(err)}
+	reconectar:=func(){if err:=a.Host.Connect(ctx,peer.AddrInfo{ID:b.ID(),Addrs:direcciones});err!=nil{t.Fatal(err)}}
 	data:=[]byte("contenido que debe quedar retenido")
 	root:=rootcid.CrearContenido(data)
 	d,err:=CrearDescriptorVersion(idA,"organismo:lease",1,root,"");if err!=nil{t.Fatal(err)}
