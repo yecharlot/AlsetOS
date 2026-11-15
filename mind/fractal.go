@@ -6,7 +6,6 @@ import (
 	"sort"
 
 	"github.com/yecharlot/AlsetOS/declarativo"
-	"github.com/yecharlot/AlsetOS/relacion"
 	"github.com/yecharlot/AlsetOS/zyrion"
 )
 
