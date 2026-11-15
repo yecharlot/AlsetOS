@@ -29,10 +29,10 @@ func TestRuntime_RelatedOrganismsDeterministic(t *testing.T) {
 	if err != nil { t.Fatal(err) }
 	a:=OrgDecl{OID:"a",Name:"A",Version:"1",Kind:"ORGES",Relations:[]relacion.Relacion{
 		{ID:"r2",Origen:"a",Destino:"c",Tipo:"x"},
-		{ID:"r1",Origen:"b",Destino:"a",Tipo:"x"},
-		{ID:"r3",Origen:"a",Destino:"b",Tipo:"x"},
 	}}
-	b:=OrgDecl{OID:"b",Name:"B",Version:"1",Kind:"ORGES"}
+	b:=OrgDecl{OID:"b",Name:"B",Version:"1",Kind:"ORGES",Relations:[]relacion.Relacion{
+		{ID:"r1",Origen:"b",Destino:"a",Tipo:"x"},
+	}}
 	c:=OrgDecl{OID:"c",Name:"C",Version:"1",Kind:"ORGES"}
 	if err:=rt.LoadAssembly([]OrgDecl{a,b,c});err!=nil{t.Fatal(err)}
 	got,err:=rt.RelatedOrganisms("a");if err!=nil{t.Fatal(err)}
