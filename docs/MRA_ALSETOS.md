@@ -40,7 +40,7 @@ La primera entrega introduce un paquete sin dependencias externas. Registra nodo
 No implementa clasificación automática de niveles, causalidad, conciencia, inferencia general ni persistencia distribuida del grafo. Esas capacidades requieren contratos y validación propios.
 
 
-## Fase 2 — Relaciones declaradas y ensamblaje (en implementación)
+## Fase 2 — Relaciones declaradas y ensamblaje (implementada en la rama)
 
 La declaración de un organismo admite ahora una lista opcional `relations`. En LISPAI-AOS se declara dentro del organismo propietario:
 
@@ -60,3 +60,6 @@ El origen se deriva del OID del organismo que contiene la declaración; no se du
 Las relaciones forman parte del CID canónico de la definición cuando están declaradas. La ausencia de relaciones conserva la representación canónica anterior: `nil` y una lista vacía son equivalentes y no alteran el CID. El grafo resuelto vive en `Assembly.Relations`; no sustituye contratos, bindings, estado reactivo ni capacidades.
 
 Esta fase no interpreta automáticamente semántica causal, no concede permisos y no convierte toda relación en dependencia de ejecución. La evidencia se conserva como metadato explícito.
+
+
+**Validación de esta entrega:** GitHub Actions ejecutó correctamente `go test ./...` y todos los escenarios existentes del workflow (organismo declarativo, incierto, persistencia, alset-node, autonomía, kernel y verificación de archivos de estado). La validación corresponde al commit `5aba2f1ef8b390a9ddff55192666332a7f14cdf4`; la rama continúa separada de `main`.
