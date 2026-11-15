@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"sort"
 
 	"github.com/libp2p/go-libp2p/core/network"
@@ -14,6 +15,8 @@ import (
 )
 
 const ProtocoloVersion = "/alset/version/1.0.0"
+const maxContenidoVersion = 64 << 20
+const maxSolicitudVersion = 96 << 20
 
 type solicitudVersion struct {
 	Descriptor DescriptorVersion `json:"descriptor"`
@@ -54,6 +57,7 @@ func (nodo *Nodo) AnunciarVersion(ctx context.Context, destino peer.ID, organism
 func (nodo *Nodo) ReplicarDescriptor(ctx context.Context, destino peer.ID, descriptor DescriptorVersion, contenido []byte) (EstadoLinaje, error) {
 	if nodo == nil || nodo.Host == nil { return "", fmt.Errorf("nodo no inicializado") }
 	if err := VerificarDescriptor(descriptor); err != nil { return "", err }
+	if len(contenido) > maxContenidoVersion { return "", fmt.Errorf("contenido supera el límite de %d bytes", maxContenidoVersion) }
 	if err := rootcid.Verificar(contenido, descriptor.RootCID); err != nil { return "", err }
 	stream, err := nodo.Host.NewStream(ctx, destino, ProtocoloVersion)
 	if err != nil { return "", fmt.Errorf("abrir stream de versión: %w", err) }
@@ -77,8 +81,13 @@ func (nodo *Nodo) recibirVersion(stream network.Stream) {
 		return
 	}
 	var solicitud solicitudVersion
-	if err := json.NewDecoder(bufio.NewReader(stream)).Decode(&solicitud); err != nil {
+	limitado := &io.LimitedReader{R: stream, N: maxSolicitudVersion + 1}
+	if err := json.NewDecoder(bufio.NewReader(limitado)).Decode(&solicitud); err != nil {
 		_ = json.NewEncoder(stream).Encode(respuestaVersion{Error:"solicitud de versión inválida"})
+		return
+	}
+	if limitado.N <= 0 || len(solicitud.Contenido) > maxContenidoVersion {
+		_ = json.NewEncoder(stream).Encode(respuestaVersion{Error:"solicitud supera el límite permitido"})
 		return
 	}
 	d := solicitud.Descriptor
