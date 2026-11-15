@@ -34,7 +34,7 @@ func TestDisponibilidadRemotaFirmadaYRedundanciaVerificada(t *testing.T) {
 	if err != nil || estado != LinajeCoherente { t.Fatalf("anunciar versión: estado=%s err=%v",estado,err) }
 
 	// La consulta no debe declarar disponible un bloque que el peer aún no posee.
-	if _, err := nodoB.ConsultarDisponibilidad(ctx,nodoA.ID(),root); err == nil {
+	if _, err := nodoA.ConsultarDisponibilidad(ctx,nodoB.ID(),root); err == nil {
 		t.Fatal("se aceptó una consulta de disponibilidad contra un nodo sin el bloque")
 	}
 
