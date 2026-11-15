@@ -49,4 +49,19 @@ El protocolo `/alset/version/1.0.0` replica un bloque junto con un `DescriptorVe
 
 `ReplicarVersionAConocidos` realiza fan-out explícito a peers ya conectados. El índice durable `versiones.json` conserva revisiones y clasifica el linaje como `coherente`, `incompleto` o `conflicto`. Las bifurcaciones se conservan; no hay last-write-wins.
 
-Esta fase todavía **no implementa GossipSub**, replicación automática, política de retención ni recuperación multi-peer paralela. El protocolo de versiones es petición/respuesta directa, no un bus de eventos.
+La fase siguiente incorpora GossipSub como canal de anuncios de descriptores. El protocolo de versiones continúa siendo el canal de transferencia explícita de bloques y reconciliación de contenido.
+
+
+## Anuncios de versiones con GossipSub
+
+El nodo se suscribe al topic `alset/versions/1.0.0` y publica eventos `alset.version-announcement.v1`. Cada evento transporta únicamente el descriptor firmado; no transporta los bytes del bloque.
+
+GossipSub aplica firma y verificación estricta del mensaje libp2p. El validador de topic comprueba además el schema, el tamaño, la estructura y la firma Ed25519 del descriptor. Los eventos válidos se registran idempotentemente en el índice de versiones. Las revisiones incompletas y las bifurcaciones mantienen sus estados; el orden de llegada no selecciona ganadores.
+
+**Separación de responsabilidades:**
+- GossipSub propaga anuncios y pistas de descubrimiento.
+- `/alset/version/1.0.0` transfiere el descriptor junto con el contenido cuando se solicita replicación explícita.
+- RootCID permite recuperar/verificar el bloque; recibir un anuncio no prueba que el bloque esté disponible.
+- La firma acredita procedencia, no autorización ni confianza.
+
+GossipSub no conserva mensajes para nodos desconectados. La sincronización histórica de descriptores, la recuperación automática de bloques, las políticas de retención, la reparación y el factor de redundancia siguen pendientes.
