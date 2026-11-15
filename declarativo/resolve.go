@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/yecharlot/AlsetOS/relacion"
 )
 
 // Binding registro de por qué se eligió un proveedor.
@@ -21,6 +23,7 @@ type Assembly struct {
 	Bindings []Binding
 	// ProviderFor[consumerOID+"|"+contract] = providerOID
 	ProviderFor map[string]string
+	Relations   *relacion.Grafo
 }
 
 func majorMinor(v string) (int, int, error) {
@@ -76,7 +79,19 @@ func Resolve(decls []OrgDecl) (*Assembly, error) {
 	a := &Assembly{
 		Orgs:        byOID,
 		ProviderFor: map[string]string{},
+		Relations:   relacion.NuevoGrafo(),
 	}
+
+	// Registrar primero todos los nodos y resolver después las referencias cruzadas.
+	for _, d := range decls {
+		if err := a.Relations.AgregarNodo(relacion.Nodo{OID: d.OID, Tipo: d.Kind}); err != nil { return nil, err }
+	}
+	for _, d := range decls {
+		for _, rel := range d.Relations {
+			if err := a.Relations.AgregarRelacion(rel); err != nil { return nil, fmt.Errorf("%s: %w", d.OID, err) }
+		}
+	}
+	if err := a.Relations.Validar(); err != nil { return nil, err }
 
 	for _, d := range decls {
 		for _, c := range d.Contracts {
