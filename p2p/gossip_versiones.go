@@ -86,6 +86,11 @@ func (nodo *Nodo) PublicarAnuncioVersion(ctx context.Context, descriptor Descrip
 	return nil
 }
 
+type solicitudRecuperacionVersion struct {
+	descriptor DescriptorVersion
+	origen peer.ID
+}
+
 func (nodo *Nodo) consumirAnunciosVersion(ctx context.Context) {
 	defer close(nodo.gossipDone)
 	for {
@@ -101,6 +106,36 @@ func (nodo *Nodo) consumirAnunciosVersion(ctx context.Context) {
 		// mensaje. Registrar es idempotente y conserva forks e incompletitud.
 		if _, err := nodo.versiones.Registrar(anuncio.Descriptor); err != nil {
 			fmt.Printf("[GOSSIP-VERSION-ERROR] organismo=%s root=%s: %v\\n", anuncio.Descriptor.OrganismoID, anuncio.Descriptor.RootCID, err)
+			continue
+		}
+		// La recuperación es asíncrona y acotada. El peer inmediato es solo
+		// un primer candidato; si no conserva el bloque, se consulta la DHT.
+		select {
+		case nodo.colaRecuperacion <- solicitudRecuperacionVersion{descriptor: anuncio.Descriptor, origen: mensaje.ReceivedFrom}:
+		default:
+			fmt.Printf("[GOSSIP-RECOVERY-QUEUE-FULL] organismo=%s root=%s\\n", anuncio.Descriptor.OrganismoID, anuncio.Descriptor.RootCID)
+		}
+	}
+}
+
+func (nodo *Nodo) consumirRecuperacionesVersion(ctx context.Context) {
+	defer close(nodo.recuperacionDone)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case solicitud := <-nodo.colaRecuperacion:
+			d := solicitud.descriptor
+			if _, err := nodo.almacen.Obtener(d.RootCID); err == nil {
+				continue
+			}
+			recuperacionCtx, cancelar := context.WithTimeout(ctx, 25*time.Second)
+			_, err := nodo.recuperarBloqueVersion(recu
+peracionCtx, solicitud.origen, d.RootCID)
+			cancelar()
+			if err != nil {
+				fmt.Printf("[GOSSIP-RECOVERY-ERROR] organismo=%s root=%s: %v\\n", d.OrganismoID, d.RootCID, err)
+			}
 		}
 	}
 }
@@ -142,7 +177,10 @@ func (nodo *Nodo) iniciarGossipVersiones() error {
 	nodo.suscripcionVersiones = sub
 	nodo.cancelarGossip = cancelar
 	nodo.gossipDone = make(chan struct{})
+	nodo.colaRecuperacion = make(chan solicitudRecuperacionVersion, 64)
+	nodo.recuperacionDone = make(chan struct{})
 	go nodo.consumirAnunciosVersion(ctx)
+	go nodo.consumirRecuperacionesVersion(ctx)
 	return nil
 }
 
