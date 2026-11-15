@@ -228,11 +228,21 @@ func (n *Nodo) recibirSolicitudLease(stream network.Stream) {
 	var usadosPeer int64
 	for id,x:=range n.leases.leases{if id!=l.ID&&x.Solicitante==remoto.String()&&x.Expira.After(time.Now().UTC()){usadosPeer+=x.Bytes}}
 	if l.Bytes>cuota-usadosPeer{n.leases.mu.Unlock();_ = json.NewEncoder(stream).Encode(respuestaLease{Motivo:"cuota del solicitante insuficiente"});return}
-	if n.leases.capacidad==0||l.Bytes>n.leases.capacidad-n.leases.usadosLocked(time.Now().UTC())+func()int64{if existe{return prev.Bytes};return 0}(){n.leases.mu.Unlock();_ = json.NewEncoder(stream).Encode(respuestaLease{Motivo:"capacidad de almacenamiento no configurada o insuficiente"});return}
+	usados:=n.leases.usadosLocked(time.Now().UTC())
+	if existe && prev.Expira.After(time.Now().UTC()) { usados-=prev.Bytes }
+	if n.leases.capacidad==0 || usados+l.Bytes>n.leases.capacidad { n.leases.mu.Unlock();_ = json.NewEncoder(stream).Encode(respuestaLease{Motivo:"capacidad de almacenamiento no configurada o insuficiente"});return }
 	l.ClavePublica=base64.StdEncoding.EncodeToString(n.Identidad.ClavePublica)
 	payload,_:=json.Marshal(l.firmable());l.Firma=base64.StdEncoding.EncodeToString(n.Identidad.Firmar(payload))
 	n.leases.leases[l.ID]=l
 	if err:=n.leases.persistirLocked();err!=nil{if existe{n.leases.leases[l.ID]=prev}else{delete(n.leases.leases,l.ID)};n.leases.mu.Unlock();_ = json.NewEncoder(stream).Encode(respuestaLease{Motivo:"no se pudo persistir compromiso"});return}
 	n.leases.mu.Unlock()
 	_ = json.NewEncoder(stream).Encode(respuestaLease{Aceptada:true,Lease:l})
+}
+
+
+// ExpirarLeases elimina únicamente compromisos vencidos del registro. El bloque
+// físico se conserva: esta operación nunca ejecuta garbage collection.
+func (n *Nodo) ExpirarLeases(ahora time.Time) error {
+	if n==nil||n.leases==nil{return fmt.Errorf("gestor de leases no inicializado")}
+	return n.leases.Expirar(ahora.UTC())
 }
