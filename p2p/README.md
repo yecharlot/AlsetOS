@@ -72,3 +72,10 @@ GossipSub no conserva mensajes para nodos desconectados. La sincronización hist
 Al recibir un descriptor firmado por GossipSub, el nodo lo registra y encola una recuperación asíncrona con capacidad y timeout acotados. Primero consulta al peer que entregó el anuncio; si ese peer actúa solo como relay o no conserva el bloque, usa los proveedores Kademlia. El contenido se verifica contra RootCID antes de almacenarse. Los nodos que recuperan el bloque pueden anunciarse como proveedores DHT.
 
 La recuperación no ejecuta organismos ni concede capacidades. Un anuncio no garantiza que el bloque exista o que un proveedor esté disponible. La cola llena, la ausencia de DHT o la falta de proveedores dejan el descriptor registrado sin contenido local.
+
+
+## Sincronización al reconectar
+
+Al establecerse una conexión libp2p, el nodo solicita al peer una instantánea acotada de sus descriptores firmados mediante `/alset/version-sync/1.0.0`. Cada descriptor se verifica y se registra de forma idempotente; después se encola la recuperación de su RootCID por el canal de contenido ya existente. La sincronización intercambia inventarios, no bloques. Los bloques se obtienen del peer que aporta el inventario y, si no está disponible, de proveedores Kademlia.
+
+La sincronización conserva revisiones fuera de orden y forks. No hay selección de ganador, consenso ni autorización implícita. Los límites actuales son 10 000 descriptores y 8 MiB por inventario; la cola de recuperación sigue siendo acotada. Una cola llena se informa y puede corregirse ejecutando de nuevo `SincronizarVersiones`. La conexión no demuestra que todos los datos estén disponibles.
