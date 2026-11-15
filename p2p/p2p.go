@@ -3,6 +3,7 @@ package p2p
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -33,6 +34,7 @@ type Nodo struct {
 	conocidos       map[peer.ID]peer.AddrInfo
 	organismos      map[string][]byte
 	rutaOrganismos  string
+	almacen         *AlmacenContenido
 	ultimoLatido    map[peer.ID]time.Time
 }
 
@@ -79,6 +81,16 @@ func NuevoConEstado(identidadNodo *identidad.Identidad, escuchar, rutaOrganismos
 		_ = h.Close()
 		return nil, err
 	}
+	rutaBloques := ""
+	if rutaOrganismos != "" { rutaBloques = filepath.Join(filepath.Dir(rutaOrganismos), "bloques") }
+	almacen, err := NuevoAlmacenContenido(rutaBloques)
+	if err != nil { _ = h.Close(); return nil, err }
+	for root, contenido := range organismos {
+		if err := almacen.Guardar(root, contenido); err != nil {
+			_ = h.Close()
+			return nil, fmt.Errorf("validar organismo persistido %s: %w", root, err)
+		}
+	}
 
 	nodo := &Nodo{
 		Host:           h,
@@ -87,6 +99,7 @@ func NuevoConEstado(identidadNodo *identidad.Identidad, escuchar, rutaOrganismos
 		conocidos:      make(map[peer.ID]peer.AddrInfo),
 		organismos:     organismos,
 		rutaOrganismos: rutaOrganismos,
+		almacen: almacen,
 		ultimoLatido:   make(map[peer.ID]time.Time),
 	}
 
