@@ -28,8 +28,12 @@ func TestReplicacionDeVersionFirmadaYConflictoEntreNodos(t *testing.T) {
 
 	contenido1 := []byte("definicion original")
 	root1 := rootcid.CrearContenido(contenido1)
-	_, estado, err := nodoA.AnunciarVersion(ctx, nodoB.ID(), "organismo:almacen", 1, root1, "", contenido1)
-	if err != nil || estado != LinajeCoherente { t.Fatalf("replicar v1: estado=%s err=%v", estado, err) }
+	descriptor, estado, err := nodoA.AnunciarVersion(ctx, "", "organismo:almacen", 1, root1, "", contenido1)
+	if err != nil || estado != LinajeCoherente { t.Fatalf("registrar v1: estado=%s err=%v", estado, err) }
+	resultados := nodoA.ReplicarVersionAConocidos(ctx, descriptor, contenido1)
+	if len(resultados) != 1 || resultados[0].PeerID != nodoB.ID().String() || resultados[0].Error != "" || resultados[0].Estado != LinajeCoherente {
+		t.Fatalf("fan-out de réplica inesperado: %+v", resultados)
+	}
 	if nodoB.EstadoLinaje("organismo:almacen") != LinajeCoherente { t.Fatal("el nodo receptor no registró el linaje inicial") }
 	recuperado, err := nodoB.RecuperarOrganismo(ctx, root1)
 	if err != nil || string(recuperado) != string(contenido1) { t.Fatalf("el nodo receptor no conserva el bloque: %v", err) }
