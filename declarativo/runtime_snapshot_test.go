@@ -103,8 +103,8 @@ func TestRuntimeSnapshot_CapacidadesNoSePuedenElevar(t *testing.T) {
 	path:=filepath.Join(dir,"runtime_state.json")
 	raw,_:=os.ReadFile(path)
 	var env snapshotEnvelope;_ = json.Unmarshal(raw,&env)
-	var payload map[string]interface{};_ = json.Unmarshal(env.Payload,&payload)
-	payload["caps"]=map[string]interface{}{decl.OID:map[string]interface{}{"admin":true}}
+	var payload runtimeSnapshot;_ = json.Unmarshal(env.Payload,&payload)
+	payload.Caps=map[string]map[string]bool{decl.OID:{"admin":true}}
 	canonical,_:=json.Marshal(payload);sum:=sha256Hex(canonical)
 	env.Payload=canonical;env.Checksum=sum
 	tampered,_:=json.Marshal(env);_ = os.WriteFile(path,tampered,0600)
