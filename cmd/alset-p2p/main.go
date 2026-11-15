@@ -56,7 +56,8 @@ func conectar(ctx context.Context, nodo *p2p.Nodo, direccion string) error {
 func main() {
 	escuchar := flag.String("escuchar", "/ip4/127.0.0.1/tcp/0", "dirección libp2p")
 	rutaIdentidad := flag.String("identidad", "estado/identidad-p2p.json", "identidad Ed25519")
-	rutaOrganismos := flag.String("organismos", "estado/organismos.json", "almacén persistente de organismos")
+	rutaOrganismos := flag.String("organismos", "estado/organismos.json", "índice persistente de organismos")
+	rutaDHT := flag.String("dht", "estado/dht", "datastore persistente Pebble para DHT")
 	peerRemoto := flag.String("peer", "", "multiaddr /p2p del nodo remoto")
 	anunciar := flag.String("anunciar", "", "manifiesto .alset que se anunciará en la DHT")
 	recuperar := flag.String("recuperar", "", "RootCID que se buscará y ejecutará remotamente")
@@ -75,6 +76,12 @@ func main() {
 		os.Exit(1)
 	}
 	defer nodo.Cerrar()
+	if *rutaDHT != "" {
+		if err := nodo.ActivarPersistenciaDHT(*rutaDHT); err != nil {
+			fmt.Printf("error datastore DHT: %v\n", err)
+			os.Exit(1)
+		}
+	}
 
 	fmt.Printf("[P2P-NODE] node-id=%s\n", identidadNodo.ID)
 	fmt.Printf("[P2P-PEER] peer-id=%s\n", nodo.ID())
