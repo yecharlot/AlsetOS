@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/yecharlot/AlsetOS/identidad"
 	"github.com/yecharlot/AlsetOS/rootcid"
 )
@@ -23,6 +24,7 @@ func TestLeaseRetencionDeniegaPorDefectoYAceptaCompromiso(t *testing.T) {
 	direcciones:=b.Host.Addrs()
 	if len(direcciones)==0 { direcciones=b.Host.Network().ListenAddresses() }
 	if len(direcciones)==0 { t.Fatal("el nodo proveedor no expone direcciones de escucha") }
+	a.Host.Peerstore().AddAddrs(b.ID(),direcciones,peerstore.PermanentAddrTTL)
 	if err:=a.Host.Connect(ctx,peer.AddrInfo{ID:b.ID(),Addrs:direcciones});err!=nil{t.Fatal(err)}
 	reconectar:=func(){if err:=a.Host.Connect(ctx,peer.AddrInfo{ID:b.ID(),Addrs:direcciones});err!=nil{t.Fatal(err)}}
 	data:=[]byte("contenido que debe quedar retenido")
