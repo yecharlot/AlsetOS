@@ -148,7 +148,7 @@ func TestGossipSubOrdenInciertoForkYDeduplicacion(t *testing.T) {
 	}
 
 	// Una segunda rama para la revisión 2 se conserva como conflicto.
-	if _, estado, err := nodos[1].AnunciarVersion(ctx, "", organismo, 2, root2Fork, root1, v2Fork); err != nil || estado != LinajeIncompleto {
+	if _, estado, err := nodos[1].AnunciarVersion(ctx, "", organismo, 2, root2Fork, root1, v2Fork); err != nil || estado != LinajeConflicto {
 		t.Fatalf("registrar rama alternativa local: estado=%s err=%v", estado, err)
 	}
 	esperarEstadoLinaje(t, ctx, nodos, organismo, LinajeConflicto, 3)
