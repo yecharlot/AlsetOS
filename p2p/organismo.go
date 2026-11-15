@@ -125,7 +125,7 @@ func (nodo *Nodo) recuperarBloqueVersion(ctx context.Context, origen peer.ID, ro
 		return nil, err
 	}
 	if err := nodo.anunciarProveedorRoot(ctx, rootCID); err != nil {
-		return nil, fmt.Errorf("bloque recuperado pero no se pudo anunciar como proveedor: %w", err)
+		fmt.Printf("[VERSION-PROVIDER-DEFERRED] root=%s: %v\\n", rootCID, err)
 	}
 	return contenido, nil
 }
