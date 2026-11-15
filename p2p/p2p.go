@@ -127,14 +127,14 @@ func NuevoConEstado(identidadNodo *identidad.Identidad, escuchar, rutaOrganismos
 
 	servicio := mdns.NewMdnsService(h, "_alset._tcp", &descubrimiento{nodo: nodo})
 	if err := servicio.Start(); err != nil {
-		_ = h.Close()
+		_ = nodo.Cerrar()
 		return nil, fmt.Errorf("iniciar descubrimiento mDNS: %w", err)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := iniciarDHT(ctx, nodo); err != nil {
-		_ = h.Close()
+		_ = nodo.Cerrar()
 		return nil, err
 	}
 
