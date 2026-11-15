@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -112,4 +113,30 @@ func (nodo *Nodo) EstadoLinaje(organismoID string) EstadoLinaje {
 func (nodo *Nodo) Versiones(organismoID string) []DescriptorVersion {
 	if nodo == nil || nodo.versiones == nil { return nil }
 	return nodo.versiones.Versiones(organismoID)
+}
+
+
+// ResultadoReplicacion describe la confirmación individual de un peer.
+// Un resultado no equivale a autorización ni a garantía de retención futura.
+type ResultadoReplicacion struct {
+	PeerID string `json:"peer_id"`
+	Estado EstadoLinaje `json:"estado"`
+	Error string `json:"error,omitempty"`
+}
+
+// ReplicarVersionAConocidos realiza fan-out explícito a los peers actualmente
+// conectados. No descubre peers, no crea una política automática de retención
+// y no afirma que el bloque siga disponible después de la confirmación.
+func (nodo *Nodo) ReplicarVersionAConocidos(ctx context.Context, descriptor DescriptorVersion, contenido []byte) []ResultadoReplicacion {
+	if nodo == nil || nodo.Host == nil { return []ResultadoReplicacion{{Error:"nodo no inicializado"}} }
+	peers := nodo.Host.Network().Peers()
+	sort.Slice(peers, func(i,j int) bool { return peers[i].String() < peers[j].String() })
+	resultados := make([]ResultadoReplicacion, 0, len(peers))
+	for _, destino := range peers {
+		estado, err := nodo.ReplicarDescriptor(ctx, destino, descriptor, contenido)
+		resultado := ResultadoReplicacion{PeerID:destino.String(), Estado:estado}
+		if err != nil { resultado.Error = err.Error() }
+		resultados = append(resultados, resultado)
+	}
+	return resultados
 }
