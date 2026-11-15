@@ -177,7 +177,7 @@ func (nodo *Nodo) AsegurarRedundancia(ctx context.Context, descriptor Descriptor
 			// esté incompleto o en conflicto; la solicitud de lease lo comprobará.
 			resultado.Error = "replicación: "+replicaErr.Error()
 		}
-		lease, leaseErr := nodo.SolicitarRetencionRemota(ctx,remoto,descriptor,24*time.Hour)
+		_, leaseErr := nodo.SolicitarRetencionRemota(ctx,remoto,descriptor,24*time.Hour)
 		if leaseErr == nil {
 			resultado.Confirmada = true
 			estado.FactorVerificado++
