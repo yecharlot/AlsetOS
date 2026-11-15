@@ -65,3 +65,10 @@ GossipSub aplica firma y verificación estricta del mensaje libp2p. El topic uti
 - La firma acredita procedencia, no autorización ni confianza.
 
 GossipSub no conserva mensajes para nodos desconectados. La sincronización histórica de descriptores, la recuperación automática de bloques, las políticas de retención, la reparación y el factor de redundancia siguen pendientes.
+
+
+## Recuperación automática de versiones anunciadas
+
+Al recibir un descriptor firmado por GossipSub, el nodo lo registra y encola una recuperación asíncrona con capacidad y timeout acotados. Primero consulta al peer que entregó el anuncio; si ese peer actúa solo como relay o no conserva el bloque, usa los proveedores Kademlia. El contenido se verifica contra RootCID antes de almacenarse. Los nodos que recuperan el bloque pueden anunciarse como proveedores DHT.
+
+La recuperación no ejecuta organismos ni concede capacidades. Un anuncio no garantiza que el bloque exista o que un proveedor esté disponible. La cola llena, la ausencia de DHT o la falta de proveedores dejan el descriptor registrado sin contenido local.
