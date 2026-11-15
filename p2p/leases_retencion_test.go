@@ -37,6 +37,8 @@ func TestLeaseRetencionDeniegaPorDefectoYAceptaCompromiso(t *testing.T) {
 	lease,err:=a.SolicitarRetencionRemota(ctx,b.ID(),d,time.Hour);if err!=nil{t.Fatal(err)}
 	if lease.Bytes!=int64(len(data))||lease.Proveedor!=b.ID().String()||!verificarFirmaLease(lease){t.Fatalf("lease devuelto no verificable: %+v",lease)}
 	if len(b.LeasesRetencion())!=1{t.Fatalf("lease no persistido en proveedor: %+v",b.LeasesRetencion())}
+	repetido,err:=a.SolicitarRetencionRemota(ctx,b.ID(),d,time.Hour);if err!=nil{t.Fatalf("repetir solicitud idempotente: %v",err)}
+	if repetido.ID!=lease.ID||len(b.LeasesRetencion())!=1{t.Fatalf("la solicitud repetida duplicó el compromiso: primero=%s segundo=%s leases=%+v",lease.ID,repetido.ID,b.LeasesRetencion())}
 	renovado,err:=a.RenovarLeaseRemoto(ctx,lease,2*time.Hour);if err!=nil{t.Fatal(err)}
 	if !renovado.Expira.After(lease.Expira){t.Fatalf("la renovación no extendió el compromiso: anterior=%s nuevo=%s",lease.Expira,renovado.Expira)}
 	if err:=a.LiberarLeaseRemoto(ctx,renovado);err!=nil{t.Fatalf("liberar lease: %v",err)}
