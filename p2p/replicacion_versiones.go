@@ -40,7 +40,11 @@ func (nodo *Nodo) AnunciarVersion(ctx context.Context, destino peer.ID, organism
 	descriptor, err := CrearDescriptorVersion(nodo.Identidad, organismoID, revision, root, anterior)
 	if err != nil { return DescriptorVersion{}, "", err }
 	if err := nodo.almacen.Guardar(root, contenido); err != nil { return DescriptorVersion{}, "", err }
-	if err := nodo.anunciarProveedorRoot(ctx, root); err != nil { return DescriptorVersion{}, "", fmt.Errorf("anunciar proveedor de versión: %w", err) }
+	if err := nodo.anunciarProveedorRoot(ctx, root); err != nil {
+		// La versión local ya está íntegra y persistida. La DHT puede no estar
+		// lista todavía; el fallo de publicación no invalida el descriptor.
+		fmt.Printf("[VERSION-PROVIDER-DEFERRED] root=%s: %v\\n", root, err)
+	}
 	estado, err := nodo.versiones.Registrar(descriptor)
 	if err != nil { return DescriptorVersion{}, "", err }
 	if err := nodo.PublicarAnuncioVersion(ctx, descriptor); err != nil {
@@ -116,8 +120,9 @@ func (nodo *Nodo) recibirVersion(stream network.Stream) {
 		return
 	}
 	if err := nodo.anunciarProveedorRoot(context.Background(), d.RootCID); err != nil {
-		_ = json.NewEncoder(stream).Encode(respuestaVersion{RootCID:d.RootCID, Estado:estado, Error:"bloque guardado, pero falló el anuncio de proveedor: "+err.Error()})
-		return
+		// El bloque y descriptor ya se verificaron y persistieron. El anuncio
+		// de proveedor puede renovarse después del bootstrap de la DHT.
+		fmt.Printf("[VERSION-PROVIDER-DEFERRED] root=%s: %v\\n", d.RootCID, err)
 	}
 	_ = json.NewEncoder(stream).Encode(respuestaVersion{RootCID:d.RootCID, Estado:estado})
 }
