@@ -215,7 +215,7 @@ func (n *Nodo) enviarSolicitudLease(ctx context.Context,destino peer.ID,s solici
 	if lim.N<=0{return LeaseRetencion{},fmt.Errorf("respuesta de lease excede límite")}
 	if !r.Aceptada{return LeaseRetencion{},fmt.Errorf("lease rechazado: %s",r.Motivo)}
 	if s.Accion=="liberar" { if r.Lease.ID!=s.Lease.ID||r.Lease.RootCID!=s.Lease.RootCID||r.Lease.Proveedor!=destino.String()||r.Lease.Solicitante!=n.ID().String()||!verificarFirmaLease(r.Lease){return LeaseRetencion{},fmt.Errorf("confirmación de liberación no verificable")};return r.Lease,nil }
-	if (s.Accion!="aceptar"&&r.Lease.ID!=s.Lease.ID)||r.Lease.RootCID!=s.Lease.RootCID||r.Lease.Solicitante!=n.ID().String()||r.Lease.Proveedor!=destino.String()||!r.Lease.Expira.After(time.Now().UTC())||!verificarFirmaLease(r.Lease){return LeaseRetencion{},fmt.Errorf("compromiso remoto inválido")}
+	if (s.Accion!="aceptar"&&r.Lease.ID!=s.Lease.ID)||r.Lease.RootCID!=s.Lease.RootCID||r.Lease.OrganismoID!=s.Lease.OrganismoID||r.Lease.Solicitante!=n.ID().String()||r.Lease.Proveedor!=destino.String()||r.Lease.Bytes<=0||!r.Lease.Expira.After(time.Now().UTC())||!verificarFirmaLease(r.Lease){return LeaseRetencion{},fmt.Errorf("compromiso remoto inválido")}
 	return r.Lease,nil
 }
 func (n *Nodo) recibirSolicitudLease(stream network.Stream) {
