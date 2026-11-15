@@ -15,6 +15,18 @@ Incorporo el Modelo de Relaciones Abstraccionales (MRA) como fundamento formal p
 9. No se presupone conciencia por memoria o autorrepresentación.
 10. El transporte P2P no adquiere semántica de dominio.
 
+## Contrato numérico de Zyrion
+El contrato canónico de estados es:
+- `1` = True (verdadero).
+- `0` = False (falso).
+- `2` = Indeterminado.
+
+Este mapeo es explícito tanto en `zyrion` como en `internal/ats001/zyrion`. No se debe invertir el significado de los valores ni usar el orden de declaración de constantes para reinterpretarlos.
+
+El estado `2` es un estado sumidero para el nivel de evaluación actual y activa la evaluación del siguiente nivel de abstracción. En ese nivel se aplican las mismas reglas declaradas, sobre el contexto del organismo relacionado. La recursividad no implica profundidad infinita: se controlan ciclos, profundidad y cantidad de organismos examinados. Si no existe una regla equivalente, faltan datos, se alcanza un límite o las ramas discrepan, el resultado permanece en `2`.
+
+La política inicial de convergencia es deliberadamente conservadora: un nivel solo se resuelve si todos sus hijos aplicables terminan en el mismo estado determinado (`0` o `1`). Una mezcla de resultados, un hijo indeterminado o una rama cíclica no se convierte en certeza. Esta política es una decisión de implementación versionada, no una ley universal de la lógica fractal.
+
 ## Modelo
 Una abstracción computacional se describe mediante identidad, estructura, relaciones, capacidades y restricciones, estado y procedencia.
 
@@ -79,3 +91,19 @@ Estas consultas no escriben estado, no disparan reglas, no cambian capacidades y
 
 
 **Validación de Fase 3:** GitHub Actions completó con éxito `go test ./...` y el workflow de escenarios existentes en el commit `a795ee328847c53e060c389b1ac47859760d1fc6`. La suite incluye pruebas nuevas para contexto entrante/saliente, vecinos ordenados, organismo sin relaciones, organismo desconocido y ausencia de concesión de capacidades por el mero hecho de estar relacionado. El workflow terminó con conclusión `success`.
+
+
+## Fase 4 — Evaluación recursiva Mind/Zyrion
+
+Se implementa la primera integración de Mind con el grafo relacional:
+- `Runtime.RulesFor` devuelve copias de las reglas de un organismo.
+- `Runtime.EvaluateRuleReadOnly` inspecciona una regla sin escribir átomos, dependencias, historial ni auditoría.
+- Para esta inspección contextual, primero se busca el átomo local `<oid>.<path>`; si no existe, se consulta el path global legado. Las reglas ARL normales no cambian su resolución de paths.
+- `Mente.EvaluarFractal` evalúa una regla en el organismo raíz. Si Zyrion devuelve `2`, explora organismos directamente relacionados que declaren exactamente la misma regla y repite el proceso.
+- La traza conserva OID, profundidad, estado, evidencias, motivo e hijos.
+- La convergencia solo acepta unanimidad de resultados determinados. Desacuerdo, incertidumbre, ciclos, ausencia de reglas equivalentes o límites conservan el estado `2`.
+- Se aplican límites predeterminados de profundidad y cantidad de organismos para impedir expansión ilimitada.
+
+La inspección es de solo lectura. No aplica `ThenPath`, no ejecuta genes, no cambia capacidades y no convierte conclusiones en autorizaciones. La ejecución continúa bajo los mecanismos existentes de capacidad y política.
+
+**Alcance:** esta fase no modifica el comportamiento de `EvalRule` ni la estrategia heredada `Mente.Decidir`. La integración fractal es una API explícita que puede probarse antes de conectarla a flujos automáticos. La semántica de convergencia es una política inicial conservadora y debe permanecer visible y versionada.
