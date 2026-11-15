@@ -23,7 +23,7 @@ func reglaFractal() declarativo.Rule {
 func TestEvaluarFractal_IndeterminadoResueltoEnNivelSiguiente(t *testing.T) {
 	rule := reglaFractal()
 	a := declarativo.OrgDecl{OID:"a",Name:"A",Version:"1",Kind:"ORGES",Rules:[]declarativo.Rule{rule},
-		Relations:[]relacion.Relacion{{ID:"a-b",Origen:"a",Destino:"b",Tipo:"contexto"}}}
+		Relations:[]relacion.Relacion{{ID:"a-b",Origen:"a",Destino:"b",Tipo:TipoRelacionFractal}}}
 	b := declarativo.OrgDecl{OID:"b",Name:"B",Version:"1",Kind:"ORGES",Rules:[]declarativo.Rule{rule},
 		InitialState:map[string]interface{}{"b.dato":"listo"}}
 	rt := runtimeFractal(t,a,b)
@@ -39,7 +39,7 @@ func TestEvaluarFractal_IndeterminadoResueltoEnNivelSiguiente(t *testing.T) {
 func TestEvaluarFractal_ConflictoPermaneceIndeterminado(t *testing.T) {
 	rule:=reglaFractal()
 	a:=declarativo.OrgDecl{OID:"a",Name:"A",Version:"1",Kind:"ORGES",Rules:[]declarativo.Rule{rule},
-		Relations:[]relacion.Relacion{{ID:"a-b",Origen:"a",Destino:"b",Tipo:"contexto"},{ID:"a-c",Origen:"a",Destino:"c",Tipo:"contexto"}}}
+		Relations:[]relacion.Relacion{{ID:"a-b",Origen:"a",Destino:"b",Tipo:TipoRelacionFractal},{ID:"a-c",Origen:"a",Destino:"c",Tipo:TipoRelacionFractal}}}
 	b:=declarativo.OrgDecl{OID:"b",Name:"B",Version:"1",Kind:"ORGES",Rules:[]declarativo.Rule{rule},InitialState:map[string]interface{}{"b.dato":"listo"}}
 	c:=declarativo.OrgDecl{OID:"c",Name:"C",Version:"1",Kind:"ORGES",Rules:[]declarativo.Rule{rule},InitialState:map[string]interface{}{"c.dato":"no"}}
 	rt:=runtimeFractal(t,a,b,c)
@@ -48,15 +48,26 @@ func TestEvaluarFractal_ConflictoPermaneceIndeterminado(t *testing.T) {
 	if got.Estado!=zyrion.Incierto{t.Fatalf("se esperaba 2 ante conflicto; obtenido %v",got.Estado)}
 }
 
-func TestEvaluarFractal_LimiteYReglaNoAplicable(t *testing.T) {
+func TestEvaluarFractal_AsociacionNormalNoActivaExpansion(t *testing.T) {
 	rule:=reglaFractal()
 	a:=declarativo.OrgDecl{OID:"a",Name:"A",Version:"1",Kind:"ORGES",Rules:[]declarativo.Rule{rule},
-		Relations:[]relacion.Relacion{{ID:"a-b",Origen:"a",Destino:"b",Tipo:"contexto"}}}
+		Relations:[]relacion.Relacion{{ID:"a-b",Origen:"a",Destino:"b",Tipo:"colabora"}}}
+	b:=declarativo.OrgDecl{OID:"b",Name:"B",Version:"1",Kind:"ORGES",Rules:[]declarativo.Rule{rule},InitialState:map[string]interface{}{"b.dato":"listo"}}
+	rt:=runtimeFractal(t,a,b)
+	got,err:=(Mente{}).EvaluarFractal(rt,"a",rule.ID,4)
+	if err!=nil{t.Fatal(err)}
+	if got.Estado!=zyrion.Incierto || len(got.Raiz.Hijos)!=0 { t.Fatalf("una relación común no debe activar expansión fractal: %+v",got) }
+}
+
+func TestEvaluarFractal_ReglaNoAplicable(t *testing.T) {
+	rule:=reglaFractal()
+	a:=declarativo.OrgDecl{OID:"a",Name:"A",Version:"1",Kind:"ORGES",Rules:[]declarativo.Rule{rule},
+		Relations:[]relacion.Relacion{{ID:"a-b",Origen:"a",Destino:"b",Tipo:TipoRelacionFractal}}}
 	b:=declarativo.OrgDecl{OID:"b",Name:"B",Version:"1",Kind:"ORGES"}
 	rt:=runtimeFractal(t,a,b)
 	got,err:=(Mente{}).EvaluarFractal(rt,"a",rule.ID,1)
 	if err!=nil{t.Fatal(err)}
-	if got.Estado!=zyrion.Incierto || got.Raiz.Motivo!="estado 2: no existe un nivel relacionado con la misma regla" { t.Fatalf("resultado inesperado: %+v",got) }
+	if got.Estado!=zyrion.Incierto || got.Raiz.Motivo!="estado 2: no existe un nivel fractal relacionado con la misma regla" { t.Fatalf("resultado inesperado: %+v",got) }
 }
 
 func TestEvaluarFractal_OrganismoDesconocido(t *testing.T) {
