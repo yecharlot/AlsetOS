@@ -40,16 +40,18 @@ func (nodo *Nodo) AnunciarOrganismo(ctx context.Context, rootCID string, manifie
 		return fmt.Errorf("el manifiesto no corresponde al RootCID")
 	}
 
+	if nodo.almacen == nil { return fmt.Errorf("almacén de contenido no inicializado") }
+	if err := nodo.almacen.Guardar(rootCID, manifiesto); err != nil { return fmt.Errorf("guardar bloque verificado: %w", err) }
+
+	nodo.mu.RLock()
+	copia := make(map[string][]byte, len(nodo.organismos)+1)
+	for root, contenido := range nodo.organismos { copia[root] = append([]byte(nil), contenido...) }
+	nodo.mu.RUnlock()
+	copia[rootCID] = append([]byte(nil), manifiesto...)
+	if err := guardarOrganismos(nodo.rutaOrganismos, copia); err != nil { return err }
 	nodo.mu.Lock()
-	nodo.organismos[rootCID] = append([]byte(nil), manifiesto...)
-	copia := make(map[string][]byte, len(nodo.organismos))
-	for root, contenido := range nodo.organismos {
-		copia[root] = append([]byte(nil), contenido...)
-	}
+	nodo.organismos = copia
 	nodo.mu.Unlock()
-	if err := guardarOrganismos(nodo.rutaOrganismos, copia); err != nil {
-		return err
-	}
 
 	clave, err := CIDRoot(rootCID)
 	if err != nil {
@@ -105,12 +107,7 @@ func (nodo *Nodo) buscarProveedor(ctx context.Context, rootCID string) ([]byte, 
 	}
 	for _, proveedor := range proveedores {
 		if proveedor.ID == nodo.ID() {
-			nodo.mu.RLock()
-			local := append([]byte(nil), nodo.organismos[rootCID]...)
-			nodo.mu.RUnlock()
-			if len(local) > 0 {
-				return local, nil
-			}
+			if local, err := nodo.almacen.Obtener(rootCID); err == nil { return local, nil }
 		}
 		if err := nodo.Host.Connect(ctx, proveedor); err != nil {
 			continue
@@ -135,7 +132,10 @@ func (nodo *Nodo) buscarProveedor(ctx context.Context, rootCID string) ([]byte, 
 		if rootcid.CrearContenido(respuesta.Manifiesto) != rootCID {
 			continue
 		}
-		return respuesta.Manifiesto, nil
+		if err := nodo.almacen.Guardar(rootCID, respuesta.Manifiesto); err != nil {
+			continue
+		}
+		return append([]byte(nil), respuesta.Manifiesto...), nil
 	}
 	return nil, fmt.Errorf("RootCID no encontrado: %s", rootCID)
 }
@@ -158,11 +158,9 @@ func (nodo *Nodo) recibirOrganismo(stream network.Stream) {
 		return
 	}
 
-	nodo.mu.RLock()
-	manifiesto := append([]byte(nil), nodo.organismos[rootCID]...)
-	nodo.mu.RUnlock()
-	if len(manifiesto) == 0 {
-		_ = json.NewEncoder(stream).Encode(respuestaOrganismo{RootCID: rootCID, Error: "organismo no encontrado"})
+	manifiesto, err := nodo.almacen.Obtener(rootCID)
+	if err != nil {
+		_ = json.NewEncoder(stream).Encode(respuestaOrganismo{RootCID: rootCID, Error: "contenido no disponible o inválido"})
 		return
 	}
 
@@ -173,9 +171,16 @@ func (nodo *Nodo) recibirOrganismo(stream network.Stream) {
 }
 
 func (nodo *Nodo) RecuperarOrganismo(ctx context.Context, rootCID string) ([]byte, error) {
-	if manifiesto, err := nodo.buscarProveedor(ctx, normalizarRootCID(rootCID)); err == nil {
-		return manifiesto, nil
-	} else {
-		return nil, err
+	rootCID = normalizarRootCID(rootCID)
+	if nodo.almacen != nil {
+		if contenido, err := nodo.almacen.Obtener(rootCID); err == nil { return contenido, nil }
 	}
+	return nodo.buscarProveedor(ctx, rootCID)
+}
+
+// DisponibleLocal comprueba existencia e integridad del bloque local.
+// No afirma que existan peers remotos ni que el contenido esté disponible en la red.
+func (nodo *Nodo) DisponibleLocal(rootCID string) (bool, error) {
+	if nodo == nil || nodo.almacen == nil { return false, fmt.Errorf("almacén de contenido no inicializado") }
+	return nodo.almacen.Disponible(normalizarRootCID(rootCID))
 }
