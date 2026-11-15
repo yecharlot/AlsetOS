@@ -40,6 +40,9 @@ func TestDisponibilidadRemotaFirmadaYRedundanciaVerificada(t *testing.T) {
 		t.Fatal("se aceptó una consulta de disponibilidad contra un nodo sin el bloque")
 	}
 
+	if err := nodoB.ConfigurarCapacidadRetencion(1 << 20); err != nil { t.Fatal(err) }
+	if err := nodoB.AutorizarRetencionRemota(nodoA.ID(), 1 << 20); err != nil { t.Fatal(err) }
+
 	resultado, err := nodoA.AsegurarRedundancia(ctx,descriptor,contenido,2)
 	if err != nil { t.Fatalf("asegurar redundancia: %+v: %v",resultado,err) }
 	if resultado.FactorVerificado != 2 || len(resultado.Resultados) != 1 || !resultado.Resultados[0].Confirmada {
