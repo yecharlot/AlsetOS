@@ -162,7 +162,7 @@ func (rt *Runtime) Restore() error {
 	if snapshot.AssemblyFingerprint != "" && snapshot.AssemblyFingerprint != huellaEnsamblaje(rt.RootCIDs) {
 		return fmt.Errorf("snapshot incompatible: huella del ensamblaje no coincide")
 	}
-	if snapshot.Bindings != nil && !jsonIgual(snapshot.Bindings, rt.Assembly.Bindings) {
+	if snapshot.Bindings != nil && !bindingsIgual(snapshot.Bindings, rt.Assembly.Bindings) {
 		return fmt.Errorf("snapshot incompatible: bindings distintos")
 	}
 	// Una instantánea nunca puede elevar o sustituir la autoridad cargada.
@@ -201,10 +201,12 @@ func decodificarSnapshot(encoded []byte) (runtimeSnapshot, bool, error) {
 		if envelope.Version != VersionSnapshot { return runtimeSnapshot{}, false, fmt.Errorf("versión de snapshot no soportada: %d", envelope.Version) }
 		if envelope.Algorithm != "sha256" { return runtimeSnapshot{}, false, fmt.Errorf("algoritmo de checksum no soportado: %s", envelope.Algorithm) }
 		if !json.Valid(raw) { return runtimeSnapshot{}, false, fmt.Errorf("payload del snapshot inválido") }
-		sum := sha256.Sum256(raw)
-		if hex.EncodeToString(sum[:]) != envelope.Checksum { return runtimeSnapshot{}, false, fmt.Errorf("checksum del snapshot no coincide") }
 		var snapshot runtimeSnapshot
 		if err := json.Unmarshal(raw, &snapshot); err != nil { return runtimeSnapshot{}, false, fmt.Errorf("payload incompatible: %w", err) }
+		canonical, err := json.Marshal(snapshot)
+		if err != nil { return runtimeSnapshot{}, false, fmt.Errorf("canonicalizar payload: %w", err) }
+		sum := sha256.Sum256(canonical)
+		if hex.EncodeToString(sum[:]) != envelope.Checksum { return runtimeSnapshot{}, false, fmt.Errorf("checksum del snapshot no coincide") }
 		if snapshot.SchemaVersion != envelope.Version { return runtimeSnapshot{}, false, fmt.Errorf("versión interna y externa del snapshot no coinciden") }
 		return normalizarSnapshot(snapshot), false, nil
 	}
@@ -265,6 +267,12 @@ func copiarEvaluaciones(source []EvaluationRecord) []EvaluationRecord {
 		out[i].Payload = append(json.RawMessage(nil), record.Payload...)
 	}
 	return out
+}
+
+func bindingsIgual(a, b []Binding) bool {
+	if len(a) != len(b) { return false }
+	if len(a) == 0 { return true }
+	return jsonIgual(a, b)
 }
 
 func jsonIgual(a, b interface{}) bool {
