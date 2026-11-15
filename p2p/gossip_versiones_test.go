@@ -40,6 +40,7 @@ func crearTrioGossip(t *testing.T) ([]*Nodo, context.Context, context.CancelFunc
 			t.Fatal(err)
 		}
 		nodo := &Nodo{Host: h, Identidad: id, almacen: almacen, versiones: indice}
+		h.SetStreamHandler(ProtocoloOrganismo, nodo.recibirOrganismo)
 		if err := nodo.iniciarGossipVersiones(); err != nil {
 			_ = h.Close()
 			t.Fatal(err)
@@ -112,9 +113,17 @@ func TestGossipSubPropagaAnuncioFirmadoATresNodos(t *testing.T) {
 			t.Fatalf("nodo %d no registró exactamente el descriptor anunciado: %+v", i, versiones)
 		}
 		if i > 0 {
-			disponible, err := nodo.almacen.Disponible(root)
-			if err != nil || disponible {
-				t.Fatalf("nodo %d confundió anuncio con disponibilidad del bloque: disponible=%v err=%v", i, disponible, err)
+			// La recepción del anuncio debe disparar recuperación real y verificada.
+			ticker := time.NewTicker(20 * time.Millisecond)
+			defer ticker.Stop()
+			for {
+				disponible, err := nodo.almacen.Disponible(root)
+				if err != nil { t.Fatalf("nodo %d: comprobar bloque: %v", i, err) }
+				if disponible { break }
+				select {
+				case <-ctx.Done(): t.Fatalf("nodo %d no recuperó el bloque anunciado: %v", i, ctx.Err())
+				case <-ticker.C:
+				}
 			}
 		}
 	}
