@@ -42,6 +42,9 @@ func (nodo *Nodo) AnunciarVersion(ctx context.Context, destino peer.ID, organism
 	if err := nodo.almacen.Guardar(root, contenido); err != nil { return DescriptorVersion{}, "", err }
 	estado, err := nodo.versiones.Registrar(descriptor)
 	if err != nil { return DescriptorVersion{}, "", err }
+	if err := nodo.PublicarAnuncioVersion(ctx, descriptor); err != nil {
+		return descriptor, estado, err
+	}
 	if destino != "" {
 		estadoRemoto, err := nodo.ReplicarDescriptor(ctx, destino, descriptor, contenido)
 		if err != nil { return descriptor, estado, err }
