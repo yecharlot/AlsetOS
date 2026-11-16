@@ -4,7 +4,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/yecharlot/AlsetOS/identidad"
@@ -62,5 +61,4 @@ func TestInventarioReferenciasNoMarcaVersionesComoHuerfanas(t *testing.T) {
 		if item.RootCID == root && (!item.Integro || !item.Referenciado || item.CandidatoSinReferencia) { t.Fatalf("versión referenciada mal clasificada: %+v", item) }
 		if item.RootCID == rootSuelto && (!item.Presente || item.Referenciado || !item.CandidatoSinReferencia) { t.Fatalf("bloque suelto mal clasificado: %+v", item) }
 	}
-	_ = time.Now()
 }
