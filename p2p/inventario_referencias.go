@@ -1,11 +1,13 @@
 package p2p
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 )
 
 // ReferenciaContenido resume las referencias conocidas de un RootCID.
@@ -64,14 +66,14 @@ func (n *Nodo) InventarioReferencias() ([]ReferenciaContenido, error) {
 	for _, root := range roots { obtener(root) }
 	for _, d := range n.versiones.Todas() { obtener(d.RootCID).Versiones++ }
 	if n.retenciones != nil { for _, r := range n.retenciones.Todas() { obtener(r.Descriptor.RootCID).Retenciones++ } }
-	if n.leases != nil { for _, l := range n.leases.ActivosNow() { obtener(l.RootCID).LeasesActivos++ } }
+	if n.leases != nil { for _, l := range n.leases.Activos(time.Now().UTC()) { obtener(l.RootCID).LeasesActivos++ } }
 	n.mu.RLock()
 	for root := range n.organismos { obtener(root).OrganismosLegados++ }
 	n.mu.RUnlock()
 	resultado := make([]ReferenciaContenido, 0, len(porRoot))
 	for _, item := range porRoot {
 		contenido, err := n.almacen.Obtener(item.RootCID)
-		item.Presente = err == nil || err != ErrContenidoNoDisponible
+		item.Presente = err == nil || !errors.Is(err, ErrContenidoNoDisponible)
 		item.Integro = err == nil
 		_ = contenido
 		item.Referenciado = item.Versiones+item.Retenciones+item.LeasesActivos+item.OrganismosLegados > 0
