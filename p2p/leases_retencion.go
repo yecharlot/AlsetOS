@@ -193,7 +193,8 @@ func (n *Nodo) AutorizarRetencionRemota(id peer.ID, cuotaBytes int64) error {
 	if n==nil||n.leases==nil{return fmt.Errorf("gestor de leases no inicializado")}
 	return n.leases.AutorizarPeer(id,cuotaBytes)
 }
-func (n *Nodo) RevocarRetencionRemota(id peer.ID) error { if n==nil||n.leases==nil{return fmt.Errorf("gestor de leases no inicializado")};return n.leases.RevocarPeer(id) }
+func (n *Nodo) RevocarRetencionRemota(id peer.ID) { _ = n.RevocarRetencionRemotaConError(id) }
+func (n *Nodo) RevocarRetencionRemotaConError(id peer.ID) error { if n==nil||n.leases==nil{return fmt.Errorf("gestor de leases no inicializado")};return n.leases.RevocarPeer(id) }
 func (n *Nodo) ConfigurarCapacidadRetencion(bytes int64) error {
 	if n==nil||n.leases==nil{return fmt.Errorf("gestor de leases no inicializado")}
 	return n.leases.ConfigurarCapacidad(bytes)
