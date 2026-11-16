@@ -135,3 +135,31 @@ La autorización por peer y la capacidad configurada son parámetros operativos 
 - No hay reserva remota independiente del nodo que firma el lease ni medición automática del espacio libre del sistema operativo; la capacidad es configurada por el operador.
 - Las cuotas y autorizaciones no se infieren de la firma del autor y no se restauran automáticamente tras reinicio.
 - Liberar o expirar un lease no elimina el bloque; la recolección de basura queda fuera de esta fase.
+
+
+## Fase 14 — Capacidad física, políticas persistentes e inventario de referencias
+
+### Políticas de autorización persistentes
+
+Las autorizaciones por PeerID, cuotas individuales y capacidad lógica global se guardan ahora en `leases-retencion.json.politicas.json`, separadas del registro de compromisos. Cada actualización se escribe de forma atómica y con permisos restrictivos. Al reiniciar, el nodo recupera la configuración; si el archivo existe pero está mal formado, el constructor falla cerrado y no inicia con una política permisiva. La autorización sigue siendo explícita y revocable mediante `RevocarRetencionRemota`. Una revocación impide nuevos compromisos, pero no elimina ni altera leases ya aceptados: estos conservan su vencimiento y deben liberarse o expirar.
+
+### Medición de capacidad
+
+En Linux, `MedirCapacidadRetencion` consulta el sistema de archivos que contiene el almacén de bloques y devuelve capacidad total y disponible. `ConfigurarCapacidadRetencionDisponible` puede establecer como techo lógico el 80% del espacio libre observado, dejando un margen operativo del 20%. Medir no cambia la política; configurar es una acción explícita y persistente. El resultado es una fotografía puntual, no una reserva del sistema operativo ni una garantía frente a otros procesos que consuman disco después. En plataformas sin implementación nativa, la medición devuelve un error explícito; el operador puede seguir configurando una capacidad lógica manual.
+
+### Inventario de referencias
+
+`InventarioReferencias` cruza los RootCID encontrados en el almacén con descriptores del índice de versiones, pins locales, leases vigentes y el índice legado de organismos. Cada entrada informa presencia, integridad y cantidad de referencias por fuente. Un bloque presente sin referencias conocidas queda marcado como `CandidatoSinReferencia`, únicamente para revisión. El inventario no interpreta automáticamente que sea seguro borrarlo: pueden existir referencias externas o metadatos aún no incorporados al índice.
+
+### Límites deliberados
+
+- La medición física disponible en esta fase está implementada para Linux; otras plataformas reciben un error explícito, no una cifra inventada.
+- El techo configurado es una política lógica; no crea cuotas del sistema de archivos ni reserva bloques físicamente.
+- La medición puede quedar obsoleta inmediatamente por actividad concurrente del sistema.
+- Las revocaciones no invalidan leases aceptados previamente.
+- No existe garbage collection. No se borra contenido al liberar pins, revocar peers, liberar leases ni expirar compromisos.
+- Un candidato sin referencia no equivale a huérfano demostrado; la eliminación requiere un futuro protocolo de referencias completas, periodo de gracia, auditoría y recuperación.
+
+### Pruebas
+
+Se prueban persistencia y revocación de políticas tras reinicio, rechazo fail-closed de configuración corrupta, medición de capacidad del sistema de archivos e inventario que distingue una versión referenciada de un bloque almacenado sin referencias conocidas.
