@@ -91,10 +91,10 @@ func NuevoGestorLeases(ruta string) (*GestorLeases,error) {
 	if ruta!="" { g.rutaPoliticas=ruta+".politicas.json" }
 	if ruta=="" { return g,nil }
 	b,err:=os.ReadFile(ruta)
-	if os.IsNotExist(err) { return g,nil }
-	if err!=nil { return nil,err }
-	if len(b)==0 { return g,nil }
-	if err:=json.Unmarshal(b,&g.leases);err!=nil{return nil,fmt.Errorf("leer leases de retención: %w",err)}
+	if err!=nil && !os.IsNotExist(err) { return nil,err }
+	if err==nil && len(b)>0 {
+		if err:=json.Unmarshal(b,&g.leases);err!=nil{return nil,fmt.Errorf("leer leases de retención: %w",err)}
+	}
 	if g.leases==nil { g.leases=map[string]LeaseRetencion{} }
 	for id,l:=range g.leases {
 		if id!=l.ID || l.Schema!=EsquemaLeaseRetencion || l.Bytes<=0 || l.Expira.IsZero() || !verificarFirmaLease(l) {
