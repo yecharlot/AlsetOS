@@ -463,3 +463,22 @@ Se modifica `AsegurarRedundancia`: cuenta la copia local y solo leases remotos a
 ### Pruebas
 
 Se incorporan pruebas de denegación por defecto, aceptación tras autorización explícita, validación de firma, persistencia, cuota/capacidad, renovación, liberación, expiración y contabilización de redundancia mediante leases vigentes. La suite de CI debe verificar también los escenarios previos de persistencia, reparación y replicación P2P.
+
+
+## Fase 14 — Capacidad física, políticas persistentes e inventario de referencias
+
+La Fase 14 cierra parte de la brecha operativa detectada en los leases de la Fase 13. Las autorizaciones, cuotas y capacidad lógica dejan de depender exclusivamente de memoria de proceso: se persisten en un archivo de política separado del registro de leases, mediante escritura atómica. La carga valida schema, PeerID y cuotas; si encuentra una política corrupta, falla cerrada. La revocación afecta nuevas solicitudes, no reescribe retroactivamente los compromisos firmados que ya están vigentes.
+
+En Linux, el nodo puede medir el tamaño y espacio disponible del sistema de archivos que contiene el almacén de bloques. La operación de medición es de solo lectura. Una operación separada permite configurar como capacidad lógica hasta el 80% del espacio libre observado, conservando un margen del 20%. Esta cifra no reserva espacio físico y puede quedar obsoleta por escrituras de otros procesos. En otras plataformas la medición devuelve un error explícito; la capacidad manual sigue disponible.
+
+El nuevo inventario cruza bloques locales con descriptores de versión, políticas de pinning, leases vigentes y el índice legado de organismos. Informa si el bloque está presente y si pasa la verificación RootCID. Los bloques presentes sin referencias conocidas se clasifican como candidatos a revisión manual, no como datos seguros para eliminar.
+
+**No se incorpora garbage collection.** No se borra contenido al liberar o expirar leases, liberar pins o revocar autorizaciones. La firma de un descriptor, la ausencia de referencias en los índices actuales y una medición de espacio libre no bastan para demostrar que el bloque es descartable.
+
+### Pruebas incorporadas
+
+- Persistencia de autorizaciones y cuotas al reconstruir el gestor.
+- Persistencia de la revocación.
+- Fallo cerrado ante política persistida corrupta.
+- Medición del sistema de archivos y cálculo del margen reservable.
+- Inventario que mantiene como referenciada una versión indexada y marca un bloque sin referencias conocidas como candidato no eliminable.
