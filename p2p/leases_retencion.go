@@ -80,6 +80,7 @@ type respuestaLease struct {
 type GestorLeases struct {
 	mu sync.RWMutex
 	ruta string
+	rutaPoliticas string
 	leases map[string]LeaseRetencion
 	permitidos map[string]int64
 	capacidad int64
@@ -87,6 +88,7 @@ type GestorLeases struct {
 
 func NuevoGestorLeases(ruta string) (*GestorLeases,error) {
 	g:=&GestorLeases{ruta:ruta,leases:map[string]LeaseRetencion{},permitidos:map[string]int64{}}
+	if ruta!="" { g.rutaPoliticas=ruta+".politicas.json" }
 	if ruta=="" { return g,nil }
 	b,err:=os.ReadFile(ruta)
 	if os.IsNotExist(err) { return g,nil }
@@ -99,7 +101,31 @@ func NuevoGestorLeases(ruta string) (*GestorLeases,error) {
 			return nil,fmt.Errorf("lease persistido inválido: %s",id)
 		}
 	}
+	if g.rutaPoliticas!="" {
+		pb,pe:=os.ReadFile(g.rutaPoliticas)
+		if pe!=nil && !os.IsNotExist(pe) { return nil,fmt.Errorf("leer políticas de retención: %w",pe) }
+		if pe==nil && len(pb)>0 {
+			var p politicasRetencionPersistidas
+			if err:=json.Unmarshal(pb,&p);err!=nil{return nil,fmt.Errorf("decodificar políticas de retención: %w",err)}
+			if p.Schema!="alset.retention-policy.v1" || p.Capacidad<0 { return nil,fmt.Errorf("política de retención persistida inválida") }
+			for id,cuota:=range p.Permitidos { if _,err:=peer.Decode(id);err!=nil||cuota<=0{return nil,fmt.Errorf("autorización persistida inválida para peer %q",id)} }
+			g.capacidad=p.Capacidad;g.permitidos=p.Permitidos
+			if g.permitidos==nil { g.permitidos=map[string]int64{} }
+		}
+	}
 	return g,nil
+}
+
+type politicasRetencionPersistidas struct { Schema string `json:"schema"`; Capacidad int64 `json:"capacidad_bytes"`; Permitidos map[string]int64 `json:"permitidos"` }
+
+func (g *GestorLeases) persistirPoliticasLocked() error {
+	if g.rutaPoliticas=="" { return nil }
+	p:=politicasRetencionPersistidas{Schema:"alset.retention-policy.v1",Capacidad:g.capacidad,Permitidos:g.permitidos}
+	b,err:=json.MarshalIndent(p,"","  ");if err!=nil{return err}
+	dir:=filepath.Dir(g.rutaPoliticas);if err:=os.MkdirAll(dir,0700);err!=nil{return err}
+	f,err:=os.CreateTemp(dir,".politicas-retencion-*");if err!=nil{return err};name:=f.Name();ok:=false
+	defer func(){if !ok{_ = os.Remove(name)}}()
+	if err:=f.Chmod(0600);err!=nil{_ = f.Close();return err};if _,err:=f.Write(b);err!=nil{_ = f.Close();return err};if err:=f.Sync();err!=nil{_ = f.Close();return err};if err:=f.Close();err!=nil{return err};if err:=os.Rename(name,g.rutaPoliticas);err!=nil{return err};if d,err:=os.Open(dir);err==nil{_ = d.Sync();_ = d.Close()};ok=true;return nil
 }
 
 // AutorizarPeer es una decisión local explícita. La autorización no se deriva
@@ -107,17 +133,17 @@ func NuevoGestorLeases(ruta string) (*GestorLeases,error) {
 func (g *GestorLeases) AutorizarPeer(id peer.ID, cuota int64) error {
 	if g==nil || id=="" || cuota<=0{return fmt.Errorf("peer o cuota de retención inválidos")}
 	g.mu.Lock();defer g.mu.Unlock()
-	g.permitidos[id.String()]=cuota
-	return nil
+	anterior,existia:=g.permitidos[id.String()];g.permitidos[id.String()]=cuota
+	if err:=g.persistirPoliticasLocked();err!=nil{if existia{g.permitidos[id.String()]=anterior}else{delete(g.permitidos,id.String())};return err};return nil
 }
-func (g *GestorLeases) RevocarPeer(id peer.ID) {
-	if g==nil{return};g.mu.Lock();delete(g.permitidos,id.String());g.mu.Unlock()
+func (g *GestorLeases) RevocarPeer(id peer.ID) error {
+	if g==nil{return nil};g.mu.Lock();defer g.mu.Unlock();anterior,ok:=g.permitidos[id.String()];if !ok{return nil};delete(g.permitidos,id.String());if err:=g.persistirPoliticasLocked();err!=nil{g.permitidos[id.String()]=anterior;return err};return nil
 }
 func (g *GestorLeases) ConfigurarCapacidad(bytes int64) error {
 	if g==nil||bytes<=0{return fmt.Errorf("capacidad de retención debe ser positiva")}
 	g.mu.Lock();defer g.mu.Unlock()
 	if g.usadosLocked(time.Now().UTC())>bytes{return fmt.Errorf("la capacidad nueva es menor que el almacenamiento comprometido")}
-	g.capacidad=bytes;return nil
+	anterior:=g.capacidad;g.capacidad=bytes;if err:=g.persistirPoliticasLocked();err!=nil{g.capacidad=anterior;return err};return nil
 }
 func (g *GestorLeases) usadosLocked(ahora time.Time) int64 {
 	var total int64
@@ -167,7 +193,7 @@ func (n *Nodo) AutorizarRetencionRemota(id peer.ID, cuotaBytes int64) error {
 	if n==nil||n.leases==nil{return fmt.Errorf("gestor de leases no inicializado")}
 	return n.leases.AutorizarPeer(id,cuotaBytes)
 }
-func (n *Nodo) RevocarRetencionRemota(id peer.ID) { if n!=nil&&n.leases!=nil{n.leases.RevocarPeer(id)} }
+func (n *Nodo) RevocarRetencionRemota(id peer.ID) error { if n==nil||n.leases==nil{return fmt.Errorf("gestor de leases no inicializado")};return n.leases.RevocarPeer(id) }
 func (n *Nodo) ConfigurarCapacidadRetencion(bytes int64) error {
 	if n==nil||n.leases==nil{return fmt.Errorf("gestor de leases no inicializado")}
 	return n.leases.ConfigurarCapacidad(bytes)
