@@ -108,7 +108,7 @@ func NuevoGestorLeases(ruta string) (*GestorLeases,error) {
 			var p politicasRetencionPersistidas
 			if err:=json.Unmarshal(pb,&p);err!=nil{return nil,fmt.Errorf("decodificar políticas de retención: %w",err)}
 			if p.Schema!="alset.retention-policy.v1" || p.Capacidad<0 { return nil,fmt.Errorf("política de retención persistida inválida") }
-			for id,cuota:=range p.Permitidos { if _,err:=peer.Decode(id);err!=nil||cuota<=0{return nil,fmt.Errorf("autorización persistida inválida para peer %q",id)} }
+			for id,cuota:=range p.Permitidos { if err:=(peer.ID(id)).Validate();err!=nil||cuota<=0{return nil,fmt.Errorf("autorización persistida inválida para peer %q",id)} }
 			g.capacidad=p.Capacidad;g.permitidos=p.Permitidos
 			if g.permitidos==nil { g.permitidos=map[string]int64{} }
 		}
