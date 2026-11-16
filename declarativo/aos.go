@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/yecharlot/AlsetOS/lispai"
+	"github.com/yecharlot/AlsetOS/relacion"
 )
 
 // UINode IR de interfaz declarativa (la UI también es organismo / orge).
@@ -285,6 +286,10 @@ func compileOrge(flow *FlowAOS, list []lispai.AOSNode) error {
 				}
 				org.InitialState[fmt.Sprint(sl[0])] = parseValue(sl[1])
 			}
+		case "relacion", "relation":
+			rel, err := compileRelacion(oid, l)
+			if err != nil { return fmt.Errorf("AOS orge %s: %w", name, err) }
+			org.Relations = append(org.Relations, rel)
 		case "rule":
 			rule, err := compileRule(l)
 			if err != nil {
@@ -368,6 +373,28 @@ func compileCond(n lispai.AOSNode) (Condition, error) {
 	return c, nil
 }
 
+
+
+func compileRelacion(origen string, l []lispai.AOSNode) (relacion.Relacion, error) {
+	if len(l) < 2 { return relacion.Relacion{}, fmt.Errorf("(relacion id (destino …) (tipo …))") }
+	r := relacion.Relacion{ID: fmt.Sprint(l[1]), Origen: origen, Evidencia: relacion.EvidenciaDesconocida}
+	for _, item := range l[2:] {
+		f, ok := item.([]lispai.AOSNode)
+		if !ok || len(f) == 0 { return relacion.Relacion{}, fmt.Errorf("campo de relación inválido") }
+		value := ""; if len(f) > 1 { value = fmt.Sprint(f[1]) }
+		switch strings.ToLower(fmt.Sprint(f[0])) {
+		case "destino", "to": r.Destino = oidFor(value)
+		case "tipo", "type": r.Tipo = value
+		case "direccion", "direction": r.Direccion = value
+		case "temporalidad", "temporality": r.Temporalidad = value
+		case "evidencia", "evidence": r.Evidencia = relacion.Evidencia(value)
+		case "condiciones", "conditions": for _, c := range f[1:] { r.Condiciones = append(r.Condiciones, fmt.Sprint(c)) }
+		default: return relacion.Relacion{}, fmt.Errorf("campo de relación desconocido: %s", f[0])
+		}
+	}
+	if err := r.Validar(); err != nil { return relacion.Relacion{}, err }
+	return r, nil
+}
 
 // mergeUIProp guarda una propiedad visual en el nodo (órgano UI).
 func mergeUIProp(node *UINode, key, val string) {

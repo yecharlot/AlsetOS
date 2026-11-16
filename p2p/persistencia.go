@@ -43,13 +43,18 @@ func guardarOrganismos(ruta string, organismos map[string][]byte) error {
 		return fmt.Errorf("crear directorio del almacén: %w", err)
 	}
 
-	temporal := ruta + ".tmp"
-	if err := os.WriteFile(temporal, contenido, 0600); err != nil {
-		return fmt.Errorf("escribir almacén temporal: %w", err)
-	}
-	if err := os.Rename(temporal, ruta); err != nil {
-		return fmt.Errorf("confirmar almacén de organismos: %w", err)
-	}
+	temporal, err := os.CreateTemp(dirRuta(ruta), ".organismos-*")
+	if err != nil { return fmt.Errorf("crear almacén temporal: %w", err) }
+	nombreTemporal := temporal.Name()
+	confirmado := false
+	defer func() { if !confirmado { _ = os.Remove(nombreTemporal) } }()
+	if err := temporal.Chmod(0600); err != nil { _ = temporal.Close(); return err }
+	if _, err := temporal.Write(contenido); err != nil { _ = temporal.Close(); return fmt.Errorf("escribir almacén temporal: %w", err) }
+	if err := temporal.Sync(); err != nil { _ = temporal.Close(); return fmt.Errorf("sincronizar almacén temporal: %w", err) }
+	if err := temporal.Close(); err != nil { return fmt.Errorf("cerrar almacén temporal: %w", err) }
+	if err := os.Rename(nombreTemporal, ruta); err != nil { return fmt.Errorf("confirmar almacén de organismos: %w", err) }
+	if directorio, err := os.Open(dirRuta(ruta)); err == nil { _ = directorio.Sync(); _ = directorio.Close() }
+	confirmado = true
 	return nil
 }
 

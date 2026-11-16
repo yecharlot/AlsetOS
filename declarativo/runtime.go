@@ -6,12 +6,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
+	"sort"
 	"sync"
 	"time"
 
 	"github.com/yecharlot/AlsetOS/identidad"
 	"github.com/yecharlot/AlsetOS/organismo"
+	"github.com/yecharlot/AlsetOS/relacion"
 )
 
 // AuditEntry registro de interacciones y transiciones.
@@ -44,6 +45,7 @@ type Runtime struct {
 	Caps      map[string]map[string]bool      // OID → cap set (copia autorizada)
 	RootCIDs  map[string]string
 	Audit     []AuditEntry
+	Evaluations []EvaluationRecord
 	seenNonce map[string]bool
 	nodeID    *identidad.Identidad
 	DataDir   string
@@ -120,7 +122,75 @@ func (rt *Runtime) LoadAssembly(decls []OrgDecl) error {
 	for _, b := range asm.Bindings {
 		rt.audit("bind", b.ConsumerOID, b.Reason, b.ProviderOID+"|"+b.Contract)
 	}
+	// El grafo se incorpora como contexto consultable; no activa operaciones ni permisos.
+	perfil := asm.Relations.Perfil()
+	rt.audit("relation_graph_loaded", "", fmt.Sprintf("nodos=%d relaciones=%d", perfil.Nodos, perfil.Relaciones), "")
 	return nil
+}
+
+
+
+// ContextoRelacional es una vista de solo lectura de las relaciones incidentes
+// de un organismo dentro del ensamblaje actual.
+type ContextoRelacional struct {
+	OID       string               `json:"oid"`
+	Salientes []relacion.Relacion  `json:"salientes"`
+	Entrantes []relacion.Relacion  `json:"entrantes"`
+}
+
+// RelationalContext devuelve relaciones entrantes y salientes de un organismo.
+// No infiere causalidad ni activa reglas: entrega hechos declarados y validados.
+func (rt *Runtime) RelationalContext(oid string) (ContextoRelacional, error) {
+	rt.mu.Lock()
+	defer rt.mu.Unlock()
+	if rt.Assembly == nil || rt.Assembly.Relations == nil {
+		return ContextoRelacional{}, fmt.Errorf("sin ensamblaje relacional")
+	}
+	if _, ok := rt.Assembly.Orgs[oid]; !ok {
+		return ContextoRelacional{}, fmt.Errorf("organismo desconocido: %s", oid)
+	}
+	_, all := rt.Assembly.Relations.Copia()
+	ctx := ContextoRelacional{OID: oid, Salientes: []relacion.Relacion{}, Entrantes: []relacion.Relacion{}}
+	for _, rel := range all {
+		rel = copiarRelacion(rel)
+		if rel.Origen == oid { ctx.Salientes = append(ctx.Salientes, rel) }
+		if rel.Destino == oid { ctx.Entrantes = append(ctx.Entrantes, rel) }
+	}
+	return ctx, nil
+}
+
+// RelatedOrganisms devuelve los OID vecinos directos, sin atribuirles
+// dependencia causal, prioridad ni autoridad.
+func (rt *Runtime) RelatedOrganisms(oid string) ([]string, error) {
+	ctx, err := rt.RelationalContext(oid)
+	if err != nil { return nil, err }
+	set := map[string]bool{}
+	for _, rel := range ctx.Salientes { set[rel.Destino] = true }
+	for _, rel := range ctx.Entrantes { set[rel.Origen] = true }
+	out := make([]string, 0, len(set))
+	for id := range set { out = append(out, id) }
+	sort.Strings(out)
+	return out, nil
+}
+
+// RelationalProfile devuelve un perfil descriptivo del grafo cargado.
+func (rt *Runtime) RelationalProfile() (relacion.Perfil, error) {
+	rt.mu.Lock()
+	defer rt.mu.Unlock()
+	if rt.Assembly == nil || rt.Assembly.Relations == nil {
+		return relacion.Perfil{}, fmt.Errorf("sin ensamblaje relacional")
+	}
+	return rt.Assembly.Relations.Perfil(), nil
+}
+
+func copiarRelacion(r relacion.Relacion) relacion.Relacion {
+	out := r
+	out.Condiciones = append([]string(nil), r.Condiciones...)
+	if r.Meta != nil {
+		out.Meta = make(map[string]string, len(r.Meta))
+		for k, v := range r.Meta { out.Meta[k] = v }
+	}
+	return out
 }
 
 // HasCap verificación de capacidad (identidad ≠ autoridad).
@@ -238,57 +308,6 @@ func (rt *Runtime) SetState(path string, v interface{}) {
 
 func (rt *Runtime) GetState(path string) (interface{}, bool) {
 	return rt.State.Get(path)
-}
-
-// Persist guarda snapshot + audit + bindings.
-func (rt *Runtime) Persist() error {
-	rt.mu.Lock()
-	defer rt.mu.Unlock()
-	if rt.DataDir == "" {
-		return fmt.Errorf("DataDir vacío")
-	}
-	doc := map[string]interface{}{
-		"atoms":     rt.State.Snapshot(),
-		"root_cids": rt.RootCIDs,
-		"bindings":  rt.Assembly.Bindings,
-		"audit":     rt.Audit,
-		"history":   rt.State.HistoryCopy(),
-		"caps":      rt.Caps,
-	}
-	b, err := json.MarshalIndent(doc, "", "  ")
-	if err != nil {
-		return err
-	}
-	path := filepath.Join(rt.DataDir, "runtime_state.json")
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, b, 0o600); err != nil {
-		return err
-	}
-	return os.Rename(tmp, path)
-}
-
-// Restore carga estado persistido (átomos y audit); requiere LoadAssembly previo o concurrente.
-func (rt *Runtime) Restore() error {
-	rt.mu.Lock()
-	defer rt.mu.Unlock()
-	path := filepath.Join(rt.DataDir, "runtime_state.json")
-	b, err := os.ReadFile(path)
-	if err != nil {
-		return err
-	}
-	var doc struct {
-		Atoms map[string]interface{} `json:"atoms"`
-		Audit []AuditEntry           `json:"audit"`
-	}
-	if err := json.Unmarshal(b, &doc); err != nil {
-		return err
-	}
-	for k, v := range doc.Atoms {
-		rt.State.Atoms[k] = v
-	}
-	rt.Audit = append(rt.Audit, doc.Audit...)
-	rt.audit("restore", "", "estado recuperado", path)
-	return nil
 }
 
 // ProviderOID devuelve el provider resuelto para un contrato del consumer.

@@ -2,11 +2,14 @@ package p2p
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"path/filepath"
 	"sync"
 	"time"
 
 	libp2p "github.com/libp2p/go-libp2p"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	libp2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
@@ -33,7 +36,21 @@ type Nodo struct {
 	conocidos       map[peer.ID]peer.AddrInfo
 	organismos      map[string][]byte
 	rutaOrganismos  string
+	almacen         *AlmacenContenido
+	retenciones     *GestorRetencion
+	leases          *GestorLeases
+	cancelarMantenimiento context.CancelFunc
+	mantenimientoDone chan struct{}
+	versiones       *IndiceVersiones
+	gossip          *pubsub.PubSub
+	topicVersiones  *pubsub.Topic
+	suscripcionVersiones *pubsub.Subscription
+	cancelarGossip  context.CancelFunc
+	gossipDone      chan struct{}
+	colaRecuperacion chan solicitudRecuperacionVersion
+	recuperacionDone chan struct{}
 	ultimoLatido    map[peer.ID]time.Time
+	cancelarNotificaciones func()
 }
 
 type descubrimiento struct{ nodo *Nodo }
@@ -79,6 +96,28 @@ func NuevoConEstado(identidadNodo *identidad.Identidad, escuchar, rutaOrganismos
 		_ = h.Close()
 		return nil, err
 	}
+	rutaBloques := ""
+	if rutaOrganismos != "" { rutaBloques = filepath.Join(filepath.Dir(rutaOrganismos), "bloques") }
+	almacen, err := NuevoAlmacenContenido(rutaBloques)
+	if err != nil { _ = h.Close(); return nil, err }
+	for root, contenido := range organismos {
+		if err := almacen.Guardar(root, contenido); err != nil {
+			_ = h.Close()
+			return nil, fmt.Errorf("validar organismo persistido %s: %w", root, err)
+		}
+	}
+	rutaVersiones := ""
+	if rutaOrganismos != "" { rutaVersiones = filepath.Join(filepath.Dir(rutaOrganismos), "versiones.json") }
+	versiones, err := NuevoIndiceVersiones(rutaVersiones)
+	if err != nil { _ = h.Close(); return nil, err }
+	rutaRetenciones := ""
+	if rutaOrganismos != "" { rutaRetenciones = filepath.Join(filepath.Dir(rutaOrganismos), "retenciones.json") }
+	retenciones, err := NuevoGestorRetencion(rutaRetenciones)
+	if err != nil { _ = h.Close(); return nil, err }
+	rutaLeases := ""
+	if rutaOrganismos != "" { rutaLeases = filepath.Join(filepath.Dir(rutaOrganismos), "leases-retencion.json") }
+	leases, err := NuevoGestorLeases(rutaLeases)
+	if err != nil { _ = h.Close(); return nil, err }
 
 	nodo := &Nodo{
 		Host:           h,
@@ -87,24 +126,38 @@ func NuevoConEstado(identidadNodo *identidad.Identidad, escuchar, rutaOrganismos
 		conocidos:      make(map[peer.ID]peer.AddrInfo),
 		organismos:     organismos,
 		rutaOrganismos: rutaOrganismos,
+		almacen: almacen,
+		retenciones: retenciones,
+		leases: leases,
+		versiones: versiones,
 		ultimoLatido:   make(map[peer.ID]time.Time),
+	}
+
+	if err := nodo.iniciarGossipVersiones(); err != nil {
+		_ = nodo.Cerrar()
+		return nil, err
 	}
 
 	h.SetStreamHandler(ProtocoloPulse, nodo.recibirPulso)
 	h.SetStreamHandler(ProtocoloOrganismo, nodo.recibirOrganismo)
+	h.SetStreamHandler(ProtocoloVersion, nodo.recibirVersion)
+	h.SetStreamHandler(ProtocoloSincronizacionVersiones, nodo.recibirSolicitudSincronizacion)
+	h.SetStreamHandler(ProtocoloDisponibilidad, nodo.recibirConsultaDisponibilidad)
+	h.SetStreamHandler(ProtocoloLeaseRetencion, nodo.recibirSolicitudLease)
 
 	servicio := mdns.NewMdnsService(h, "_alset._tcp", &descubrimiento{nodo: nodo})
 	if err := servicio.Start(); err != nil {
-		_ = h.Close()
+		_ = nodo.Cerrar()
 		return nil, fmt.Errorf("iniciar descubrimiento mDNS: %w", err)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := iniciarDHT(ctx, nodo); err != nil {
-		_ = h.Close()
+		_ = nodo.Cerrar()
 		return nil, err
 	}
+	nodo.iniciarSincronizacionReconexiones()
 
 	return nodo, nil
 }
@@ -133,10 +186,11 @@ func (nodo *Nodo) ReanunciarOrganismos(ctx context.Context) error {
 	nodo.mu.RUnlock()
 
 	for root := range copia {
-		clave, err := CIDRoot(root)
-		if err != nil {
-			return err
+		if _, err := nodo.almacen.Obtener(root); err != nil {
+			return fmt.Errorf("no se puede reanunciar contenido no disponible o corrupto %s: %w", root, err)
 		}
+		clave, err := CIDRoot(root)
+		if err != nil { return err }
 		if err := nodo.DHT.Provide(ctx, clave, true); err != nil {
 			return fmt.Errorf("reanunciar %s: %w", root, err)
 		}
@@ -252,11 +306,34 @@ func (nodo *Nodo) Direcciones() []string {
 }
 
 func (nodo *Nodo) Cerrar() error {
+ if nodo == nil { return nil }
+ var errores []error
+ if nodo.cancelarNotificaciones != nil {
+  nodo.cancelarNotificaciones()
+  nodo.cancelarNotificaciones = nil
+ }
+ if nodo.cancelarMantenimiento != nil {
+  nodo.cancelarMantenimiento()
+  if nodo.mantenimientoDone != nil { <-nodo.mantenimientoDone }
+  nodo.cancelarMantenimiento = nil
+ }
+ if nodo.cancelarGossip != nil {
+  nodo.cancelarGossip()
+  if nodo.suscripcionVersiones != nil { nodo.suscripcionVersiones.Cancel() }
+  if nodo.gossipDone != nil { <-nodo.gossipDone }
+  if nodo.recuperacionDone != nil { <-nodo.recuperacionDone }
+  nodo.cancelarGossip = nil
+ }
  if nodo.DHT != nil {
-  if err := nodo.DHT.Close(); err != nil { return err }
+  if err := nodo.DHT.Close(); err != nil { errores = append(errores, fmt.Errorf("cerrar DHT: %w", err)) }
+  nodo.DHT = nil
  }
  if nodo.datastore != nil {
-  if err := nodo.datastore.Close(); err != nil { return err }
+  if err := nodo.datastore.Close(); err != nil { errores = append(errores, fmt.Errorf("cerrar datastore: %w", err)) }
+  nodo.datastore = nil
  }
- return nodo.Host.Close()
+ if nodo.Host != nil {
+  if err := nodo.Host.Close(); err != nil { errores = append(errores, fmt.Errorf("cerrar host: %w", err)) }
+ }
+ return errors.Join(errores...)
 }
